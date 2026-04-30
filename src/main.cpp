@@ -775,10 +775,12 @@ void loop()
           //send depth
           if (changed) {
             SendCommand(DEPTH, depth, OSSM_ID);
+            SendCommand(STROKE, stroke, OSSM_ID);
           }
         }else if(lv_slider_get_value(ui_homedepthslider) != depth){
             depth = lv_slider_get_value(ui_homedepthslider);
             SendCommand(DEPTH, depth, OSSM_ID);
+            SendCommand(STROKE, stroke, OSSM_ID);
         }
         char depth_v[7];
         dtostrf(depth, 6, 0, depth_v);
@@ -820,6 +822,7 @@ void loop()
           //send stroke
           if (changed) {
             SendCommand(STROKE, stroke, OSSM_ID);
+            SendCommand(DEPTH, depth, OSSM_ID);
           }
 
         } else if(lv_slider_get_left_value(ui_homestrokeslider) != depth - stroke){
@@ -827,6 +830,7 @@ void loop()
             SendCommand(STROKE, stroke, OSSM_ID);
         } else if(lv_slider_get_value(ui_homestrokeslider) != depth){
             depth = lv_slider_get_value(ui_homestrokeslider);
+            SendCommand(DEPTH, depth, OSSM_ID);
             SendCommand(DEPTH, depth, OSSM_ID);
         }
 
