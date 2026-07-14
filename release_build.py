@@ -1,9 +1,19 @@
+"""Build full-install firmware artifacts for every supported Redux variant.
+
+The generated web-flasher manifests install merged images at offset zero. The
+merged images overwrite stored settings even when the optional full-device
+erase is not selected.
+"""
+
+import hashlib
 import json
-import re
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+from scripts.project_metadata import firmware_stem, load_project_metadata
 
 
 ENVS = [
@@ -12,14 +22,15 @@ ENVS = [
 ]
 
 CHARGE_CURRENTS = [
-    100,
+    500,
     1000,
 ]
 
-CONFIG_FILE = Path("src/config.h")
-
-OUTPUT_DIR = Path("build/release")
-FIRMWARE_DIR = Path("build/firmware")
+PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_CONFIG = PROJECT_DIR / "platformio.ini"
+OUTPUT_DIR = PROJECT_DIR / "build" / "release"
+FIRMWARE_DIR = PROJECT_DIR / "build" / "firmware"
+CHARGE_CURRENT_ENV = "OSSM_CHARGE_CURRENT_MA"
 
 
 def find_platformio():
@@ -42,80 +53,24 @@ def find_platformio():
     )
 
 
-import shutil
-
-PIO_EXE = find_platformio()
-
-
-def run_platformio(args):
-    command = [PIO_EXE] + args
+def run_platformio(pio_exe, args, charge_current):
+    command = [pio_exe] + args
+    child_env = os.environ.copy()
+    child_env[CHARGE_CURRENT_ENV] = str(charge_current)
 
     print("")
     print("Running: " + " ".join(command))
+    print(f"{CHARGE_CURRENT_ENV}={charge_current}")
 
-    result = subprocess.run(command, shell=False)
+    result = subprocess.run(
+        command,
+        shell=False,
+        env=child_env,
+        cwd=PROJECT_DIR,
+    )
 
     if result.returncode != 0:
         raise RuntimeError("Command failed: " + " ".join(command))
-
-
-def patch_charge_current(value):
-    text = CONFIG_FILE.read_text(encoding="utf-8")
-
-    pattern = re.compile(
-        r"^(\s*#\s*define\s+BATTERY_CHARGE_CURRENT\s+)(\d+)(.*)$",
-        flags=re.MULTILINE,
-    )
-
-    new_text, count = pattern.subn(
-        rf"\g<1>{value}\g<3>",
-        text,
-        count=1,
-    )
-
-    if count == 0:
-        raise RuntimeError(
-            "Could not find an active '#define BATTERY_CHARGE_CURRENT ...' in "
-            + str(CONFIG_FILE)
-        )
-
-    CONFIG_FILE.write_text(new_text, encoding="utf-8")
-
-
-def read_flag(flag):
-    text = CONFIG_FILE.read_text(encoding="utf-8")
-
-    pattern = re.compile(
-        r"^\s*#\s*define\s+"
-        + re.escape(flag)
-        + r'\s+"?([^"\s]+)"?',
-        flags=re.MULTILINE,
-    )
-
-    match = pattern.search(text)
-
-    if match:
-        return match.group(1)
-
-    return None
-
-
-def get_app_version_from_config():
-    app_version = read_flag("APP_VERSION")
-
-    if app_version:
-        return app_version.replace("V", "").replace("v", "")
-
-    return "2.2.0"
-
-
-def get_app_name_from_config():
-    app_name = read_flag("APP_NAME")
-
-    if app_name:
-        return app_name
-
-    return "OSSM-M5-Remote"
 
 
 def chip_family_for_env(env_name):
@@ -128,88 +83,53 @@ def chip_family_for_env(env_name):
     raise RuntimeError("Unknown chip family for env: " + env_name)
 
 
-def manifest_short_name_for_env(env_name):
-    if env_name == "m5stack-cores3":
-        return "cores3"
-
-    if env_name == "m5stack-core2":
-        return "core2"
-
-    return env_name
+def intermediate_firmware_path(metadata, env_name):
+    return FIRMWARE_DIR / f"{firmware_stem(metadata, env_name)}.bin"
 
 
-def find_best_firmware_source(env_name):
-    """
-    Prefer release/renamed firmware from rename_fw.py.
-    Fall back to merged-flash.bin from PlatformIO build dir.
-    Last fallback is firmware.bin, but that is app-only and not ideal for webflasher at offset 0.
-    """
+def clear_intermediate_firmware(metadata, env_name):
+    firmware_bin = intermediate_firmware_path(metadata, env_name)
+    firmware_bin.unlink(missing_ok=True)
+    firmware_bin.with_suffix(".md5").unlink(missing_ok=True)
+    firmware_bin.with_suffix(".sha256").unlink(missing_ok=True)
 
-    release_bins = sorted(FIRMWARE_DIR.glob(f"*_{env_name}_*.bin"))
 
-    if release_bins:
-        return release_bins[-1], True
+def require_intermediate_firmware(metadata, env_name):
+    firmware_bin = intermediate_firmware_path(metadata, env_name)
 
-    merged_bin = Path(".pio") / "build" / env_name / "merged-flash.bin"
+    if not firmware_bin.is_file():
+        raise RuntimeError(
+            "Expected merged firmware was not produced: " + str(firmware_bin)
+        )
 
-    if merged_bin.exists():
-        print("")
-        print("WARNING: No renamed release .bin found in build/firmware.")
-        print("Using merged image directly: " + str(merged_bin))
-        return merged_bin, True
+    return firmware_bin
 
-    app_bin = Path(".pio") / "build" / env_name / "firmware.bin"
 
-    if app_bin.exists():
-        print("")
-        print("WARNING: merged-flash.bin not found.")
-        print("Using app-only firmware.bin: " + str(app_bin))
-        print("This is NOT suitable for ESP Web Flasher offset 0.")
-        print("Fix mergeb_bin.py / extra_scripts if you want a full merged image.")
-        return app_bin, False
+def write_sha256(bin_file):
+    sha256_file = bin_file.with_suffix(".sha256")
 
-    raise RuntimeError(
-        "No firmware found for env "
-        + env_name
-        + "\nChecked:\n"
-        + str(FIRMWARE_DIR / f'*_{env_name}_*.bin')
-        + "\n"
-        + str(merged_bin)
-        + "\n"
-        + str(app_bin)
+    with bin_file.open("rb") as firmware:
+        digest = hashlib.sha256(firmware.read()).hexdigest()
+
+    sha256_file.write_text(
+        f"{digest}  {bin_file.name}\n",
+        encoding="utf-8",
     )
+    print("Writing SHA-256: " + str(sha256_file))
 
 
-def find_md5_for_source(source_bin):
-    md5_file = source_bin.with_suffix(".md5")
+def create_webflasher_manifest(metadata, charge_current, firmware_filenames):
+    builds = []
 
-    if md5_file.exists():
-        return md5_file
+    for env_name in ENVS:
+        firmware_filename = firmware_filenames.get(env_name)
 
-    return None
+        if not firmware_filename:
+            raise RuntimeError(
+                f"Missing release firmware for {env_name} at {charge_current} mA"
+            )
 
-
-def create_md5_file(bin_file):
-    import hashlib
-
-    md5_file = bin_file.with_suffix(".md5")
-
-    with open(bin_file, "rb") as f:
-        md5 = hashlib.md5(f.read()).hexdigest()
-
-    with open(md5_file, "w", encoding="utf-8") as f:
-        f.write(md5)
-
-    print("Writing MD5: " + str(md5_file))
-    return md5_file
-
-
-def create_webflasher_manifest(env_name, charge_current, firmware_filename, app_version):
-    manifest = {
-        "name": f"M5-Remote-{charge_current}mAh",
-        "version": f"V{app_version}",
-        "funding_url": "",
-        "builds": [
+        builds.append(
             {
                 "chipFamily": chip_family_for_env(env_name),
                 "parts": [
@@ -219,66 +139,48 @@ def create_webflasher_manifest(env_name, charge_current, firmware_filename, app_
                     }
                 ],
             }
-        ],
+        )
+
+    manifest = {
+        "name": f"{metadata.display_name} - {charge_current} mA charge current",
+        "version": metadata.version,
+        "new_install_prompt_erase": True,
+        "builds": builds,
     }
 
-    short_env = manifest_short_name_for_env(env_name)
-    manifest_file = OUTPUT_DIR / f"manifest_{short_env}_{charge_current}mah.json"
-
-    print("Writing webflasher manifest: " + str(manifest_file))
-
-    with open(manifest_file, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=4)
-
-    return manifest_file
+    manifest_file = OUTPUT_DIR / f"manifest_{charge_current}mA.json"
+    print("Writing web flasher manifest: " + str(manifest_file))
+    manifest_file.write_text(json.dumps(manifest, indent=4) + "\n", encoding="utf-8")
 
 
-def copy_release_files(env_name, charge_current):
-    source_bin, is_merged_image = find_best_firmware_source(env_name)
-
-    app_name = get_app_name_from_config()
-    app_version = get_app_version_from_config()
-    version_for_filename = app_version.replace(".", "-")
-
+def copy_release_files(metadata, env_name, charge_current):
+    source_bin = require_intermediate_firmware(metadata, env_name)
     target_bin = OUTPUT_DIR / (
-        f"{app_name}_{env_name}_{version_for_filename}_charge-{charge_current}mA.bin"
+        f"{firmware_stem(metadata, env_name)}_charge-{charge_current}mA.bin"
     )
 
     print("Copying " + str(source_bin) + " -> " + str(target_bin))
-    shutil.copy(source_bin, target_bin)
-
-    source_md5 = find_md5_for_source(source_bin)
-
-    if source_md5:
-        target_md5 = target_bin.with_suffix(".md5")
-        print("Copying " + str(source_md5) + " -> " + str(target_md5))
-        shutil.copy(source_md5, target_md5)
-    else:
-        create_md5_file(target_bin)
-
-    if not is_merged_image:
-        print("")
-        print("WARNING: Manifest was created for offset 0, but source was app-only firmware.bin.")
-        print("This will probably flash but not boot.")
-        print("You need merged-flash.bin for ESP Web Flasher offset 0.")
-
-    create_webflasher_manifest(
-        env_name=env_name,
-        charge_current=charge_current,
-        firmware_filename=target_bin.name,
-        app_version=app_version,
-    )
+    shutil.copy2(source_bin, target_bin)
+    write_sha256(target_bin)
+    return target_bin.name
 
 
 def main():
-    print("Using PlatformIO: " + PIO_EXE)
+    metadata = load_project_metadata(PROJECT_CONFIG)
+    pio_exe = find_platformio()
 
-    if not CONFIG_FILE.exists():
-        raise RuntimeError("Missing config file: " + str(CONFIG_FILE))
+    print("Using PlatformIO: " + pio_exe)
+    print("Building " + metadata.display_name + " " + metadata.version)
+    print("WARNING: These merged installers overwrite stored settings.")
+    print("The web flasher's optional erase performs an additional full-device erase.")
 
-    original_config = CONFIG_FILE.read_text(encoding="utf-8")
+    if OUTPUT_DIR.exists():
+        shutil.rmtree(OUTPUT_DIR)
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True)
+    firmware_filenames = {
+        charge_current: {} for charge_current in CHARGE_CURRENTS
+    }
 
     try:
         for env_name in ENVS:
@@ -286,22 +188,36 @@ def main():
                 print("")
                 print("========================================")
                 print(
-                    f"Building {env_name} "
-                    f"with BATTERY_CHARGE_CURRENT {charge_current}"
+                    f"Building {env_name} with {charge_current} mA charge current"
                 )
                 print("========================================")
 
-                patch_charge_current(charge_current)
+                clear_intermediate_firmware(metadata, env_name)
+                run_platformio(
+                    pio_exe,
+                    ["run", "-e", env_name, "-t", "clean"],
+                    charge_current,
+                )
+                run_platformio(
+                    pio_exe,
+                    ["run", "-e", env_name],
+                    charge_current,
+                )
+                firmware_filenames[charge_current][env_name] = copy_release_files(
+                    metadata, env_name, charge_current
+                )
 
-                run_platformio(["run", "-e", env_name, "-t", "clean"])
-                run_platformio(["run", "-e", env_name])
-
-                copy_release_files(env_name, charge_current)
-
-    finally:
+        for charge_current in CHARGE_CURRENTS:
+            create_webflasher_manifest(
+                metadata=metadata,
+                charge_current=charge_current,
+                firmware_filenames=firmware_filenames[charge_current],
+            )
+    except BaseException:
         print("")
-        print("Restoring original config.h")
-        CONFIG_FILE.write_text(original_config, encoding="utf-8")
+        print("Removing incomplete release output: " + str(OUTPUT_DIR))
+        shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
+        raise
 
     print("")
     print("Release build completed.")

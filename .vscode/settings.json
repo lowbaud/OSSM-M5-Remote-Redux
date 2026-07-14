@@ -1,8 +1,17 @@
 {
+    "[c]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.formatOnSave": true
+    },
+    "[cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.formatOnSave": true
+    },
     "files.associations": {
         "functional": "cpp",
         "m5core2.h": "c",
         "string": "cpp"
     },
-    "C_Cpp.dimInactiveRegions": false
+    "C_Cpp.dimInactiveRegions": false,
+    "C_Cpp.formatting": "clangFormat"
 }

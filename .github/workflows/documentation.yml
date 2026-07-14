@@ -1,0 +1,71 @@
+name: Deploy documentation
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out current documentation
+        uses: actions/checkout@v6
+
+      - name: Download newest released web flasher bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_tag="$(gh release list \
+            --exclude-drafts \
+            --limit 1 \
+            --json tagName \
+            --jq '.[0].tagName')"
+
+          if [ -z "$release_tag" ] || [ "$release_tag" = "null" ]; then
+            echo "No published release was found."
+            exit 1
+          fi
+
+          release_bundle="web-flasher-${release_tag}.zip"
+          mkdir -p _release _firmware
+          gh release download "$release_tag" \
+            --pattern "$release_bundle" \
+            --dir _release
+          unzip "_release/$release_bundle" -d _firmware
+
+      - name: Assemble Pages site
+        shell: bash
+        run: |
+          mkdir -p _site/web-flasher
+          cp -a docs/. _site/
+          cp -a _firmware/. _site/web-flasher/
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

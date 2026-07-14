@@ -1,0 +1,3 @@
+eez-ui/**
+src/ui/generated/**
+src/lv_conf.h

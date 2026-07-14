@@ -1,4 +1,9 @@
+import subprocess
+
 Import("env")
+
+if env.IsIntegrationDump():
+    Return()
 
 APP_BIN = "$BUILD_DIR/${PROGNAME}.bin"
 MERGED_BIN = "$BUILD_DIR/merged-flash.bin"
@@ -14,21 +19,25 @@ def merge_bin(target, source, env):
 
     flash_size = BOARD_CONFIG.get("upload.flash_size", "16MB")
 
-    cmd = [
-        "$PYTHONEXE",
-        "$OBJCOPY",
+    command = [
+        env.subst("$PYTHONEXE"),
+        env.subst("$OBJCOPY"),
         "--chip",
         BOARD_CONFIG.get("build.mcu", "esp32s3"),
         "merge_bin",
         "-o",
-        MERGED_BIN,
+        env.subst(MERGED_BIN),
         "--flash_mode",
         "keep",
         "--flash_size",
         flash_size,
-    ] + flash_images
+    ] + [env.subst(str(image)) for image in flash_images]
 
-    env.Execute(" ".join(cmd))
+    subprocess.run(
+        command,
+        check=True,
+        cwd=env.subst("$PROJECT_DIR"),
+    )
 
 
 env.AddPostAction(APP_BIN, merge_bin)
