@@ -71,8 +71,11 @@ bool OssmControl::setPattern(int patternId) {
         return true;
     }
 
-    client_.setPattern(patternId);
     values_.pattern = patternId;
+    values_.sensation = 50;
+
+    client_.setPattern(values_.pattern);
+    client_.setSensation(values_.sensation);
     return true;
 }
 
