@@ -12,6 +12,12 @@ come before adding more features.
 **Redux supports the official OSSM BLE firmware, so you no longer need to flash
 custom firmware to the machine.**
 
+<p align="center">
+  <img src="images/redux-remote.jpg"
+       width="700"
+       alt="M5 Remote Redux running on an M5Stack Core2 remote">
+</p>
+
 > [!WARNING]
 > **Work in progress:** This is pre-v1.0 code and may still change significantly. Carefully
 > test all controls and functionality with your specific remote and machine in a safe manner
