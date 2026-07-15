@@ -28,6 +28,17 @@ further down on this page or in the [original repo](https://github.com/ortlof/OS
 
 ## Flashing the firmware
 
+The easiest way to install or update the firmware is with the
+[web flasher](https://lowbaud.github.io/ossm-m5-remote-redux/web-flasher/). Connect the remote via
+USB, open the flasher in a browser that supports Web Serial (such as Chrome or Edge), select the
+battery charge current, and click **Install firmware**. The flasher detects Core2 and CoreS3
+hardware automatically.
+
+Use the recommended 500 mA charge current unless the installed battery is explicitly rated for
+charging at 1000 mA. Flashing resets the remote's saved settings.
+
+To upload the firmware from source instead:
+
 1. Install Visual Studio Code and the PlatformIO extension.
 2. Open this repository in VS Code.
 3. Adjust the charge current if necessary for your battery (see development notes below).
@@ -44,8 +55,6 @@ For CoreS3:
 For Core2:
 
 `pio run -e m5stack-core2 -t upload`
-
-A web-based flasher is not available yet.
 
 ## Using the remote
 
