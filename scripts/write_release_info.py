@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from build_metadata import load_build_metadata
 from project_metadata import load_project_metadata
 
 
@@ -18,8 +19,17 @@ def main():
 
     project_dir = Path(__file__).resolve().parent.parent
     metadata = load_project_metadata(project_dir / "platformio.ini")
+    build_metadata = load_build_metadata(project_dir, metadata.version)
+
+    if build_metadata.available and build_metadata.commit != args.commit:
+        raise RuntimeError(
+            f"Release commit {args.commit} does not match source commit "
+            f"{build_metadata.commit}"
+        )
+
     release_info = {
         "version": metadata.version,
+        "buildVersion": build_metadata.build_version,
         "tag": args.tag,
         "commit": args.commit,
         "channel": args.channel,

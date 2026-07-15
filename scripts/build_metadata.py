@@ -13,6 +13,7 @@ SHORT_COMMIT_LENGTH = 8
 class BuildMetadata:
     commit: str
     short_commit: str
+    build_version: str
     dirty: bool
     available: bool
     release: bool
@@ -34,6 +35,16 @@ def _is_prerelease(version):
     return "-" in version.split("+", 1)[0]
 
 
+def _format_build_version(version, short_commit, dirty, available, release):
+    if release:
+        return f"v{version}"
+
+    separator = "." if "+" in version else "+"
+    provenance = short_commit if available else UNKNOWN_COMMIT
+    dirty_suffix = ".dirty" if available and dirty else ""
+    return f"v{version}{separator}{provenance}{dirty_suffix}"
+
+
 def load_build_metadata(project_dir, version):
     project_dir = Path(project_dir)
 
@@ -50,6 +61,13 @@ def load_build_metadata(project_dir, version):
         return BuildMetadata(
             commit=UNKNOWN_COMMIT,
             short_commit=UNKNOWN_COMMIT,
+            build_version=_format_build_version(
+                version,
+                UNKNOWN_COMMIT,
+                dirty=False,
+                available=False,
+                release=False,
+            ),
             dirty=False,
             available=False,
             release=False,
@@ -58,10 +76,18 @@ def load_build_metadata(project_dir, version):
     dirty = bool(status)
     matching_tags = {f"v{version}", f"V{version}"}
     release = not _is_prerelease(version) and not dirty and bool(matching_tags.intersection(tags))
+    short_commit = commit[:SHORT_COMMIT_LENGTH]
 
     return BuildMetadata(
         commit=commit,
-        short_commit=commit[:SHORT_COMMIT_LENGTH],
+        short_commit=short_commit,
+        build_version=_format_build_version(
+            version,
+            short_commit,
+            dirty=dirty,
+            available=True,
+            release=release,
+        ),
         dirty=dirty,
         available=True,
         release=release,

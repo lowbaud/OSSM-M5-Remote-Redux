@@ -33,6 +33,7 @@ env.Append(
         ("APP_DISPLAY_NAME", env.StringifyMacro(metadata.display_name)),
         ("APP_NAME", env.StringifyMacro(metadata.artifact_name)),
         ("APP_VERSION", env.StringifyMacro(metadata.version)),
+        ("APP_BUILD_VERSION", env.StringifyMacro(build_metadata.build_version)),
         ("APP_GIT_COMMIT", env.StringifyMacro(build_metadata.commit)),
         ("APP_GIT_SHORT_COMMIT", env.StringifyMacro(build_metadata.short_commit)),
         ("APP_BUILD_DIRTY", int(build_metadata.dirty)),

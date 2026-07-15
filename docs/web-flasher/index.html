@@ -85,6 +85,7 @@
                 const release = await response.json();
                 if (
                     !release.version ||
+                    !release.buildVersion ||
                     !release.commit ||
                     !release.channel ||
                     !release.timestamp
@@ -94,13 +95,12 @@
 
                 const date = release.timestamp.slice(0, 10);
                 if (release.channel === "preview") {
-                    const shortCommit = release.commit.slice(0, 7);
                     releaseInfo.classList.add("preview");
                     releaseInfo.textContent =
-                        `PREVIEW BUILD ${release.version} — built ${date} — commit ${shortCommit}`;
+                        `PREVIEW BUILD ${release.buildVersion} — built ${date}`;
                 } else if (release.channel === "release") {
                     releaseInfo.textContent =
-                        `Firmware release: ${release.version} — published ${date}`;
+                        `Firmware release: ${release.buildVersion} — published ${date}`;
                 } else {
                     throw new Error(`Unknown release channel: ${release.channel}`);
                 }
