@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#include "app/BuildInfo.h"
 #include "ui/generated/screens.h"
 #include "ui/generated/ui.h"
 
@@ -18,6 +19,12 @@ constexpr std::uint32_t kHeartbeatDurationMs =
     (kPulseDurationMs + kPulseReturnDurationMs) * 2 + kBetweenPulsesMs;
 constexpr std::int32_t kFirstPulseScale = 269;
 constexpr std::int32_t kSecondPulseScale = 265;
+
+void setVersionText() {
+    char text[kBuildVersionTextSize];
+    formatBuildVersion(text, sizeof(text));
+    lv_label_set_text(objects.boot_version_lbl, text);
+}
 
 std::int32_t
 interpolateScale(std::int32_t from, std::int32_t to, std::int32_t elapsed, std::int32_t duration) {
@@ -52,7 +59,7 @@ void setLogoHeartbeatFrame(void* object, std::int32_t elapsedMs) {
 void BootScreen::enter() {
     timerStarted_ = false;
     stopLogoPulse();
-    lv_label_set_text_static(objects.boot_version_lbl, "v" APP_VERSION);
+    setVersionText();
     if (lv_screen_active() != objects.boot) {
         loadScreen(SCREEN_ID_BOOT);
     }

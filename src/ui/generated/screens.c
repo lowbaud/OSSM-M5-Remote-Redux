@@ -54,11 +54,11 @@ void create_screen_boot() {
             // boot_version_lbl
             lv_obj_t *obj = lv_label_create(parent_obj);
             objects.boot_version_lbl = obj;
-            lv_obj_set_pos(obj, 110, 213);
+            lv_obj_set_pos(obj, 60, 213);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_obj_set_style_text_font(obj, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_width(obj, 100, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_width(obj, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_text_color(obj, lv_color_hex(0x818181), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_text_static(obj, "v0.0.0");
         }

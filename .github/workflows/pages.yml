@@ -50,7 +50,7 @@ jobs:
         if: github.event_name == 'release'
         shell: bash
         run: |
-          tag_version="${GITHUB_REF_NAME#v}"
+          tag_version="${GITHUB_REF_NAME#[vV]}"
           project_version="$(python -c 'from scripts.project_metadata import load_project_metadata; print(load_project_metadata("platformio.ini").version)')"
 
           if [ "$tag_version" != "$project_version" ]; then
