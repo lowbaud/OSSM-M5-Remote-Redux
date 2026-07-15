@@ -655,7 +655,15 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     JsonDocument document;
     const DeserializationError error =
         deserializeJson(document, notification.data, notification.length);
-    if (error || !document.is<JsonObject>()) {
+    if (error) {
+        Serial.printf("OSSM state notification parse failed: %s\n", error.c_str());
+        observedStateValid_ = false;
+        observedStateCategory_ = MachineStateCategory::NoUsableState;
+        return;
+    }
+
+    if (!document.is<JsonObject>()) {
+        Serial.println("OSSM state notification parse failed: root is not an object");
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
@@ -675,6 +683,7 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     if (!timestamp.is<uint32_t>() || !state.is<const char*>() || !speed.is<int>() ||
         !stroke.is<int>() || !depth.is<int>() || !sensation.is<int>() || !buffer.is<int>() ||
         !pattern.is<int>() || !position.is<float>() || !sessionId.is<const char*>()) {
+        Serial.println("OSSM state notification parse failed: invalid required field");
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
@@ -686,6 +695,10 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     const size_t sessionIdLength = std::strlen(sessionIdText);
     if (stateLength == 0 || stateLength >= OssmClient::kObservedStateCapacity ||
         sessionIdLength == 0 || sessionIdLength >= OssmClient::kObservedSessionIdCapacity) {
+        Serial.printf(
+            "OSSM state notification parse failed: invalid text length; state=%u session=%u\n",
+            static_cast<unsigned>(stateLength),
+            static_cast<unsigned>(sessionIdLength));
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
