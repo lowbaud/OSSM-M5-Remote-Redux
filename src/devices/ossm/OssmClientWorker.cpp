@@ -22,6 +22,28 @@ bool writeTextValue(
     const NimBLERemoteCharacteristic& characteristic, const char* payload, bool response) {
     return payload && characteristic.writeValue(payload, std::strlen(payload), response);
 }
+
+void logPayload(const uint8_t* data, size_t length) {
+    Serial.print("OSSM state payload text: \"");
+    for (size_t index = 0; index < length; ++index) {
+        const uint8_t byte = data[index];
+        if (byte == '\\' || byte == '"') {
+            Serial.write('\\');
+            Serial.write(byte);
+        } else if (byte >= 0x20 && byte <= 0x7e) {
+            Serial.write(byte);
+        } else {
+            Serial.printf("\\x%02X", static_cast<unsigned>(byte));
+        }
+    }
+    Serial.println("\"");
+
+    Serial.print("OSSM state payload hex:");
+    for (size_t index = 0; index < length; ++index) {
+        Serial.printf(" %02X", static_cast<unsigned>(data[index]));
+    }
+    Serial.println();
+}
 }  // namespace
 
 OssmClientCallbacks::OssmClientCallbacks(OssmClientWorker& worker) : worker_(worker) {}
@@ -656,7 +678,16 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     const DeserializationError error =
         deserializeJson(document, notification.data, notification.length);
     if (error) {
-        Serial.printf("OSSM state notification parse failed: %s\n", error.c_str());
+        unsigned firstByte = 0;
+        unsigned lastByte = 0;
+        if (notification.length > 0) {
+            firstByte = static_cast<unsigned>(notification.data[0]);
+            lastByte = static_cast<unsigned>(notification.data[notification.length - 1]);
+        }
+        Serial.printf(
+            "OSSM state notification parse failed: %s; length=%u first=0x%02X last=0x%02X\n",
+            error.c_str(), static_cast<unsigned>(notification.length), firstByte, lastByte);
+        logPayload(notification.data, notification.length);
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
