@@ -140,7 +140,7 @@ class OssmClient {
         int depth = 0;
         int stroke = 0;
         int sensation = 0;
-        int pattern = 2;
+        int pattern = 0;
     };
 
     static_assert(

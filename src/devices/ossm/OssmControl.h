@@ -11,7 +11,7 @@ struct OssmControlValues {
     int stroke = 10;
     int depth = 10;
     int sensation = 50;
-    int pattern = 2;
+    int pattern = 0;
 };
 
 struct OssmControlAdjustments {
