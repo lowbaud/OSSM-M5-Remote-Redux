@@ -77,6 +77,8 @@ class OssmClientWorker {
     bool connectNow(const NimBLEAddress& address);
     void clearConnectionState();
     void setModeState(OssmClient::ModeState state);
+    static const char* modeFailureName(ModeFailure failure);
+    static const char* machineStateCategoryName(MachineStateCategory category);
     void failMode(ModeFailure failure);
     void setMotionReady(bool ready);
     void invalidateSpeed();

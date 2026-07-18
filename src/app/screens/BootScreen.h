@@ -11,7 +11,7 @@ enum class BootScreenAction : std::uint8_t {
 
 class BootScreen {
   public:
-    void enter();
+    void enter(bool showSkipAutoConnectMessage = false);
     void leave();
     BootScreenAction update();
 

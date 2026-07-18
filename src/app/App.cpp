@@ -285,6 +285,7 @@ void handleConnectionEvents(const OssmConnectionEvents& events) {
     if (events.readinessLost) {
         ossmControl.handleReadinessLost();
         ossmPatternsScreen.invalidateCatalog();
+        Serial.println("OSSM readiness lost; returning to welcome");
         navigateTo(Screen::Welcome);
         return;
     }
@@ -430,7 +431,7 @@ void begin() {
     lvgl_port::begin();
     ui_init();
 
-    bootScreen.enter();
+    bootScreen.enter(hasSavedConnection && autoConnectEnabled);
     welcomeScreen.begin();
     scanScreen.begin();
     connectScreen.begin();

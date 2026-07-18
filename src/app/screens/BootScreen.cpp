@@ -50,9 +50,13 @@ void setLogoHeartbeatFrame(void* object, std::int32_t elapsedMs) {
 
 }  // namespace
 
-void BootScreen::enter() {
+void BootScreen::enter(bool showSkipAutoConnectMessage) {
     timerStarted_ = false;
-    stopLogoPulse();
+    if (showSkipAutoConnectMessage) {
+        lv_obj_remove_flag(objects.boot_message_lbl, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(objects.boot_message_lbl, LV_OBJ_FLAG_HIDDEN);
+    }
     lv_label_set_text_static(objects.boot_version_lbl, buildInfo().buildVersion);
     if (lv_screen_active() != objects.boot) {
         loadScreen(SCREEN_ID_BOOT);

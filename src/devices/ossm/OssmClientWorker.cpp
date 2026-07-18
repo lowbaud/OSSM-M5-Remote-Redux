@@ -1,6 +1,7 @@
 #include "OssmClientWorker.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -18,11 +19,32 @@ bool startsWith(const char* value, const char* prefix) {
     return value && prefix && std::strncmp(value, prefix, std::strlen(prefix)) == 0;
 }
 
+bool startsWith(const uint8_t* data, size_t length, const char* prefix) {
+    if (!data || !prefix)
+        return false;
+
+    const size_t prefixLength = std::strlen(prefix);
+    return length >= prefixLength && std::memcmp(data, prefix, prefixLength) == 0;
+}
+
+bool tryReadFloat(JsonVariantConst value, float& result) {
+    if (!value.is<float>())
+        return false;
+
+    const float number = value.as<float>();
+    if (!std::isfinite(number))
+        return false;
+
+    result = number;
+    return true;
+}
+
 bool writeTextValue(
     const NimBLERemoteCharacteristic& characteristic, const char* payload, bool response) {
     return payload && characteristic.writeValue(payload, std::strlen(payload), response);
 }
 
+#ifdef SERIAL_INFO
 void logPayload(const uint8_t* data, size_t length) {
     Serial.print("OSSM state payload text: \"");
     for (size_t index = 0; index < length; ++index) {
@@ -44,6 +66,7 @@ void logPayload(const uint8_t* data, size_t length) {
     }
     Serial.println();
 }
+#endif
 }  // namespace
 
 OssmClientCallbacks::OssmClientCallbacks(OssmClientWorker& worker) : worker_(worker) {}
@@ -490,8 +513,49 @@ void OssmClientWorker::setModeState(OssmClient::ModeState state) {
     setMotionReady(state == OssmClient::ModeState::Ready);
 }
 
+const char* OssmClientWorker::modeFailureName(ModeFailure failure) {
+    switch (failure) {
+        case ModeFailure::None:
+            return "none";
+        case ModeFailure::CommandWriteFailed:
+            return "command-write-failed";
+        case ModeFailure::UnsupportedState:
+            return "unsupported-state";
+        case ModeFailure::TimedOut:
+            return "timed-out";
+        case ModeFailure::ReadinessLost:
+            return "readiness-lost";
+    }
+
+    return "unknown";
+}
+
+const char* OssmClientWorker::machineStateCategoryName(MachineStateCategory category) {
+    switch (category) {
+        case MachineStateCategory::NoUsableState:
+            return "no-usable-state";
+        case MachineStateCategory::MenuReady:
+            return "menu-ready";
+        case MachineStateCategory::MotionReady:
+            return "motion-ready";
+        case MachineStateCategory::Waiting:
+            return "waiting";
+        case MachineStateCategory::SpeedKnobBlocked:
+            return "speed-knob-blocked";
+        case MachineStateCategory::UnsupportedBlocked:
+            return "unsupported-blocked";
+    }
+
+    return "unknown";
+}
+
 void OssmClientWorker::failMode(ModeFailure failure) {
     modeOperation_.failure = failure;
+    Serial.printf(
+        "OSSM mode failure: cause=%s category=%s error=%d\n",
+        modeFailureName(failure),
+        machineStateCategoryName(observedStateCategory_),
+        lastError_.load());
     setModeState(OssmClient::ModeState::Failed);
 }
 
@@ -674,6 +738,25 @@ bool OssmClientWorker::loadPatterns() {
 }
 
 void OssmClientWorker::parseStateNotification(const StateNotification& notification) {
+    // The state characteristic also carries plain-text command responses.
+    if (startsWith(notification.data, notification.length, "ok:")) {
+#ifdef SERIAL_INFO
+        Serial.printf(
+            "OSSM ignored protocol response: %.*s\n",
+            static_cast<int>(notification.length),
+            reinterpret_cast<const char*>(notification.data));
+#endif
+        return;
+    }
+
+    if (startsWith(notification.data, notification.length, "fail:")) {
+        Serial.printf(
+            "OSSM protocol failure response: %.*s\n",
+            static_cast<int>(notification.length),
+            reinterpret_cast<const char*>(notification.data));
+        return;
+    }
+
     JsonDocument document;
     const DeserializationError error =
         deserializeJson(document, notification.data, notification.length);
@@ -687,7 +770,9 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
         Serial.printf(
             "OSSM state notification parse failed: %s; length=%u first=0x%02X last=0x%02X\n",
             error.c_str(), static_cast<unsigned>(notification.length), firstByte, lastByte);
+#ifdef SERIAL_INFO
         logPayload(notification.data, notification.length);
+#endif
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
@@ -695,6 +780,9 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
 
     if (!document.is<JsonObject>()) {
         Serial.println("OSSM state notification parse failed: root is not an object");
+#ifdef SERIAL_INFO
+        logPayload(notification.data, notification.length);
+#endif
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
@@ -710,26 +798,61 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     const JsonVariantConst pattern = document["pattern"];
     const JsonVariantConst position = document["position"];
     const JsonVariantConst sessionId = document["sessionId"];
+    const bool hasPosition = position.is<JsonVariantConst>();
+    const bool hasSessionId = sessionId.is<JsonVariantConst>();
+    float speedValue = 0;
+    float strokeValue = 0;
+    float depthValue = 0;
+    float sensationValue = 0;
+    float bufferValue = 0;
+    const bool speedValid = tryReadFloat(speed, speedValue);
+    const bool strokeValid = tryReadFloat(stroke, strokeValue);
+    const bool depthValid = tryReadFloat(depth, depthValue);
+    const bool sensationValid = tryReadFloat(sensation, sensationValue);
+    const bool bufferValid = tryReadFloat(buffer, bufferValue);
 
-    if (!timestamp.is<uint32_t>() || !state.is<const char*>() || !speed.is<int>() ||
-        !stroke.is<int>() || !depth.is<int>() || !sensation.is<int>() || !buffer.is<int>() ||
-        !pattern.is<int>() || !position.is<float>() || !sessionId.is<const char*>()) {
-        Serial.println("OSSM state notification parse failed: invalid required field");
+    if (!timestamp.is<uint32_t>() || !state.is<const char*>() || !speedValid ||
+        !strokeValid || !depthValid || !sensationValid || !bufferValid || !pattern.is<int>() ||
+        (hasPosition && !position.is<float>()) ||
+        (hasSessionId && !sessionId.is<const char*>())) {
+        Serial.println("OSSM state notification parse failed: invalid field");
+#ifdef SERIAL_INFO
+        if (!timestamp.is<uint32_t>())
+            Serial.println("OSSM invalid field: timestamp");
+        if (!state.is<const char*>())
+            Serial.println("OSSM invalid field: state");
+        if (!speedValid)
+            Serial.println("OSSM invalid field: speed");
+        if (!strokeValid)
+            Serial.println("OSSM invalid field: stroke");
+        if (!depthValid)
+            Serial.println("OSSM invalid field: depth");
+        if (!sensationValid)
+            Serial.println("OSSM invalid field: sensation");
+        if (!bufferValid)
+            Serial.println("OSSM invalid field: buffer");
+        if (!pattern.is<int>())
+            Serial.println("OSSM invalid field: pattern");
+        if (hasPosition && !position.is<float>())
+            Serial.println("OSSM invalid field: position");
+        if (hasSessionId && !sessionId.is<const char*>())
+            Serial.println("OSSM invalid field: sessionId");
+        logPayload(notification.data, notification.length);
+#endif
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
     }
 
     const char* stateText = state.as<const char*>();
-    const char* sessionIdText = sessionId.as<const char*>();
     const size_t stateLength = std::strlen(stateText);
-    const size_t sessionIdLength = std::strlen(sessionIdText);
-    if (stateLength == 0 || stateLength >= OssmClient::kObservedStateCapacity ||
-        sessionIdLength == 0 || sessionIdLength >= OssmClient::kObservedSessionIdCapacity) {
+    if (stateLength == 0 || stateLength >= OssmClient::kObservedStateCapacity) {
         Serial.printf(
-            "OSSM state notification parse failed: invalid text length; state=%u session=%u\n",
-            static_cast<unsigned>(stateLength),
-            static_cast<unsigned>(sessionIdLength));
+            "OSSM state notification parse failed: invalid state length=%u\n",
+            static_cast<unsigned>(stateLength));
+#ifdef SERIAL_INFO
+        logPayload(notification.data, notification.length);
+#endif
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
@@ -738,14 +861,31 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     OssmClient::ObservedState observed{};
     observed.timestamp = timestamp.as<uint32_t>();
     std::memcpy(observed.state, stateText, stateLength + 1);
-    observed.speed = speed.as<int>();
-    observed.stroke = stroke.as<int>();
-    observed.depth = depth.as<int>();
-    observed.sensation = sensation.as<int>();
-    observed.buffer = buffer.as<int>();
+    observed.speed = speedValue;
+    observed.stroke = strokeValue;
+    observed.depth = depthValue;
+    observed.sensation = sensationValue;
+    observed.buffer = bufferValue;
     observed.pattern = pattern.as<int>();
-    observed.position = position.as<float>();
-    std::memcpy(observed.sessionId, sessionIdText, sessionIdLength + 1);
+    if (hasPosition)
+        observed.position = position.as<float>();
+    if (hasSessionId) {
+        const char* sessionIdText = sessionId.as<const char*>();
+        const size_t sessionIdLength = std::strlen(sessionIdText);
+        if (sessionIdLength == 0 ||
+            sessionIdLength >= OssmClient::kObservedSessionIdCapacity) {
+            Serial.printf(
+                "OSSM state notification parse failed: invalid session length=%u\n",
+                static_cast<unsigned>(sessionIdLength));
+#ifdef SERIAL_INFO
+            logPayload(notification.data, notification.length);
+#endif
+            observedStateValid_ = false;
+            observedStateCategory_ = MachineStateCategory::NoUsableState;
+            return;
+        }
+        std::memcpy(observed.sessionId, sessionIdText, sessionIdLength + 1);
+    }
 
     observedStateValid_ = true;
     observedStateCategory_ = classifyMachineState(observed.state);
@@ -753,8 +893,8 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
 
 #ifdef SERIAL_INFO
     Serial.printf(
-        "OSSM observed: %s speed=%d stroke=%d depth=%d sensation=%d "
-        "buffer=%d pattern=%d position=%.2f session=%s timestamp=%lu\n",
+        "OSSM observed: %s speed=%.2f stroke=%.2f depth=%.2f sensation=%.2f "
+        "buffer=%.2f pattern=%d position=%.2f session=%s timestamp=%lu\n",
         observed.state,
         observed.speed,
         observed.stroke,
@@ -771,11 +911,7 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
 // Collapse protocol-level state strings into the small set of states the worker can act on.
 OssmClientWorker::MachineStateCategory
 OssmClientWorker::classifyMachineState(const char* state) const {
-    if (!state || state[0] == '\0' || startsWith(state, "ok:")) {
-        return MachineStateCategory::NoUsableState;
-    }
-
-    if (startsWith(state, "fail:")) {
+    if (!state || state[0] == '\0') {
         return MachineStateCategory::NoUsableState;
     }
 

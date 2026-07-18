@@ -53,11 +53,11 @@ class OssmClient {
     struct ObservedState {
         uint32_t timestamp = 0;
         char state[kObservedStateCapacity] = {};
-        int speed = 0;
-        int stroke = 0;
-        int depth = 0;
-        int sensation = 0;
-        int buffer = 0;
+        float speed = 0;
+        float stroke = 0;
+        float depth = 0;
+        float sensation = 0;
+        float buffer = 0;
         int pattern = 0;
         float position = 0;
         char sessionId[kObservedSessionIdCapacity] = {};
