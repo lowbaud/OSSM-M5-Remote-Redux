@@ -30,7 +30,7 @@ class RemoteInput {
     void update();
     RemoteInputEvents takeEvents();
     bool leftPressed() const;
-    void suppressLeftClickUntilRelease();
+    void suppressLeftClick();
 
   private:
     static constexpr std::int64_t kCountsPerDetent = 2;

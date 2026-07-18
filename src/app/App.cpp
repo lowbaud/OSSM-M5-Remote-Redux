@@ -423,11 +423,6 @@ void begin() {
     SavedOssmConnection savedConnection;
     const bool hasSavedConnection = settingsStore.savedOssmConnection(savedConnection);
     const bool autoConnectEnabled = settingsStore.autoConnectEnabled();
-    const bool skipAutoConnect =
-        hasSavedConnection && autoConnectEnabled && remoteInput.leftPressed();
-    if (skipAutoConnect) {
-        remoteInput.suppressLeftClickUntilRelease();
-    }
     lvgl_port::begin();
     ui_init();
 
@@ -444,7 +439,7 @@ void begin() {
         Serial.println("OSSM discovery initialization failed");
     }
 
-    connectAfterBoot = hasSavedConnection && autoConnectEnabled && !skipAutoConnect;
+    connectAfterBoot = hasSavedConnection && autoConnectEnabled;
     if (connectAfterBoot) {
         startupConnection = savedConnection;
     }
@@ -459,6 +454,13 @@ void update() {
         ossmConnection.isReady();
     remoteInput.update();
     const RemoteInputEvents inputEvents = remoteInput.takeEvents();
+    if (currentScreen == Screen::Boot && remoteInput.leftPressed()) {
+        remoteInput.suppressLeftClick();
+        if (connectAfterBoot) {
+            connectAfterBoot = false;
+            bootScreen.showAutoConnectSkipped();
+        }
+    }
     if (hasInputActivity(inputEvents)) {
         idleTimer.reset(millis());
     }

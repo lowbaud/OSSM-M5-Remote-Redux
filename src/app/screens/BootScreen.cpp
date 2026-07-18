@@ -19,6 +19,8 @@ constexpr std::uint32_t kHeartbeatDurationMs =
     (kPulseDurationMs + kPulseReturnDurationMs) * 2 + kBetweenPulsesMs;
 constexpr std::int32_t kFirstPulseScale = 269;
 constexpr std::int32_t kSecondPulseScale = 265;
+constexpr const char* kSkipAutoConnectMessage = "Hold left encoder to skip auto-connect.";
+constexpr const char* kAutoConnectSkippedMessage = "Auto-connect skipped.";
 
 std::int32_t
 interpolateScale(std::int32_t from, std::int32_t to, std::int32_t elapsed, std::int32_t duration) {
@@ -52,6 +54,7 @@ void setLogoHeartbeatFrame(void* object, std::int32_t elapsedMs) {
 
 void BootScreen::enter(bool showSkipAutoConnectMessage) {
     timerStarted_ = false;
+    lv_label_set_text_static(objects.boot_message_lbl, kSkipAutoConnectMessage);
     if (showSkipAutoConnectMessage) {
         lv_obj_remove_flag(objects.boot_message_lbl, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -62,6 +65,11 @@ void BootScreen::enter(bool showSkipAutoConnectMessage) {
         loadScreen(SCREEN_ID_BOOT);
     }
     startLogoPulse();
+}
+
+void BootScreen::showAutoConnectSkipped() {
+    lv_label_set_text_static(objects.boot_message_lbl, kAutoConnectSkippedMessage);
+    lv_obj_remove_flag(objects.boot_message_lbl, LV_OBJ_FLAG_HIDDEN);
 }
 
 void BootScreen::leave() {

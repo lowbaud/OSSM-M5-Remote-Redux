@@ -91,7 +91,7 @@ bool RemoteInput::leftPressed() const {
     return digitalRead(kLeftButtonPin) == HIGH;
 }
 
-void RemoteInput::suppressLeftClickUntilRelease() {
+void RemoteInput::suppressLeftClick() {
     suppressLeftClick_ = leftPressed();
 }
 

@@ -14,6 +14,7 @@ class BootScreen {
     void enter(bool showSkipAutoConnectMessage = false);
     void leave();
     BootScreenAction update();
+    void showAutoConnectSkipped();
 
   private:
     bool timerStarted_ = false;
