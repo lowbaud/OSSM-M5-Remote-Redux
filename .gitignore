@@ -1,5 +1,7 @@
 .pio
 /build/
+.DS_Store
+Thumbs.db
 __pycache__/
 *.py[cod]
 .vscode/.browse.c_cpp.db*
@@ -7,5 +9,4 @@ __pycache__/
 .vscode/launch.json
 .vscode/ipch
 lvgl/backup/
-lib/
 eez-ui/OSSM-M5-Remote-Redux.eez-project-ui-state
