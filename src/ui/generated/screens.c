@@ -113,17 +113,17 @@ void create_screen_welcome() {
         }
         {
             lv_obj_t *obj = lv_label_create(parent_obj);
-            lv_obj_set_pos(obj, 39, 87);
+            lv_obj_set_pos(obj, 45, 83);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-            lv_label_set_text_static(obj, "Click the Scan button to connect.");
+            lv_label_set_text_static(obj, "Select Scan to start connecting.");
         }
         {
             lv_obj_t *obj = lv_label_create(parent_obj);
-            lv_obj_set_pos(obj, 11, 120);
+            lv_obj_set_pos(obj, 10, 117);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_obj_set_style_width(obj, 300, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_label_set_text_static(obj, "The soft buttons at the bottom of the screen show the available actions. Press the corresponding button on the remote to perform that action.");
+            lv_label_set_text_static(obj, "The soft buttons at the bottom of the screen show the available actions. Tap one or press the corresponding control on the remote.");
         }
         {
             // welcome_settings_btn

@@ -676,9 +676,9 @@
             {
               "objID": "5ee6c555-c874-4a9c-89e4-e068074b7f64",
               "type": "LVGLLabelWidget",
-              "left": 39,
-              "top": 87,
-              "width": 244,
+              "left": 45,
+              "top": 83,
+              "width": 231,
               "height": 16,
               "customInputs": [],
               "customOutputs": [],
@@ -710,7 +710,7 @@
               },
               "group": "",
               "groupIndex": 0,
-              "text": "Click the Scan button to connect.",
+              "text": "Select Scan to start connecting.",
               "textType": "literal",
               "longMode": "WRAP",
               "recolor": false
@@ -718,8 +718,8 @@
             {
               "objID": "71551b61-77e4-46f6-b5de-ffefa28f9d84",
               "type": "LVGLLabelWidget",
-              "left": 11,
-              "top": 120,
+              "left": 10,
+              "top": 117,
               "width": 300,
               "height": 64,
               "customInputs": [],
@@ -760,7 +760,7 @@
               },
               "group": "",
               "groupIndex": 0,
-              "text": "The soft buttons at the bottom of the screen show the available actions. Press the corresponding button on the remote to perform that action.",
+              "text": "The soft buttons at the bottom of the screen show the available actions. Tap one or press the corresponding control on the remote.",
               "textType": "literal",
               "longMode": "WRAP",
               "recolor": false
