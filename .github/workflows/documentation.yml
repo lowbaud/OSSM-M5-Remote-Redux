@@ -43,15 +43,20 @@ jobs:
             --dir _release
           unzip "_release/$release_bundle" -d _firmware
 
-      - name: Assemble Pages site
-        shell: bash
-        run: |
-          mkdir -p _site/web-flasher
-          cp -a docs/. _site/
-          cp -a _firmware/. _site/web-flasher/
-
       - name: Configure Pages
         uses: actions/configure-pages@v5
+
+      - name: Build site with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./docs
+          destination: ./_site
+
+      - name: Add web flasher firmware
+        shell: bash
+        run: |
+          mkdir -p _site/flash
+          cp -a _firmware/. _site/flash/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4

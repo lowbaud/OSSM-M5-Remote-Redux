@@ -1,0 +1,18 @@
+title: M5 Remote Redux
+description: An open-source replacement firmware and web flasher for the M5 remote.
+url: https://lowbaud.github.io
+baseurl: /OSSM-M5-Remote-Redux
+repository_url: https://github.com/lowbaud/OSSM-M5-Remote-Redux
+
+markdown: kramdown
+permalink: pretty
+
+keep_files:
+  - flash
+
+exclude:
+  - compose.yaml
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - vendor

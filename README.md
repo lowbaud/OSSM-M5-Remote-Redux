@@ -35,7 +35,7 @@ further down on this page or in the [original repo](https://github.com/ortlof/OS
 ## Flashing the firmware
 
 The easiest way to install or update the firmware is with the
-[web flasher](https://lowbaud.github.io/OSSM-M5-Remote-Redux/web-flasher/). Connect the remote via
+[web flasher](https://lowbaud.github.io/OSSM-M5-Remote-Redux/flash/). Connect the remote via
 USB, open the flasher in a browser that supports Web Serial (such as Chrome or Edge), select the
 battery charge current, and click **Install firmware**. The flasher detects Core2 and CoreS3
 hardware automatically.

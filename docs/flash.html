@@ -1,0 +1,131 @@
+---
+layout: default
+title: Web Flasher
+description: Install M5 Remote Redux from your browser.
+nav_key: flash
+permalink: /flash/
+---
+
+<h1>Web Flasher</h1>
+
+<p id="release-info" class="release-info" role="status">
+  Loading firmware release information...
+</p>
+
+<p>
+  The flasher automatically detects whether the connected OSSM M5 Remote is
+  Core2-based or CoreS3-based.
+</p>
+<p>
+  Flashing resets your saved settings whether or not
+  <strong>Erase device</strong> is checked. Leaving it unchecked is faster
+  because it skips an additional full-device erase.
+</p>
+
+<div class="flasher-control">
+  <label for="charge-current">Battery charge current:</label>
+  <select id="charge-current">
+    <option value="500" selected>500 mA (recommended)</option>
+    <option value="1000">1000 mA (fast charging)</option>
+  </select>
+</div>
+
+<p>
+  The standard remote build uses an external battery. Use the recommended
+  500 mA option unless the installed battery is explicitly rated for charging
+  at least 1000 mA. The documented EEMB LP103454 supports the 1000 mA option.
+  Slower charge rates require building from source.
+</p>
+
+<div class="notice">
+  <p>
+    <strong>Remote not listed?</strong> Core2-based remotes may require a USB
+    driver. Install the CP210x or CH9102 driver for your operating system from
+    the
+    <a href="https://docs.m5stack.com/en/download">official M5Stack downloads</a>.
+    Which driver you need depends on the Core2 hardware revision. If unsure,
+    install both. CoreS3-based remotes should not require an additional driver.
+  </p>
+</div>
+
+<ol class="flasher-steps">
+  <li>Connect the remote using a USB data cable.</li>
+  <li>Select the appropriate battery charge current above.</li>
+  <li>Click <strong>Install firmware</strong> and optionally check <strong>Erase device</strong>.</li>
+  <li>Select the remote from the browser's serial-device list.</li>
+  <li>Wait for flashing to finish. The remote will restart automatically.</li>
+</ol>
+
+<esp-web-install-button
+  id="install-button"
+  manifest="{{ '/flash/manifest_500mA.json' | relative_url }}"
+>
+  <button id="install-firmware" slot="activate" disabled>
+    Install firmware
+  </button>
+  <span slot="unsupported">
+    Use a current desktop version of Firefox, Chrome, or Edge to install
+    firmware.
+  </span>
+  <span slot="not-allowed">
+    Web Serial requires HTTPS or a page served from localhost.
+  </span>
+</esp-web-install-button>
+
+<script
+  type="module"
+  src="https://unpkg.com/esp-web-tools@10.2.1/dist/web/install-button.js?module"
+></script>
+<script>
+  const flasherBaseUrl = "{{ '/flash/' | relative_url }}";
+  const chargeCurrent = document.querySelector("#charge-current");
+  const installButton = document.querySelector("#install-button");
+  const installFirmware = document.querySelector("#install-firmware");
+  const releaseInfo = document.querySelector("#release-info");
+
+  async function loadReleaseInfo() {
+    try {
+      const response = await fetch(`${flasherBaseUrl}release-info.json`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const release = await response.json();
+      if (
+        !release.version ||
+        !release.buildVersion ||
+        !release.commit ||
+        !release.channel ||
+        !release.timestamp
+      ) {
+        throw new Error("Incomplete release information");
+      }
+
+      const date = release.timestamp.slice(0, 10);
+      if (release.channel === "preview") {
+        releaseInfo.classList.add("preview");
+        releaseInfo.textContent =
+          `PREVIEW BUILD ${release.buildVersion} — built ${date}`;
+      } else if (release.channel === "release") {
+        releaseInfo.textContent =
+          `Firmware release: ${release.buildVersion} — published ${date}`;
+      } else {
+        throw new Error(`Unknown release channel: ${release.channel}`);
+      }
+      installFirmware.disabled = false;
+    } catch (error) {
+      releaseInfo.textContent =
+        "Firmware release information is unavailable. Flashing is disabled.";
+      console.error("Could not load firmware release information:", error);
+    }
+  }
+
+  chargeCurrent.addEventListener("change", () => {
+    installButton.manifest =
+      `${flasherBaseUrl}manifest_${chargeCurrent.value}mA.json`;
+  });
+
+  loadReleaseInfo();
+</script>

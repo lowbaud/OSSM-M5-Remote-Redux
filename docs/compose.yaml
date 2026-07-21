@@ -1,0 +1,43 @@
+name: m5-redux-docs
+
+services:
+  site:
+    image: ruby:3.4-bookworm
+    working_dir: /workspace/docs
+    init: true
+    environment:
+      BUNDLE_FROZEN: "true"
+      BUNDLE_GEMFILE: /workspace/docs/Gemfile
+      BUNDLE_PATH: /usr/local/bundle
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        bundle check || bundle install
+
+        rm -rf /workspace/site/flash
+        mkdir -p /workspace/site/flash
+        cp -a /workspace/firmware/. /workspace/site/flash/
+
+        exec bundle exec jekyll serve \
+          --source /workspace/docs \
+          --destination /workspace/site \
+          --config /workspace/docs/_config.yml \
+          --host 0.0.0.0 \
+          --port 4000 \
+          --livereload \
+          --livereload-port 35729 \
+          --force_polling \
+          --baseurl ""
+    ports:
+      - "4000:4000"
+      - "35729:35729"
+    volumes:
+      - .:/workspace/docs:ro
+      - ../build/release:/workspace/firmware:ro
+      - ../build/docs-site:/workspace/site
+      - gems:/usr/local/bundle
+
+volumes:
+  gems:

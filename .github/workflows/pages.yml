@@ -93,16 +93,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" "$RELEASE_BUNDLE" --clobber
 
-      - name: Assemble Pages site
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build site with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./docs
+          destination: ./_site
+
+      - name: Add web flasher firmware
         shell: bash
         run: |
-          mkdir -p _site/web-flasher
-          cp -a docs/. _site/
-          cp -a build/release/. _site/web-flasher/
-
-      - name: Configure Pages
-        if: github.event_name == 'release' || inputs.deploy_preview
-        uses: actions/configure-pages@v5
+          mkdir -p _site/flash
+          cp -a build/release/. _site/flash/
 
       - name: Upload Pages artifact
         if: github.event_name == 'release' || inputs.deploy_preview
