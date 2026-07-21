@@ -96,17 +96,17 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      - name: Add web flasher firmware to site source
+        shell: bash
+        run: |
+          mkdir -p docs/flash
+          cp -a build/release/. docs/flash/
+
       - name: Build site with Jekyll
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs
           destination: ./_site
-
-      - name: Add web flasher firmware
-        shell: bash
-        run: |
-          mkdir -p _site/flash
-          cp -a build/release/. _site/flash/
 
       - name: Upload Pages artifact
         if: github.event_name == 'release' || inputs.deploy_preview
