@@ -348,12 +348,20 @@ main th {
 
   .site-nav {
     width: 100%;
-    overflow-x: auto;
+    font-size: clamp(0.95rem, 4.25vw, 1.05rem);
   }
 
   .site-nav ul {
-    min-width: max-content;
-    justify-content: safe center;
+    justify-content: center;
+    gap: clamp(0.25rem, 2vw, 0.75rem);
+  }
+
+  .site-nav a {
+    padding-inline: clamp(0.35rem, 1.5vw, 0.6rem);
+  }
+
+  .site-nav a.site-nav__github {
+    padding: 0.45rem clamp(0.5rem, 1.8vw, 0.65rem);
   }
 
   .site-nav a[aria-current="page"]::after {
