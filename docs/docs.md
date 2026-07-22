@@ -8,11 +8,11 @@ permalink: /docs/
 
 # Documentation
 
-OSSM M5 Remote Redux is an unofficial fork and rewrite of the user interface
-and firmware from the
+OSSM M5 Remote Redux is an unofficial fork and rewrite of the user
+interface/firmware from the
 [original OSSM M5 Remote project](https://github.com/ortlof/OSSM-M5-Remote).
 It supports both the Core2-based and CoreS3-based versions of the OSSM M5
-Remote, but replaces significant parts of their firmware and user interface.
+Remote.
 
 The goal is to provide a clean, reliable remote that is easy to use and
 actively maintained for compatibility with the official OSSM firmware.
@@ -43,13 +43,13 @@ The easiest installation method is the [Web Flasher]({{ '/flash/' | relative_url
 It requires a current desktop version of Firefox, Chrome, or Edge and a USB data
 connection to the remote. The flasher detects the remote variant automatically.
 
-The standard remote build expects an external battery. Select the recommended
-500 mA charging option unless the installed battery is explicitly rated for a
-charge current of at least 1000 mA. Retaining a small stock M5 battery is not a
-supported remote configuration.
+Select the recommended 500 mA charging option unless the installed battery is
+explicitly rated for a charge current of at least 1000 mA. Lower charge currents
+can be set when building the firmware from source.
 
-Flashing installs a complete firmware image and resets saved settings, whether
-or not the optional full-device erase is selected.
+Flashing via the Web Flasher always resets all settings to their defaults, regardless
+of whether **Erase device** is selected.
+
 
 ## Connect to an OSSM
 
