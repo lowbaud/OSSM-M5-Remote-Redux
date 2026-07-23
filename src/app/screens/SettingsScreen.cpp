@@ -11,10 +11,12 @@ constexpr char kBrightnessSettingName[] = "Display brightness";
 constexpr char kIdleDimSettingName[] = "Dim after";
 constexpr char kIdlePowerOffSettingName[] = "Power off after";
 constexpr char kAutoConnectSettingName[] = "Auto-connect";
+constexpr char kStrokeDirectionSettingName[] = "Stroke direction";
 constexpr std::size_t kBrightnessSettingIndex = 0;
 constexpr std::size_t kIdleDimSettingIndex = 1;
 constexpr std::size_t kIdlePowerOffSettingIndex = 2;
 constexpr std::size_t kAutoConnectSettingIndex = 3;
+constexpr std::size_t kStrokeDirectionSettingIndex = 4;
 constexpr std::int32_t kOptionsTitleHeight = 28;
 constexpr std::int32_t kOptionsPanelWidth = 263;
 constexpr std::int32_t kOptionsPanelHeight = 154;
@@ -126,6 +128,12 @@ void SettingsScreen::refresh() {
     lv_label_set_text_static(
         settingRows_[kAutoConnectSettingIndex].valueLabel,
         SettingsStore::autoConnectOption(autoConnectIndex).name);
+
+    const std::size_t strokeDirectionIndex =
+        SettingsStore::strokeDirectionOptionIndex(settings_.strokeEncoderReversed());
+    lv_label_set_text_static(
+        settingRows_[kStrokeDirectionSettingIndex].valueLabel,
+        SettingsStore::strokeDirectionOption(strokeDirectionIndex).name);
 }
 
 void SettingsScreen::setStopAvailable(bool available) {
@@ -184,6 +192,11 @@ void SettingsScreen::requestSelect() {
             pendingEvent_.action = SettingsScreenAction::CommitAutoConnect;
             pendingEvent_.autoConnectEnabled =
                 SettingsStore::autoConnectOption(selectedOptionIndex_).enabled;
+            break;
+        case kStrokeDirectionSettingIndex:
+            pendingEvent_.action = SettingsScreenAction::CommitStrokeDirection;
+            pendingEvent_.strokeEncoderReversed =
+                SettingsStore::strokeDirectionOption(selectedOptionIndex_).reversed;
             break;
         default:
             break;
@@ -251,6 +264,20 @@ void SettingsScreen::buildSettingRows() {
     lv_label_set_text_static(autoConnectSetting.valueLabel, "");
 
     lv_obj_add_event_cb(autoConnectSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
+
+    SettingRow& strokeDirectionSetting = settingRows_[kStrokeDirectionSettingIndex];
+    strokeDirectionSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
+    styleSelectableRow(strokeDirectionSetting.button, objects.settings_list);
+
+    lv_obj_t* strokeDirectionNameLabel = lv_label_create(strokeDirectionSetting.button);
+    lv_label_set_text_static(strokeDirectionNameLabel, kStrokeDirectionSettingName);
+    lv_obj_set_flex_grow(strokeDirectionNameLabel, 1);
+
+    strokeDirectionSetting.valueLabel = lv_label_create(strokeDirectionSetting.button);
+    lv_label_set_text_static(strokeDirectionSetting.valueLabel, "");
+
+    lv_obj_add_event_cb(
+        strokeDirectionSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
 }
 
 void SettingsScreen::buildOptionsPanel() {
@@ -332,6 +359,9 @@ void SettingsScreen::configureOptions() {
         case kAutoConnectSettingIndex:
             lv_label_set_text_static(optionsTitle_, kAutoConnectSettingName);
             break;
+        case kStrokeDirectionSettingIndex:
+            lv_label_set_text_static(optionsTitle_, kStrokeDirectionSettingName);
+            break;
         default:
             lv_label_set_text_static(optionsTitle_, "");
             break;
@@ -358,6 +388,9 @@ void SettingsScreen::configureOptions() {
                 break;
             case kAutoConnectSettingIndex:
                 name = SettingsStore::autoConnectOption(index).name;
+                break;
+            case kStrokeDirectionSettingIndex:
+                name = SettingsStore::strokeDirectionOption(index).name;
                 break;
             default:
                 break;
@@ -394,6 +427,8 @@ std::size_t SettingsScreen::currentOptionCount() const {
             return SettingsStore::kIdlePowerOffOptionCount;
         case kAutoConnectSettingIndex:
             return SettingsStore::kAutoConnectOptionCount;
+        case kStrokeDirectionSettingIndex:
+            return SettingsStore::kStrokeDirectionOptionCount;
         default:
             return 0;
     }
@@ -409,6 +444,8 @@ std::size_t SettingsScreen::currentStoredOptionIndex() const {
             return SettingsStore::idlePowerOffOptionIndex(settings_.idlePowerOffTimeout());
         case kAutoConnectSettingIndex:
             return SettingsStore::autoConnectOptionIndex(settings_.autoConnectEnabled());
+        case kStrokeDirectionSettingIndex:
+            return SettingsStore::strokeDirectionOptionIndex(settings_.strokeEncoderReversed());
         default:
             return kNoSelection;
     }

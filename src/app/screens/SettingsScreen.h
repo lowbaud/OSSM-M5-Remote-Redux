@@ -21,6 +21,7 @@ enum class SettingsScreenAction : std::uint8_t {
     CommitIdleDimTimeout,
     CommitIdlePowerOffTimeout,
     CommitAutoConnect,
+    CommitStrokeDirection,
 };
 
 struct SettingsScreenEvent {
@@ -29,6 +30,7 @@ struct SettingsScreenEvent {
     IdleDimTimeout idleDimTimeout = SettingsStore::kDefaultIdleDimTimeout;
     IdlePowerOffTimeout idlePowerOffTimeout = SettingsStore::kDefaultIdlePowerOffTimeout;
     bool autoConnectEnabled = SettingsStore::kDefaultAutoConnectEnabled;
+    bool strokeEncoderReversed = SettingsStore::kDefaultStrokeEncoderReversed;
 };
 
 class SettingsScreen {
@@ -60,7 +62,7 @@ class SettingsScreen {
         lv_obj_t* textLabel = nullptr;
     };
 
-    static constexpr std::size_t kSettingCount = 4;
+    static constexpr std::size_t kSettingCount = 5;
     static constexpr std::size_t kMaxOptionRows = 4;
     static constexpr std::size_t kNoSelection = static_cast<std::size_t>(-1);
     static_assert(
@@ -73,6 +75,9 @@ class SettingsScreen {
         "Settings option pool is too small");
     static_assert(
         kMaxOptionRows >= SettingsStore::kAutoConnectOptionCount,
+        "Settings option pool is too small");
+    static_assert(
+        kMaxOptionRows >= SettingsStore::kStrokeDirectionOptionCount,
         "Settings option pool is too small");
 
     SettingsStore& settings_;

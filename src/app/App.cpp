@@ -276,6 +276,15 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 Serial.println("Unable to save auto-connect setting");
             }
             break;
+        case SettingsScreenAction::CommitStrokeDirection:
+            if (settingsStore.setStrokeEncoderReversed(event.strokeEncoderReversed)) {
+                ossmControlScreen.setStrokeEncoderReversed(event.strokeEncoderReversed);
+                settingsScreen.commitSucceeded();
+            } else {
+                settingsScreen.commitFailed();
+                Serial.println("Unable to save stroke direction setting");
+            }
+            break;
         case SettingsScreenAction::None:
             break;
     }
@@ -410,6 +419,7 @@ void begin() {
     if (!settingsStore.begin()) {
         Serial.println("Redux settings initialization failed");
     }
+    ossmControlScreen.setStrokeEncoderReversed(settingsStore.strokeEncoderReversed());
     const std::uint32_t now = millis();
     idleTimer.begin(now);
     backlightController.begin(

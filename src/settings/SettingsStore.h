@@ -49,6 +49,11 @@ struct AutoConnectOption {
     const char* name;
 };
 
+struct StrokeDirectionOption {
+    bool reversed;
+    const char* name;
+};
+
 struct SavedOssmConnection {
     std::uint64_t address = 0;
     std::uint8_t addressType = 0;
@@ -62,11 +67,13 @@ class SettingsStore {
     static constexpr IdlePowerOffTimeout kDefaultIdlePowerOffTimeout =
         IdlePowerOffTimeout::Minutes30;
     static constexpr bool kDefaultAutoConnectEnabled = true;
+    static constexpr bool kDefaultStrokeEncoderReversed = false;
 
     static constexpr std::size_t kBrightnessOptionCount = 4;
     static constexpr std::size_t kIdleDimOptionCount = 4;
     static constexpr std::size_t kIdlePowerOffOptionCount = 4;
     static constexpr std::size_t kAutoConnectOptionCount = 2;
+    static constexpr std::size_t kStrokeDirectionOptionCount = 2;
 
     bool begin();
     BrightnessLevel brightnessLevel() const;
@@ -77,6 +84,8 @@ class SettingsStore {
     bool setIdlePowerOffTimeout(IdlePowerOffTimeout timeout);
     bool autoConnectEnabled() const;
     bool setAutoConnectEnabled(bool enabled);
+    bool strokeEncoderReversed() const;
+    bool setStrokeEncoderReversed(bool reversed);
     bool savedOssmConnection(SavedOssmConnection& connection) const;
     bool setSavedOssmConnection(const SavedOssmConnection& connection);
 
@@ -88,6 +97,8 @@ class SettingsStore {
     static std::size_t idlePowerOffOptionIndex(IdlePowerOffTimeout timeout);
     static const AutoConnectOption& autoConnectOption(std::size_t index);
     static std::size_t autoConnectOptionIndex(bool enabled);
+    static const StrokeDirectionOption& strokeDirectionOption(std::size_t index);
+    static std::size_t strokeDirectionOptionIndex(bool reversed);
 
   private:
     Preferences preferences_;
@@ -95,6 +106,7 @@ class SettingsStore {
     IdleDimTimeout idleDimTimeout_ = kDefaultIdleDimTimeout;
     IdlePowerOffTimeout idlePowerOffTimeout_ = kDefaultIdlePowerOffTimeout;
     bool autoConnectEnabled_ = kDefaultAutoConnectEnabled;
+    bool strokeEncoderReversed_ = kDefaultStrokeEncoderReversed;
     SavedOssmConnection savedOssmConnection_{};
     bool hasSavedOssmConnection_ = false;
     bool initialized_ = false;

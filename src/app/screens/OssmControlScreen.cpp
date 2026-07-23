@@ -43,7 +43,8 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
     }
 
     const std::uint32_t now = millis();
-    const std::int64_t strokeAdjustment = -static_cast<std::int64_t>(events.encoderSteps[1]);
+    const std::int64_t strokeAdjustment =
+        static_cast<std::int64_t>(events.encoderSteps[1]) * (strokeEncoderReversed_ ? 1 : -1);
 
     OssmControlAdjustments adjustments;
     adjustments.speed = accelerate(
@@ -146,6 +147,10 @@ void OssmControlScreen::setPatternLabel(int patternId, const char* patternName) 
     } else {
         lv_label_set_text_fmt(objects.ossm_control_pattern_lbl, "Pattern %d", patternId);
     }
+}
+
+void OssmControlScreen::setStrokeEncoderReversed(bool reversed) {
+    strokeEncoderReversed_ = reversed;
 }
 
 }  // namespace m5_redux

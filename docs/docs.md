@@ -71,6 +71,9 @@ low speed. Press the center MX button to stop motion.
 | Right encoder | Adjusts sensation; press to select a pattern. |
 | Center MX button | Stops motion. |
 
+The **Stroke direction** setting controls how the left middle encoder adjusts stroke. By default,
+turning it right decreases the stroke, matching the slider motion and machine travel.
+
 To change the active pattern, press the right encoder, turn it to select a
 pattern, and press it again to confirm.
 

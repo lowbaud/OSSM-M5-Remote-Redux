@@ -84,7 +84,8 @@ To change the active pattern, click the right encoder, turn it to select a patte
 again to confirm.
 
 Settings can be reached from the welcome screen or the control screen by clicking the left
-encoder.
+encoder. The **Stroke direction** setting controls how the left middle encoder adjusts stroke. By
+default, turning it right decreases the stroke, matching the slider motion and machine travel.
 
 The **Stop** button remains active at all times while connected, including in menus.
 

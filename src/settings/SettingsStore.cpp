@@ -12,6 +12,7 @@ constexpr char kBrightnessKey[] = "brightness";
 constexpr char kIdleDimKey[] = "idle_dim";
 constexpr char kIdlePowerOffKey[] = "idle_power_off";
 constexpr char kAutoConnectKey[] = "auto_connect";
+constexpr char kStrokeDirectionKey[] = "stroke_reverse";
 constexpr char kOssmConnectionKey[] = "ossm_conn";
 constexpr std::uint8_t kOssmConnectionVersion = 1;
 
@@ -56,12 +57,19 @@ constexpr AutoConnectOption kAutoConnectOptions[] = {
     {false, "No"},
 };
 
+constexpr StrokeDirectionOption kStrokeDirectionOptions[] = {
+    {false, "Right decreases"},
+    {true, "Right increases"},
+};
+
 static_assert(
     sizeof(kPreferencesNamespace) - 1 <= 15, "NVS namespace names are limited to 15 characters");
 static_assert(sizeof(kBrightnessKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kIdleDimKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kIdlePowerOffKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kAutoConnectKey) - 1 <= 15, "NVS key names are limited to 15 characters");
+static_assert(
+    sizeof(kStrokeDirectionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kOssmConnectionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(
     sizeof(kBrightnessOptions) / sizeof(kBrightnessOptions[0]) ==
@@ -78,6 +86,10 @@ static_assert(
     sizeof(kAutoConnectOptions) / sizeof(kAutoConnectOptions[0]) ==
         SettingsStore::kAutoConnectOptionCount,
     "Auto-connect option count does not match its catalog");
+static_assert(
+    sizeof(kStrokeDirectionOptions) / sizeof(kStrokeDirectionOptions[0]) ==
+        SettingsStore::kStrokeDirectionOptionCount,
+    "Stroke direction option count does not match its catalog");
 static_assert(
     kIdleDimOptions[kDefaultIdleDimOptionIndex].timeout == SettingsStore::kDefaultIdleDimTimeout,
     "Default idle dim option must remain one minute");
@@ -117,6 +129,8 @@ bool SettingsStore::begin() {
     }
 
     autoConnectEnabled_ = preferences_.getBool(kAutoConnectKey, kDefaultAutoConnectEnabled);
+    strokeEncoderReversed_ =
+        preferences_.getBool(kStrokeDirectionKey, kDefaultStrokeEncoderReversed);
 
     StoredOssmConnection storedConnection;
     if (preferences_.getBytesLength(kOssmConnectionKey) == sizeof(storedConnection) &&
@@ -226,6 +240,27 @@ bool SettingsStore::setAutoConnectEnabled(bool enabled) {
     return true;
 }
 
+bool SettingsStore::strokeEncoderReversed() const {
+    return strokeEncoderReversed_;
+}
+
+bool SettingsStore::setStrokeEncoderReversed(bool reversed) {
+    if (!initialized_) {
+        return false;
+    }
+
+    if (reversed == strokeEncoderReversed_) {
+        return true;
+    }
+
+    if (preferences_.putBool(kStrokeDirectionKey, reversed) != sizeof(reversed)) {
+        return false;
+    }
+
+    strokeEncoderReversed_ = reversed;
+    return true;
+}
+
 bool SettingsStore::savedOssmConnection(SavedOssmConnection& connection) const {
     if (!hasSavedOssmConnection_) {
         return false;
@@ -320,6 +355,22 @@ const AutoConnectOption& SettingsStore::autoConnectOption(std::size_t index) {
 std::size_t SettingsStore::autoConnectOptionIndex(bool enabled) {
     for (std::size_t index = 0; index < kAutoConnectOptionCount; ++index) {
         if (kAutoConnectOptions[index].enabled == enabled) {
+            return index;
+        }
+    }
+    return 0;
+}
+
+const StrokeDirectionOption& SettingsStore::strokeDirectionOption(std::size_t index) {
+    if (index >= kStrokeDirectionOptionCount) {
+        index = strokeDirectionOptionIndex(kDefaultStrokeEncoderReversed);
+    }
+    return kStrokeDirectionOptions[index];
+}
+
+std::size_t SettingsStore::strokeDirectionOptionIndex(bool reversed) {
+    for (std::size_t index = 0; index < kStrokeDirectionOptionCount; ++index) {
+        if (kStrokeDirectionOptions[index].reversed == reversed) {
             return index;
         }
     }

@@ -27,6 +27,7 @@ class OssmControlScreen {
     void refresh();
     void setBatteryLevel(int percent);
     void setPatternLabel(int patternId, const char* patternName);
+    void setStrokeEncoderReversed(bool reversed);
 
   private:
     enum class AccelerationPolicy : std::uint8_t {
@@ -53,6 +54,7 @@ class OssmControlScreen {
     std::array<AccelerationState, RemoteInputEvents::kEncoderCount> accelerationStates_{};
     BatteryIndicator batteryIndicator_;
     StopButtonFeedback stopButtonFeedback_;
+    bool strokeEncoderReversed_ = false;
 
     void resetAcceleration();
     static std::int64_t accelerate(
