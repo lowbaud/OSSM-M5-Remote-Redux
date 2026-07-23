@@ -35,6 +35,7 @@ class OssmControl {
   private:
     static constexpr int kMinimum = 0;
     static constexpr int kMaximum = 100;
+    static constexpr int kAutomaticStrokeFloor = 10;
 
     ossm::OssmClient& client_;
     OssmControlValues values_{};
