@@ -272,7 +272,7 @@ main th {
   color: #07101e;
 }
 
-.release-info {
+.flasher__release-info {
   width: fit-content;
   max-width: 100%;
   padding: 0.75rem 1rem;
@@ -281,11 +281,11 @@ main th {
   font-weight: 600;
 }
 
-.release-info.preview {
+.flasher__release-info--preview {
   color: var(--orange);
 }
 
-.flasher-control {
+.flasher__control {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -293,19 +293,83 @@ main th {
   margin-block: 1.5rem;
 }
 
-.flasher-control label {
+.flasher__control label {
   font-weight: 600;
 }
 
-.flasher-control select,
-#install-firmware {
+.flasher__control select,
+.flasher__button {
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--blue);
   border-radius: 0.35rem;
   font: inherit;
 }
 
-#install-firmware {
+.flasher__actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+  max-width: 55rem;
+  gap: 1.5rem;
+  margin-block: 2rem;
+}
+
+.flasher__card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  border: 2px solid var(--blue);
+  border-radius: 0.5rem;
+  background-color: rgb(56 189 248 / 5%);
+}
+
+.flasher__card--full {
+  border-color: var(--orange);
+  background-color: rgb(245 158 50 / 5%);
+}
+
+.flasher__card > :first-child {
+  margin-top: 0;
+}
+
+.flasher__card > :last-child {
+  margin-bottom: 0;
+}
+
+.flasher__card .notice {
+  margin-block: 1rem;
+}
+
+.flasher__card > esp-web-install-button,
+.flasher__card-controls {
+  margin-top: auto;
+}
+
+.flasher__confirmation {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-block: 0.5rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.flasher__confirmation input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  accent-color: var(--blue);
+}
+
+.flasher__card-controls .flasher__confirmation {
+  margin-bottom: 0;
+}
+
+.flasher__choice-help {
+  margin-top: -0.75rem;
+  margin-bottom: 2rem;
+}
+
+.flasher__button {
   margin-top: 1rem;
   background: var(--blue);
   color: #07101e;
@@ -313,7 +377,12 @@ main th {
   cursor: pointer;
 }
 
-#install-firmware:disabled {
+.flasher__card--full .flasher__button {
+  border-color: var(--orange);
+  background: var(--orange);
+}
+
+.flasher__button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }

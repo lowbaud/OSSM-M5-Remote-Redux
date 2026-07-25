@@ -47,8 +47,9 @@ Select the recommended 500 mA charging option unless the installed battery is
 explicitly rated for a charge current of at least 1000 mA. Lower charge currents
 can be set when building the firmware from source.
 
-Flashing via the Web Flasher always resets all settings to their defaults, regardless
-of whether **Erase device** is selected.
+The Web Flasher offers **Full install** and **Update Redux**. Use Full install
+for first-time installation, recovery, or replacing other firmware. Use Update
+Redux only when the remote already runs Redux; it preserves saved settings.
 
 
 ## Connect to an OSSM

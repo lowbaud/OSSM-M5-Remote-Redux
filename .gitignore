@@ -1,5 +1,6 @@
 .pio
 /build/
+/src/idf_component.yml
 .DS_Store
 Thumbs.db
 __pycache__/

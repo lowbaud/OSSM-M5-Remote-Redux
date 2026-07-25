@@ -89,6 +89,10 @@ jobs:
             exit 1
           fi
 
+      - name: Test release tooling
+        if: github.event_name == 'release' || inputs.firmware_source == 'Build preview binaries from selected branch'
+        run: python -m unittest discover -s tests -p "test_release_build.py"
+
       - name: Build firmware
         if: github.event_name == 'release' || inputs.firmware_source == 'Build preview binaries from selected branch'
         run: python release_build.py

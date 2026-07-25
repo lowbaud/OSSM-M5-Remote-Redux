@@ -37,11 +37,15 @@ further down on this page or in the [original repo](https://github.com/ortlof/OS
 The easiest way to install or update the firmware is with the
 [web flasher](https://lowbaud.github.io/OSSM-M5-Remote-Redux/flash/). Connect the remote via
 USB, open the flasher in a browser that supports Web Serial (such as Chrome or Edge), select the
-battery charge current, and click **Install firmware**. The flasher detects Core2 and CoreS3
+battery charge current, and choose an installation type. The flasher detects Core2 and CoreS3
 hardware automatically.
 
 Use the recommended 500 mA charge current unless the installed battery is explicitly rated for
-charging at 1000 mA. Flashing resets the remote's saved settings.
+charging at 1000 mA.
+
+The Web Flasher offers **Full install** and **Update Redux**. Use Full install for first-time
+installation, recovery, or replacing other firmware. Use Update Redux only when the remote already
+runs Redux; it preserves saved settings.
 
 To upload the firmware from source instead:
 

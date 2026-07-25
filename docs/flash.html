@@ -6,9 +6,10 @@ nav_key: flash
 permalink: /flash/
 ---
 
-<h1>Web Flasher</h1>
+<div class="flasher">
+<h1>Install M5 Remote Redux</h1>
 
-<p id="release-info" class="release-info" role="status">
+<p id="release-info" class="flasher__release-info" role="status">
   Loading firmware release information...
 </p>
 
@@ -16,13 +17,8 @@ permalink: /flash/
   The flasher automatically detects whether the connected OSSM M5 Remote is
   Core2-based or CoreS3-based.
 </p>
-<p>
-  Flashing resets your saved settings whether or not
-  <strong>Erase device</strong> is checked during install. Leaving it
-  unchecked is faster because it skips an additional full-device erase.
-</p>
 
-<div class="flasher-control">
+<div class="flasher__control">
   <label for="charge-current">Battery charge current:</label>
   <select id="charge-current">
     <option value="500" selected>500 mA (recommended)</option>
@@ -37,6 +33,66 @@ permalink: /flash/
   Slower charge rates require building from source.
 </p>
 
+<div class="flasher__actions">
+  <section class="flasher__card flasher__card--full">
+    <h2>Full install</h2>
+    <p>
+      For first-time installation, recovery, or replacing different firmware.
+    </p>
+    <p><strong>Erases saved devices and settings.</strong></p>
+
+    <esp-web-install-button
+      id="factory-install-button"
+      manifest="{{ '/flash/manifest_factory_500mA.json' | relative_url }}"
+    >
+      <button id="factory-firmware" class="flasher__button" slot="activate" disabled>
+        Start full install
+      </button>
+      <span slot="unsupported">
+        Use a current desktop version of Firefox, Chrome, or Edge to flash
+        firmware.
+      </span>
+      <span slot="not-allowed">
+        Web Serial requires HTTPS or a page served from localhost.
+      </span>
+    </esp-web-install-button>
+  </section>
+
+  <section class="flasher__card">
+    <h2>Update Redux</h2>
+    <p>
+      Keeps saved devices and settings.
+    </p>
+
+    <p>During installation, leave <strong>Erase device</strong> unchecked.</p>
+
+    <div class="flasher__card-controls">
+      <label class="flasher__confirmation" for="redux-installed">
+        <input id="redux-installed" type="checkbox">
+        <span>This remote already runs Redux</span>
+      </label>
+
+      <esp-web-install-button
+        id="update-install-button"
+        manifest="{{ '/flash/manifest_update_500mA.json' | relative_url }}"
+      >
+        <button id="update-firmware" class="flasher__button" slot="activate" disabled>
+          Update and keep settings
+        </button>
+        <span slot="unsupported">
+          Use a current desktop version of Firefox, Chrome, or Edge to flash
+          firmware.
+        </span>
+        <span slot="not-allowed">
+          Web Serial requires HTTPS or a page served from localhost.
+        </span>
+      </esp-web-install-button>
+    </div>
+  </section>
+</div>
+
+<p class="flasher__choice-help"><strong>Not sure?</strong> Choose Full install.</p>
+
 <div class="notice">
   <p>
     <strong>Remote not listed?</strong> Core2-based remotes may require a USB
@@ -48,32 +104,20 @@ permalink: /flash/
   </p>
 </div>
 
-<ol class="flasher-steps">
+<ol class="flasher__steps">
   <li>Connect the remote using a USB data cable.</li>
   <li>Select the battery charge current above.</li>
-  <li>Click <strong>Install firmware</strong>.</li>
+  <li>Choose Full install or Update using the guidance above.</li>
   <li>Select the remote from the browser's serial-device list.</li>
-  <li>In the flasher dialog, click <strong>Install OSSM M5 Remote Redux</strong>.</li>
-  <li>Optionally enable <strong>Erase device</strong>, then click <strong>Next</strong>.</li>
+  <li>In the flasher dialog, choose the displayed Redux action.</li>
+  <li>
+    For an Update, leave <strong>Erase device</strong> unchecked. A Full install
+    resets the Redux settings either way.
+  </li>
   <li>On the confirmation screen, click <strong>Install</strong>.</li>
   <li>Wait for flashing to finish. The remote will restart automatically.</li>
 </ol>
-
-<esp-web-install-button
-  id="install-button"
-  manifest="{{ '/flash/manifest_500mA.json' | relative_url }}"
->
-  <button id="install-firmware" slot="activate" disabled>
-    Install firmware
-  </button>
-  <span slot="unsupported">
-    Use a current desktop version of Firefox, Chrome, or Edge to install
-    firmware.
-  </span>
-  <span slot="not-allowed">
-    Web Serial requires HTTPS or a page served from localhost.
-  </span>
-</esp-web-install-button>
+</div>
 
 <script
   type="module"
@@ -82,9 +126,17 @@ permalink: /flash/
 <script>
   const flasherBaseUrl = "{{ '/flash/' | relative_url }}";
   const chargeCurrent = document.querySelector("#charge-current");
-  const installButton = document.querySelector("#install-button");
-  const installFirmware = document.querySelector("#install-firmware");
+  const updateInstallButton = document.querySelector("#update-install-button");
+  const factoryInstallButton = document.querySelector("#factory-install-button");
+  const updateFirmware = document.querySelector("#update-firmware");
+  const factoryFirmware = document.querySelector("#factory-firmware");
+  const reduxInstalled = document.querySelector("#redux-installed");
   const releaseInfo = document.querySelector("#release-info");
+  let releaseAvailable = false;
+
+  function updateButtonAvailability() {
+    updateFirmware.disabled = !releaseAvailable || !reduxInstalled.checked;
+  }
 
   async function loadReleaseInfo() {
     try {
@@ -108,16 +160,18 @@ permalink: /flash/
 
       const date = release.timestamp.slice(0, 10);
       if (release.channel === "preview") {
-        releaseInfo.classList.add("preview");
+        releaseInfo.classList.add("flasher__release-info--preview");
         releaseInfo.textContent =
-          `PREVIEW BUILD ${release.buildVersion} — built ${date}`;
+          `PREVIEW BUILD ${release.buildVersion} \u2014 built ${date}`;
       } else if (release.channel === "release") {
         releaseInfo.textContent =
-          `Firmware release: ${release.buildVersion} — published ${date}`;
+          `Firmware release: ${release.buildVersion} \u2014 published ${date}`;
       } else {
         throw new Error(`Unknown release channel: ${release.channel}`);
       }
-      installFirmware.disabled = false;
+      releaseAvailable = true;
+      updateButtonAvailability();
+      factoryFirmware.disabled = false;
     } catch (error) {
       releaseInfo.textContent =
         "Firmware release information is unavailable. Flashing is disabled.";
@@ -126,9 +180,13 @@ permalink: /flash/
   }
 
   chargeCurrent.addEventListener("change", () => {
-    installButton.manifest =
-      `${flasherBaseUrl}manifest_${chargeCurrent.value}mA.json`;
+    updateInstallButton.manifest =
+      `${flasherBaseUrl}manifest_update_${chargeCurrent.value}mA.json`;
+    factoryInstallButton.manifest =
+      `${flasherBaseUrl}manifest_factory_${chargeCurrent.value}mA.json`;
   });
+
+  reduxInstalled.addEventListener("change", updateButtonAvailability);
 
   loadReleaseInfo();
 </script>

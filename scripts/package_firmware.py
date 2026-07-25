@@ -1,4 +1,5 @@
 import hashlib
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -15,9 +16,14 @@ from project_metadata import firmware_stem, load_project_metadata
 
 
 APP_BIN = "$BUILD_DIR/${PROGNAME}.bin"
-MERGED_BIN = "$BUILD_DIR/merged-flash.bin"
+DEFAULT_FACTORY_SOURCE = "$BUILD_DIR/merged-flash.bin"
+FACTORY_SOURCE = env.GetProjectOption(
+    "custom_firmware_package_source",
+    DEFAULT_FACTORY_SOURCE,
+)
 FIRMWARE_DIR = PROJECT_DIR / "build" / "firmware"
 METADATA = load_project_metadata(PROJECT_DIR / "platformio.ini")
+ARTIFACT_DESCRIPTOR_SCHEMA = 1
 
 
 def write_sha256(bin_file):
@@ -31,35 +37,90 @@ def write_sha256(bin_file):
         encoding="utf-8",
     )
     print("Writing SHA-256: " + str(sha256_file))
+    return digest
 
 
-def package_merged_firmware(target, source, env):
+def parse_flash_offset(value):
+    try:
+        offset = int(str(value), 0)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid application flash offset: {value}") from exc
+
+    if offset <= 0:
+        raise RuntimeError(f"Application flash offset must be positive: {value}")
+
+    return offset
+
+
+def remove_artifact(path):
+    path.unlink(missing_ok=True)
+    path.with_suffix(".md5").unlink(missing_ok=True)
+    path.with_suffix(".sha256").unlink(missing_ok=True)
+
+
+def package_firmware(target, source, env):
     build_target = env.get("PIOENV") or "unknown"
-    merged_bin = Path(env.subst(MERGED_BIN))
+    artifact_stem = firmware_stem(METADATA, build_target)
+    factory_source = Path(env.subst(FACTORY_SOURCE))
+    update_source = Path(env.subst(APP_BIN))
+    app_offset = parse_flash_offset(env.subst("$ESP32_APP_OFFSET"))
 
-    if not merged_bin.is_file():
-        print("ERROR: merged firmware not found: " + str(merged_bin))
-        print("Make sure merge_bin.py runs before package_firmware.py")
-        env.Exit(1)
+    for artifact_type, artifact_source in (
+        ("factory", factory_source),
+        ("update", update_source),
+    ):
+        if not artifact_source.is_file():
+            print(
+                f"ERROR: {artifact_type} firmware source not found: "
+                + str(artifact_source)
+            )
+            env.Exit(1)
 
     FIRMWARE_DIR.mkdir(parents=True, exist_ok=True)
-    output_bin = FIRMWARE_DIR / f"{firmware_stem(METADATA, build_target)}.bin"
-    legacy_md5 = output_bin.with_suffix(".md5")
-    output_sha256 = output_bin.with_suffix(".sha256")
+    legacy_output = FIRMWARE_DIR / f"{artifact_stem}.bin"
+    factory_output = FIRMWARE_DIR / f"{artifact_stem}_factory.bin"
+    update_output = FIRMWARE_DIR / f"{artifact_stem}_update.bin"
+    descriptor_output = FIRMWARE_DIR / f"{artifact_stem}_artifacts.json"
 
-    output_bin.unlink(missing_ok=True)
-    legacy_md5.unlink(missing_ok=True)
-    output_sha256.unlink(missing_ok=True)
+    for artifact in (legacy_output, factory_output, update_output):
+        remove_artifact(artifact)
+    descriptor_output.unlink(missing_ok=True)
 
     print("App Version: " + METADATA.version)
     print("App Name: " + METADATA.artifact_name)
     print("Build Target: " + build_target)
-    print("Copying merged firmware to " + str(output_bin))
+    print("Packaging " + str(factory_source) + " as " + str(factory_output))
+    shutil.copy2(factory_source, factory_output)
+    factory_sha256 = write_sha256(factory_output)
 
-    shutil.copy2(merged_bin, output_bin)
-    write_sha256(output_bin)
+    print("Packaging " + str(update_source) + " as " + str(update_output))
+    shutil.copy2(update_source, update_output)
+    update_sha256 = write_sha256(update_output)
+
+    descriptor = {
+        "schemaVersion": ARTIFACT_DESCRIPTOR_SCHEMA,
+        "environment": build_target,
+        "artifacts": {
+            "factory": {
+                "filename": factory_output.name,
+                "offset": 0,
+                "sha256": factory_sha256,
+            },
+            "update": {
+                "filename": update_output.name,
+                "offset": app_offset,
+                "sha256": update_sha256,
+            },
+        },
+    }
+    print("Writing artifact descriptor: " + str(descriptor_output))
+    descriptor_output.write_text(
+        json.dumps(descriptor, indent=4) + "\n",
+        encoding="utf-8",
+    )
 
 
-# merge_bin.py registers its APP_BIN post-action first. Attaching packaging to
-# the same target makes the merge/package ordering explicit and reliable.
-env.AddPostAction(APP_BIN, package_merged_firmware)
+# The factory image is produced before this action: either by merge_bin.py for
+# legacy environments or by pioarduino's factory-image post-action. APP_BIN is
+# the application-only update image attached to this post-action.
+env.AddPostAction(APP_BIN, package_firmware)

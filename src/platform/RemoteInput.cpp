@@ -50,10 +50,10 @@ void RemoteInput::begin() {
         encoders_[index].setCount(0);
     }
 
-    // Preserve the active-high, pull-up configuration used by the legacy remote.
-    mxButton_.setup(kMxButtonPin, INPUT_PULLUP, false);
-    leftButton_.setup(kLeftButtonPin, INPUT_PULLUP, false);
-    rightButton_.setup(kRightButtonPin, INPUT_PULLUP, false);
+    // The expansion board provides 10 kOhm pull-downs; pressing a button drives it high.
+    mxButton_.setup(kMxButtonPin, INPUT, false);
+    leftButton_.setup(kLeftButtonPin, INPUT, false);
+    rightButton_.setup(kRightButtonPin, INPUT, false);
     mxButton_.attachPress(handleMxPress, this);
     leftButton_.attachClick(handleLeftClick, this);
     rightButton_.attachClick(handleRightClick, this);

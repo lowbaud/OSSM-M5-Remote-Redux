@@ -1,9 +1,4 @@
-"""Build full-install firmware artifacts for every supported Redux variant.
-
-The generated web-flasher manifests install merged images at offset zero. The
-merged images overwrite stored settings even when the optional full-device
-erase is not selected.
-"""
+"""Build factory-install and settings-preserving Redux release artifacts."""
 
 import hashlib
 import json
@@ -31,6 +26,8 @@ PROJECT_CONFIG = PROJECT_DIR / "platformio.ini"
 OUTPUT_DIR = PROJECT_DIR / "build" / "release"
 FIRMWARE_DIR = PROJECT_DIR / "build" / "firmware"
 CHARGE_CURRENT_ENV = "OSSM_CHARGE_CURRENT_MA"
+ARTIFACT_DESCRIPTOR_SCHEMA = 1
+ARTIFACT_TYPES = ("factory", "update")
 
 
 def find_platformio():
@@ -83,26 +80,111 @@ def chip_family_for_env(env_name):
     raise RuntimeError("Unknown chip family for env: " + env_name)
 
 
-def intermediate_firmware_path(metadata, env_name):
-    return FIRMWARE_DIR / f"{firmware_stem(metadata, env_name)}.bin"
+def intermediate_artifact_path(metadata, env_name, artifact_type):
+    return FIRMWARE_DIR / (
+        f"{firmware_stem(metadata, env_name)}_{artifact_type}.bin"
+    )
+
+
+def intermediate_descriptor_path(metadata, env_name):
+    return FIRMWARE_DIR / f"{firmware_stem(metadata, env_name)}_artifacts.json"
 
 
 def clear_intermediate_firmware(metadata, env_name):
-    firmware_bin = intermediate_firmware_path(metadata, env_name)
-    firmware_bin.unlink(missing_ok=True)
-    firmware_bin.with_suffix(".md5").unlink(missing_ok=True)
-    firmware_bin.with_suffix(".sha256").unlink(missing_ok=True)
+    legacy_bin = FIRMWARE_DIR / f"{firmware_stem(metadata, env_name)}.bin"
+    artifact_files = [legacy_bin] + [
+        intermediate_artifact_path(metadata, env_name, artifact_type)
+        for artifact_type in ARTIFACT_TYPES
+    ]
+
+    for artifact_file in artifact_files:
+        artifact_file.unlink(missing_ok=True)
+        artifact_file.with_suffix(".md5").unlink(missing_ok=True)
+        artifact_file.with_suffix(".sha256").unlink(missing_ok=True)
+
+    intermediate_descriptor_path(metadata, env_name).unlink(missing_ok=True)
 
 
-def require_intermediate_firmware(metadata, env_name):
-    firmware_bin = intermediate_firmware_path(metadata, env_name)
+def file_sha256(bin_file):
+    with bin_file.open("rb") as firmware:
+        return hashlib.sha256(firmware.read()).hexdigest()
 
-    if not firmware_bin.is_file():
+
+def require_intermediate_artifacts(metadata, env_name):
+    descriptor_file = intermediate_descriptor_path(metadata, env_name)
+
+    if not descriptor_file.is_file():
         raise RuntimeError(
-            "Expected merged firmware was not produced: " + str(firmware_bin)
+            "Expected artifact descriptor was not produced: " + str(descriptor_file)
         )
 
-    return firmware_bin
+    try:
+        descriptor = json.loads(descriptor_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            "Could not read artifact descriptor: " + str(descriptor_file)
+        ) from exc
+
+    if descriptor.get("schemaVersion") != ARTIFACT_DESCRIPTOR_SCHEMA:
+        raise RuntimeError("Unsupported artifact descriptor schema")
+
+    if descriptor.get("environment") != env_name:
+        raise RuntimeError(
+            f"Artifact descriptor environment does not match {env_name}"
+        )
+
+    descriptor_artifacts = descriptor.get("artifacts")
+    if not isinstance(descriptor_artifacts, dict):
+        raise RuntimeError("Artifact descriptor is missing artifacts")
+
+    artifacts = {}
+    for artifact_type in ARTIFACT_TYPES:
+        expected_file = intermediate_artifact_path(
+            metadata, env_name, artifact_type
+        )
+        artifact = descriptor_artifacts.get(artifact_type)
+
+        if not isinstance(artifact, dict):
+            raise RuntimeError(
+                f"Artifact descriptor is missing {artifact_type} firmware"
+            )
+
+        if artifact.get("filename") != expected_file.name:
+            raise RuntimeError(
+                f"Unexpected {artifact_type} firmware filename in descriptor"
+            )
+
+        offset = artifact.get("offset")
+        if not isinstance(offset, int) or offset < 0:
+            raise RuntimeError(
+                f"Invalid {artifact_type} firmware offset in descriptor"
+            )
+
+        if artifact_type == "factory" and offset != 0:
+            raise RuntimeError("Factory firmware must be flashed at offset zero")
+
+        if artifact_type == "update" and offset == 0:
+            raise RuntimeError("Update firmware must have a non-zero offset")
+
+        if not expected_file.is_file():
+            raise RuntimeError(
+                f"Expected {artifact_type} firmware was not produced: "
+                + str(expected_file)
+            )
+
+        expected_sha256 = artifact.get("sha256")
+        actual_sha256 = file_sha256(expected_file)
+        if expected_sha256 != actual_sha256:
+            raise RuntimeError(
+                f"SHA-256 mismatch for intermediate {artifact_type} firmware"
+            )
+
+        artifacts[artifact_type] = {
+            "path": expected_file,
+            "offset": offset,
+        }
+
+    return artifacts
 
 
 def write_sha256(bin_file):
@@ -118,15 +200,19 @@ def write_sha256(bin_file):
     print("Writing SHA-256: " + str(sha256_file))
 
 
-def create_webflasher_manifest(metadata, charge_current, firmware_filenames):
+def create_webflasher_manifest(
+    metadata, charge_current, artifact_type, firmware_artifacts
+):
     builds = []
 
     for env_name in ENVS:
-        firmware_filename = firmware_filenames.get(env_name)
+        environment_artifacts = firmware_artifacts.get(env_name, {})
+        artifact = environment_artifacts.get(artifact_type)
 
-        if not firmware_filename:
+        if not artifact:
             raise RuntimeError(
-                f"Missing release firmware for {env_name} at {charge_current} mA"
+                f"Missing {artifact_type} firmware for {env_name} at "
+                f"{charge_current} mA"
             )
 
         builds.append(
@@ -134,35 +220,51 @@ def create_webflasher_manifest(metadata, charge_current, firmware_filenames):
                 "chipFamily": chip_family_for_env(env_name),
                 "parts": [
                     {
-                        "path": firmware_filename,
-                        "offset": 0,
+                        "path": artifact["filename"],
+                        "offset": artifact["offset"],
                     }
                 ],
             }
         )
 
+    action_name = "Full Install" if artifact_type == "factory" else "Update"
     manifest = {
-        "name": f"{metadata.display_name} - {charge_current} mA charge current",
+        "name": (
+            f"{metadata.display_name} {action_name} - "
+            f"{charge_current} mA charge current"
+        ),
         "version": metadata.version,
         "new_install_prompt_erase": True,
         "builds": builds,
     }
 
-    manifest_file = OUTPUT_DIR / f"manifest_{charge_current}mA.json"
+    manifest_file = OUTPUT_DIR / (
+        f"manifest_{artifact_type}_{charge_current}mA.json"
+    )
     print("Writing web flasher manifest: " + str(manifest_file))
     manifest_file.write_text(json.dumps(manifest, indent=4) + "\n", encoding="utf-8")
 
 
 def copy_release_files(metadata, env_name, charge_current):
-    source_bin = require_intermediate_firmware(metadata, env_name)
-    target_bin = OUTPUT_DIR / (
-        f"{firmware_stem(metadata, env_name)}_charge-{charge_current}mA.bin"
-    )
+    intermediate_artifacts = require_intermediate_artifacts(metadata, env_name)
+    release_artifacts = {}
 
-    print("Copying " + str(source_bin) + " -> " + str(target_bin))
-    shutil.copy2(source_bin, target_bin)
-    write_sha256(target_bin)
-    return target_bin.name
+    for artifact_type, artifact in intermediate_artifacts.items():
+        source_bin = artifact["path"]
+        target_bin = OUTPUT_DIR / (
+            f"{firmware_stem(metadata, env_name)}_charge-{charge_current}mA_"
+            f"{artifact_type}.bin"
+        )
+
+        print("Copying " + str(source_bin) + " -> " + str(target_bin))
+        shutil.copy2(source_bin, target_bin)
+        write_sha256(target_bin)
+        release_artifacts[artifact_type] = {
+            "filename": target_bin.name,
+            "offset": artifact["offset"],
+        }
+
+    return release_artifacts
 
 
 def main():
@@ -171,14 +273,14 @@ def main():
 
     print("Using PlatformIO: " + pio_exe)
     print("Building " + metadata.display_name + " " + metadata.version)
-    print("WARNING: These merged installers overwrite stored settings.")
-    print("The web flasher's optional erase performs an additional full-device erase.")
+    print("Factory installers reset stored settings.")
+    print("Application updates preserve settings only when erase is not selected.")
 
     if OUTPUT_DIR.exists():
         shutil.rmtree(OUTPUT_DIR)
 
     OUTPUT_DIR.mkdir(parents=True)
-    firmware_filenames = {
+    firmware_artifacts = {
         charge_current: {} for charge_current in CHARGE_CURRENTS
     }
 
@@ -203,16 +305,18 @@ def main():
                     ["run", "-e", env_name],
                     charge_current,
                 )
-                firmware_filenames[charge_current][env_name] = copy_release_files(
+                firmware_artifacts[charge_current][env_name] = copy_release_files(
                     metadata, env_name, charge_current
                 )
 
         for charge_current in CHARGE_CURRENTS:
-            create_webflasher_manifest(
-                metadata=metadata,
-                charge_current=charge_current,
-                firmware_filenames=firmware_filenames[charge_current],
-            )
+            for artifact_type in ARTIFACT_TYPES:
+                create_webflasher_manifest(
+                    metadata=metadata,
+                    charge_current=charge_current,
+                    artifact_type=artifact_type,
+                    firmware_artifacts=firmware_artifacts[charge_current],
+                )
     except BaseException:
         print("")
         print("Removing incomplete release output: " + str(OUTPUT_DIR))

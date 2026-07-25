@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <cstring>
 
+#include "diagnostics/MigrationDiagnostics.h"
+
 namespace ossm {
 
 namespace {
@@ -485,6 +487,7 @@ bool OssmClientWorker::connectNow(const NimBLEAddress& address) {
     if (!observedStateValid_) {
         Serial.println("OSSM connected; waiting for machine state");
     }
+    m5_redux::migration_diagnostics::printSnapshot("ble-session-initialized-worker");
     return true;
 }
 
@@ -596,6 +599,7 @@ void OssmClientWorker::handlePendingDisconnect() {
         connectionState_.store(OssmClient::ConnectionState::Disconnected);
         recordError(disconnectReason_.load());
     }
+    m5_redux::migration_diagnostics::printSnapshot("ble-disconnected-worker");
 }
 
 void OssmClientWorker::reconcileUrgentStopRequest() {
@@ -769,7 +773,10 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
         }
         Serial.printf(
             "OSSM state notification parse failed: %s; length=%u first=0x%02X last=0x%02X\n",
-            error.c_str(), static_cast<unsigned>(notification.length), firstByte, lastByte);
+            error.c_str(),
+            static_cast<unsigned>(notification.length),
+            firstByte,
+            lastByte);
 #ifdef SERIAL_INFO
         logPayload(notification.data, notification.length);
 #endif
@@ -811,10 +818,9 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     const bool sensationValid = tryReadFloat(sensation, sensationValue);
     const bool bufferValid = tryReadFloat(buffer, bufferValue);
 
-    if (!timestamp.is<uint32_t>() || !state.is<const char*>() || !speedValid ||
-        !strokeValid || !depthValid || !sensationValid || !bufferValid || !pattern.is<int>() ||
-        (hasPosition && !position.is<float>()) ||
-        (hasSessionId && !sessionId.is<const char*>())) {
+    if (!timestamp.is<uint32_t>() || !state.is<const char*>() || !speedValid || !strokeValid ||
+        !depthValid || !sensationValid || !bufferValid || !pattern.is<int>() ||
+        (hasPosition && !position.is<float>()) || (hasSessionId && !sessionId.is<const char*>())) {
         Serial.println("OSSM state notification parse failed: invalid field");
 #ifdef SERIAL_INFO
         if (!timestamp.is<uint32_t>())
@@ -872,8 +878,7 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     if (hasSessionId) {
         const char* sessionIdText = sessionId.as<const char*>();
         const size_t sessionIdLength = std::strlen(sessionIdText);
-        if (sessionIdLength == 0 ||
-            sessionIdLength >= OssmClient::kObservedSessionIdCapacity) {
+        if (sessionIdLength == 0 || sessionIdLength >= OssmClient::kObservedSessionIdCapacity) {
             Serial.printf(
                 "OSSM state notification parse failed: invalid session length=%u\n",
                 static_cast<unsigned>(sessionIdLength));
