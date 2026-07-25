@@ -16,6 +16,11 @@ void begin() {
     config.output_power = false;
     M5.begin(config);
 
+#if ARDUINO_USB_MODE && ARDUINO_USB_CDC_ON_BOOT
+    // Serial diagnostics must not stall the UI when a USB host stops reading.
+    Serial.setTxTimeoutMs(0);
+#endif
+
     Serial.println("Serial diagnostics ready");
     M5.Power.setChargeCurrent(BATTERY_CHARGE_CURRENT);
 }
