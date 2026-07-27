@@ -267,7 +267,7 @@ bool OssmClientWorker::reconcileConnection() {
 
                 if (client_ && client_->isConnected()) {
                     if (commandCharacteristic_ && writeSetCommand("speed", 0)) {
-                        lastWrittenMotion_.speed = 0;
+                        motionWriteState_.speed.recordSuccessfulWrite(0);
                     }
                     disconnectExpected_.store(true);
                     client_->disconnect();
@@ -287,15 +287,6 @@ bool OssmClientWorker::reconcileConnection() {
 
     return connectionState_.load() == OssmClient::ConnectionState::Connected && client_ &&
            client_->isConnected();
-}
-
-void OssmClientWorker::applyRequestedState(const OssmClient::RequestedState& incoming) {
-    OssmClient::RequestedState accepted = incoming;
-    if (accepted.speed > 0 &&
-        (accepted.speedValidityEpoch != speedValidityEpoch_.load() || !motionReady())) {
-        accepted.speed = 0;
-    }
-    requested_ = accepted;
 }
 
 bool OssmClientWorker::reconcileMode() {
@@ -368,6 +359,96 @@ bool OssmClientWorker::reconcileMode() {
     }
 
     return false;
+}
+
+void OssmClientWorker::reconcileUrgentStopRequest() {
+    if (requested_.speed != 0 || !motionReady()) {
+        return;
+    }
+
+    if (writeSetCommand("speed", 0)) {
+        motionWriteState_.speed.recordSuccessfulWrite(0);
+    }
+}
+
+void OssmClientWorker::reconcileMotion() {
+    // Normal motion writes are tick-gated, but dirty fields are sent together as a bounded burst.
+    // Urgent stop is handled separately on mailbox wake.
+    if (!motionReady() || !hasDirtyMotion()) {
+        return;
+    }
+
+    const TickType_t now = xTaskGetTickCount();
+    if (now < nextMotionWriteAt_) {
+        return;
+    }
+
+    if (!motionWriteState_.speed.matchesLastWrite(requested_.speed)) {
+        if (writeSetCommand("speed", requested_.speed)) {
+            motionWriteState_.speed.recordSuccessfulWrite(requested_.speed);
+        }
+    }
+
+    if (!motionWriteState_.stroke.matchesLastWrite(requested_.stroke)) {
+        if (writeSetCommand("stroke", requested_.stroke)) {
+            motionWriteState_.stroke.recordSuccessfulWrite(requested_.stroke);
+        }
+    }
+
+    if (!motionWriteState_.depth.matchesLastWrite(requested_.depth)) {
+        if (writeSetCommand("depth", requested_.depth)) {
+            motionWriteState_.depth.recordSuccessfulWrite(requested_.depth);
+        }
+    }
+
+    if (!motionWriteState_.sensation.matchesLastWrite(requested_.sensation)) {
+        if (writeSetCommand("sensation", requested_.sensation)) {
+            motionWriteState_.sensation.recordSuccessfulWrite(requested_.sensation);
+        }
+    }
+
+    if (!motionWriteState_.pattern.matchesLastWrite(requested_.pattern)) {
+        if (writePatternCommand(requested_.pattern)) {
+            motionWriteState_.pattern.recordSuccessfulWrite(requested_.pattern);
+        }
+    }
+
+    nextMotionWriteAt_ = xTaskGetTickCount() + OssmClient::kMotionWriteInterval;
+}
+
+void OssmClientWorker::applyRequestedState(const OssmClient::RequestedState& incoming) {
+    OssmClient::RequestedState accepted = incoming;
+    if (accepted.speed > 0 &&
+        (accepted.speedValidityEpoch != speedValidityEpoch_.load() || !motionReady())) {
+        accepted.speed = 0;
+    }
+    requested_ = accepted;
+}
+
+bool OssmClientWorker::motionReady() const {
+    return connectionState_.load() == OssmClient::ConnectionState::Connected && client_ &&
+           client_->isConnected() && commandCharacteristic_ &&
+           requested_.mode.target == OssmClient::ModeTarget::StrokeEngine &&
+           requested_.mode.generation != 0 &&
+           requested_.mode.generation == modeOperation_.generation &&
+           modeState_.load() == OssmClient::ModeState::Ready &&
+           observedStateCategory_ == MachineStateCategory::MotionReady;
+}
+
+bool OssmClientWorker::hasDirtyMotion() const {
+    return !motionWriteState_.speed.matchesLastWrite(requested_.speed) ||
+           !motionWriteState_.stroke.matchesLastWrite(requested_.stroke) ||
+           !motionWriteState_.depth.matchesLastWrite(requested_.depth) ||
+           !motionWriteState_.sensation.matchesLastWrite(requested_.sensation) ||
+           !motionWriteState_.pattern.matchesLastWrite(requested_.pattern);
+}
+
+TickType_t OssmClientWorker::nextWakeAt() const {
+    TickType_t wakeAt = nextReconcileAt_;
+    if (motionReady() && hasDirtyMotion() && nextMotionWriteAt_ < wakeAt) {
+        wakeAt = nextMotionWriteAt_;
+    }
+    return wakeAt;
 }
 
 bool OssmClientWorker::connectNow(const NimBLEAddress& address) {
@@ -500,8 +581,7 @@ void OssmClientWorker::clearConnectionState() {
     patternListCharacteristic_ = nullptr;
     observedStateValid_ = false;
     observedStateCategory_ = MachineStateCategory::NoUsableState;
-    lastWrittenMotion_ = {};
-    motionBaselineWritten_ = false;
+    motionWriteState_ = {};
     nextMotionWriteAt_ = 0;
 
     if (initialized_) {
@@ -509,78 +589,6 @@ void OssmClientWorker::clearConnectionState() {
         xQueueReset(observedStateMailbox_);
         xQueueReset(patternMailbox_);
     }
-}
-
-void OssmClientWorker::setModeState(OssmClient::ModeState state) {
-    modeState_.store(state);
-    setMotionReady(state == OssmClient::ModeState::Ready);
-}
-
-const char* OssmClientWorker::modeFailureName(ModeFailure failure) {
-    switch (failure) {
-        case ModeFailure::None:
-            return "none";
-        case ModeFailure::CommandWriteFailed:
-            return "command-write-failed";
-        case ModeFailure::UnsupportedState:
-            return "unsupported-state";
-        case ModeFailure::TimedOut:
-            return "timed-out";
-        case ModeFailure::ReadinessLost:
-            return "readiness-lost";
-    }
-
-    return "unknown";
-}
-
-const char* OssmClientWorker::machineStateCategoryName(MachineStateCategory category) {
-    switch (category) {
-        case MachineStateCategory::NoUsableState:
-            return "no-usable-state";
-        case MachineStateCategory::MenuReady:
-            return "menu-ready";
-        case MachineStateCategory::MotionReady:
-            return "motion-ready";
-        case MachineStateCategory::Waiting:
-            return "waiting";
-        case MachineStateCategory::SpeedKnobBlocked:
-            return "speed-knob-blocked";
-        case MachineStateCategory::UnsupportedBlocked:
-            return "unsupported-blocked";
-    }
-
-    return "unknown";
-}
-
-void OssmClientWorker::failMode(ModeFailure failure) {
-    modeOperation_.failure = failure;
-    Serial.printf(
-        "OSSM mode failure: cause=%s category=%s error=%d\n",
-        modeFailureName(failure),
-        machineStateCategoryName(observedStateCategory_),
-        lastError_.load());
-    setModeState(OssmClient::ModeState::Failed);
-}
-
-void OssmClientWorker::setMotionReady(bool ready) {
-    if (!ready) {
-        invalidateSpeed();
-        return;
-    }
-
-    ready_.store(true);
-}
-
-void OssmClientWorker::invalidateSpeed() {
-    if (ready_.exchange(false)) {
-        speedValidityEpoch_.fetch_add(1);
-    }
-    requested_.speed = 0;
-}
-
-void OssmClientWorker::resetModeOperation() {
-    modeOperation_ = {};
-    setModeState(OssmClient::ModeState::Idle);
 }
 
 void OssmClientWorker::handlePendingDisconnect() {
@@ -602,14 +610,40 @@ void OssmClientWorker::handlePendingDisconnect() {
     m5_redux::migration_diagnostics::printSnapshot("ble-disconnected-worker");
 }
 
-void OssmClientWorker::reconcileUrgentStopRequest() {
-    if (requested_.speed != 0 || !motionReady()) {
+void OssmClientWorker::setModeState(OssmClient::ModeState state) {
+    modeState_.store(state);
+    setMotionReady(state == OssmClient::ModeState::Ready);
+}
+
+void OssmClientWorker::failMode(ModeFailure failure) {
+    modeOperation_.failure = failure;
+    Serial.printf(
+        "OSSM mode failure: cause=%s category=%s error=%d\n",
+        modeFailureName(failure),
+        machineStateCategoryName(observedStateCategory_),
+        lastError_.load());
+    setModeState(OssmClient::ModeState::Failed);
+}
+
+void OssmClientWorker::resetModeOperation() {
+    modeOperation_ = {};
+    setModeState(OssmClient::ModeState::Idle);
+}
+
+void OssmClientWorker::setMotionReady(bool ready) {
+    if (!ready) {
+        invalidateSpeed();
         return;
     }
 
-    if (writeSetCommand("speed", 0)) {
-        lastWrittenMotion_.speed = 0;
+    ready_.store(true);
+}
+
+void OssmClientWorker::invalidateSpeed() {
+    if (ready_.exchange(false)) {
+        speedValidityEpoch_.fetch_add(1);
     }
+    requested_.speed = 0;
 }
 
 bool OssmClientWorker::drainLatestStateNotification() {
@@ -941,105 +975,6 @@ OssmClientWorker::classifyMachineState(const char* state) const {
     return MachineStateCategory::UnsupportedBlocked;
 }
 
-void OssmClientWorker::recordError(int error) {
-    lastError_.store(error);
-}
-
-bool OssmClientWorker::motionReady() const {
-    return connectionState_.load() == OssmClient::ConnectionState::Connected && client_ &&
-           client_->isConnected() && commandCharacteristic_ &&
-           requested_.mode.target == OssmClient::ModeTarget::StrokeEngine &&
-           requested_.mode.generation != 0 &&
-           requested_.mode.generation == modeOperation_.generation &&
-           modeState_.load() == OssmClient::ModeState::Ready &&
-           observedStateCategory_ == MachineStateCategory::MotionReady;
-}
-
-void OssmClientWorker::reconcileMotion() {
-    // Normal motion writes are tick-gated, but dirty fields are sent together as a bounded burst.
-    // Urgent stop is handled separately on mailbox wake.
-    if (!motionReady() || !hasDirtyMotion()) {
-        return;
-    }
-
-    const TickType_t now = xTaskGetTickCount();
-    if (now < nextMotionWriteAt_) {
-        return;
-    }
-
-    bool attemptedWrite = false;
-    bool initialWriteComplete = true;
-
-    if (!motionBaselineWritten_ || requested_.speed != lastWrittenMotion_.speed) {
-        attemptedWrite = true;
-        if (writeSetCommand("speed", requested_.speed)) {
-            lastWrittenMotion_.speed = requested_.speed;
-        } else if (!motionBaselineWritten_) {
-            initialWriteComplete = false;
-        }
-    }
-
-    if (!motionBaselineWritten_ || requested_.stroke != lastWrittenMotion_.stroke) {
-        attemptedWrite = true;
-        if (writeSetCommand("stroke", requested_.stroke)) {
-            lastWrittenMotion_.stroke = requested_.stroke;
-        } else if (!motionBaselineWritten_) {
-            initialWriteComplete = false;
-        }
-    }
-
-    if (!motionBaselineWritten_ || requested_.depth != lastWrittenMotion_.depth) {
-        attemptedWrite = true;
-        if (writeSetCommand("depth", requested_.depth)) {
-            lastWrittenMotion_.depth = requested_.depth;
-        } else if (!motionBaselineWritten_) {
-            initialWriteComplete = false;
-        }
-    }
-
-    if (!motionBaselineWritten_ || requested_.sensation != lastWrittenMotion_.sensation) {
-        attemptedWrite = true;
-        if (writeSetCommand("sensation", requested_.sensation)) {
-            lastWrittenMotion_.sensation = requested_.sensation;
-        } else if (!motionBaselineWritten_) {
-            initialWriteComplete = false;
-        }
-    }
-
-    if (!motionBaselineWritten_ || requested_.pattern != lastWrittenMotion_.pattern) {
-        attemptedWrite = true;
-        if (writePatternCommand(requested_.pattern)) {
-            lastWrittenMotion_.pattern = requested_.pattern;
-        } else if (!motionBaselineWritten_) {
-            initialWriteComplete = false;
-        }
-    }
-
-    if (!motionBaselineWritten_ && initialWriteComplete) {
-        motionBaselineWritten_ = true;
-    }
-
-    if (attemptedWrite) {
-        nextMotionWriteAt_ = xTaskGetTickCount() + OssmClient::kMotionWriteInterval;
-    }
-}
-
-bool OssmClientWorker::hasDirtyMotion() const {
-    return !motionBaselineWritten_ || requested_.speed != lastWrittenMotion_.speed ||
-           requested_.stroke != lastWrittenMotion_.stroke ||
-           requested_.depth != lastWrittenMotion_.depth ||
-           requested_.sensation != lastWrittenMotion_.sensation ||
-           requested_.pattern != lastWrittenMotion_.pattern;
-}
-
-TickType_t OssmClientWorker::nextWakeAt() const {
-    TickType_t wakeAt = nextReconcileAt_;
-    if (motionReady() && hasDirtyMotion() && nextMotionWriteAt_ < wakeAt) {
-        wakeAt = nextMotionWriteAt_;
-    }
-    return wakeAt;
-}
-
 bool OssmClientWorker::writeCommand(const char* command) {
     if (!commandCharacteristic_ || !command)
         return false;
@@ -1072,6 +1007,46 @@ bool OssmClientWorker::writePatternCommand(int patternId) {
         return false;
 
     return writeCommand(command);
+}
+
+const char* OssmClientWorker::modeFailureName(ModeFailure failure) {
+    switch (failure) {
+        case ModeFailure::None:
+            return "none";
+        case ModeFailure::CommandWriteFailed:
+            return "command-write-failed";
+        case ModeFailure::UnsupportedState:
+            return "unsupported-state";
+        case ModeFailure::TimedOut:
+            return "timed-out";
+        case ModeFailure::ReadinessLost:
+            return "readiness-lost";
+    }
+
+    return "unknown";
+}
+
+const char* OssmClientWorker::machineStateCategoryName(MachineStateCategory category) {
+    switch (category) {
+        case MachineStateCategory::NoUsableState:
+            return "no-usable-state";
+        case MachineStateCategory::MenuReady:
+            return "menu-ready";
+        case MachineStateCategory::MotionReady:
+            return "motion-ready";
+        case MachineStateCategory::Waiting:
+            return "waiting";
+        case MachineStateCategory::SpeedKnobBlocked:
+            return "speed-knob-blocked";
+        case MachineStateCategory::UnsupportedBlocked:
+            return "unsupported-blocked";
+    }
+
+    return "unknown";
+}
+
+void OssmClientWorker::recordError(int error) {
+    lastError_.store(error);
 }
 
 void OssmClientWorker::logRemoteWrite(const char* target, const char* payload, bool success) const {

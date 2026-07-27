@@ -38,8 +38,6 @@ class OssmClientWorker {
   private:
     static constexpr size_t kStateNotificationCapacity = 256;
     static constexpr TickType_t kModeTimeout = pdMS_TO_TICKS(60000);
-
-    // Queue-safe copy of BLE notification bytes; oversized notifications are dropped.
     struct StateNotification {
         size_t length = 0;
         uint8_t data[kStateNotificationCapacity] = {};
@@ -70,63 +68,99 @@ class OssmClientWorker {
         ModeFailure failure = ModeFailure::None;
     };
 
+    // A valid value was accepted by a successful BLE write in this connection; it does not
+    // confirm that the machine applied the value.
+    struct MotionFieldWriteState {
+        int lastWrittenValue = 0;
+        bool valid = false;
+
+        bool matchesLastWrite(int value) const {
+            return valid && value == lastWrittenValue;
+        }
+
+        void recordSuccessfulWrite(int value) {
+            lastWrittenValue = value;
+            valid = true;
+        }
+    };
+
+    struct MotionWriteState {
+        MotionFieldWriteState speed;
+        MotionFieldWriteState stroke;
+        MotionFieldWriteState depth;
+        MotionFieldWriteState sensation;
+        MotionFieldWriteState pattern;
+    };
+
     void reconcile();
     bool reconcileConnection();
-    void applyRequestedState(const OssmClient::RequestedState& incoming);
     bool reconcileMode();
+    void reconcileUrgentStopRequest();
+    void reconcileMotion();
+
+    void applyRequestedState(const OssmClient::RequestedState& incoming);
+    bool motionReady() const;
+    bool hasDirtyMotion() const;
+    TickType_t nextWakeAt() const;
+
     bool connectNow(const NimBLEAddress& address);
     void clearConnectionState();
+    void handlePendingDisconnect();
+
     void setModeState(OssmClient::ModeState state);
-    static const char* modeFailureName(ModeFailure failure);
-    static const char* machineStateCategoryName(MachineStateCategory category);
     void failMode(ModeFailure failure);
+    void resetModeOperation();
     void setMotionReady(bool ready);
     void invalidateSpeed();
-    void resetModeOperation();
-    void handlePendingDisconnect();
-    void reconcileUrgentStopRequest();
+
     bool drainLatestStateNotification();
     void readInitialState();
     bool loadPatterns();
     void parseStateNotification(const StateNotification& notification);
     MachineStateCategory classifyMachineState(const char* state) const;
-    bool motionReady() const;
-    void recordError(int error);
-    void reconcileMotion();
-    bool hasDirtyMotion() const;
-    TickType_t nextWakeAt() const;
+
     bool writeCommand(const char* command);
     bool writeSetCommand(const char* field, int value);
     bool writePatternCommand(int patternId);
+
+    static const char* modeFailureName(ModeFailure failure);
+    static const char* machineStateCategoryName(MachineStateCategory category);
+    void recordError(int error);
     void logRemoteWrite(const char* target, const char* payload, bool success) const;
 
     QueueHandle_t requestedMailbox_ = nullptr;
     QueueHandle_t stateNotificationMailbox_ = nullptr;
     QueueHandle_t observedStateMailbox_ = nullptr;
     QueueHandle_t patternMailbox_ = nullptr;
+
     std::atomic<OssmClient::ConnectionState>& connectionState_;
     std::atomic<OssmClient::ModeState>& modeState_;
     std::atomic<bool>& ready_;
     std::atomic<uint32_t>& speedValidityEpoch_;
     std::atomic<int>& lastError_;
     OssmClientCallbacks callbacks_;
+
     OssmClient::RequestedState requested_{};
     TickType_t nextReconcileAt_ = 0;
-    TickType_t nextMotionWriteAt_ = 0;
+
     NimBLEClient* client_ = nullptr;
-    NimBLERemoteCharacteristic* commandCharacteristic_ = nullptr;
-    NimBLERemoteCharacteristic* speedKnobCharacteristic_ = nullptr;
-    NimBLERemoteCharacteristic* stateCharacteristic_ = nullptr;
-    NimBLERemoteCharacteristic* patternListCharacteristic_ = nullptr;
-    bool observedStateValid_ = false;
-    MachineStateCategory observedStateCategory_ = MachineStateCategory::NoUsableState;
-    ModeOperation modeOperation_{};
-    OssmClient::RequestedState lastWrittenMotion_{};
-    bool motionBaselineWritten_ = false;
     uint32_t handledConnectionGeneration_ = 0;
     std::atomic<bool> disconnectPending_{false};
     std::atomic<bool> disconnectExpected_{false};
     std::atomic<int> disconnectReason_{0};
+
+    NimBLERemoteCharacteristic* commandCharacteristic_ = nullptr;
+    NimBLERemoteCharacteristic* speedKnobCharacteristic_ = nullptr;
+    NimBLERemoteCharacteristic* stateCharacteristic_ = nullptr;
+    NimBLERemoteCharacteristic* patternListCharacteristic_ = nullptr;
+
+    bool observedStateValid_ = false;
+    MachineStateCategory observedStateCategory_ = MachineStateCategory::NoUsableState;
+    ModeOperation modeOperation_{};
+
+    MotionWriteState motionWriteState_{};
+    TickType_t nextMotionWriteAt_ = 0;
+
     bool initialized_ = false;
 };
 
