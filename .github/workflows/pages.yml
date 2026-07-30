@@ -166,7 +166,7 @@ jobs:
             > _releases.json
 
           official_tag="$(python scripts/select_webflasher_release.py \
-            _official_releases.json --channel release)"
+            _official_releases.json --channel release --optional)"
           development_tag="$(python scripts/select_webflasher_release.py \
             _releases.json --channel development --optional)"
 
@@ -178,6 +178,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          if [ -z "$OFFICIAL_TAG" ]; then
+            echo "No published official firmware was found; skipping it."
+            exit 0
+          fi
+
           release_bundle="web-flasher-${OFFICIAL_TAG}.zip"
           mkdir -p _release/official "$DOCS_SOURCE/flash"
           gh release download "$OFFICIAL_TAG" \
