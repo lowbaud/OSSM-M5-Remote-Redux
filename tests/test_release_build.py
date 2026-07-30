@@ -74,6 +74,23 @@ class ReleaseBuildTests(unittest.TestCase):
             self.assertTrue(release_file.with_suffix(".sha256").is_file())
             self.assertIn(f"_{artifact_type}.bin", release_file.name)
 
+    def test_charge_current_selection_defaults_to_all_supported_currents(self):
+        self.assertEqual(
+            release_build.resolve_charge_currents(None),
+            release_build.CHARGE_CURRENTS,
+        )
+
+    def test_charge_current_selection_preserves_unique_requested_currents(self):
+        self.assertEqual(
+            release_build.resolve_charge_currents([500, 500]),
+            [500],
+        )
+
+    def test_charge_current_argument_accepts_development_current(self):
+        args = release_build.parse_arguments(["--charge-current", "500"])
+
+        self.assertEqual(args.charge_currents, [500])
+
     def test_descriptor_hash_mismatch_is_rejected(self):
         env_name = "m5stack-core2"
         self.write_intermediate_artifacts(env_name, valid_hashes=False)

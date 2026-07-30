@@ -1,43 +1,35 @@
 ---
 layout: default
-title: Web Flasher
-description: Install M5 Remote Redux from your browser.
+title: Development Web Flasher
+description: Install a development build of M5 Remote Redux from your browser.
 nav_key: flash
-permalink: /flash/
+permalink: /flash/development/
 ---
 
 <div class="flasher">
-<h1>Install M5 Remote Redux</h1>
+<h1>Install a Redux development build</h1>
 
-<p id="release-info" class="flasher__release-info" role="status">
-  Loading firmware release information...
-</p>
-
-<p>
-  Want to test the newest development firmware?
-  <a href="{{ '/flash/development/' | relative_url }}">
-    Open the development flasher
-  </a>.
-</p>
-
-<p>
-  The flasher automatically detects whether the connected OSSM M5 Remote is
-  Core2-based or CoreS3-based.
-</p>
-
-<div class="flasher__control">
-  <label for="charge-current">Battery charge current:</label>
-  <select id="charge-current">
-    <option value="500" selected>500 mA (recommended)</option>
-    <option value="1000">1000 mA (fast charging)</option>
-  </select>
+<div class="notice flasher__development-warning">
+  <p>
+    <strong>Testing firmware:</strong> Development builds are unreleased and may
+    contain incomplete features or regressions. Use the
+    <a href="{{ '/flash/' | relative_url }}">official web flasher</a> for the
+    latest supported release.
+  </p>
 </div>
 
+<p
+  id="release-info"
+  class="flasher__release-info flasher__release-info--development"
+  role="status"
+>
+  Loading development firmware information...
+</p>
+
 <p>
-  The standard remote build uses an external battery. Use the recommended
-  500 mA option unless the installed battery is explicitly rated for charging
-  at least 1000 mA. The documented EEMB LP103454 supports the 1000 mA option.
-  Slower charge rates require building from source.
+  This flasher uses the latest published development build with a fixed 500 mA
+  battery charge current. It automatically detects whether the connected OSSM
+  M5 Remote is Core2-based or CoreS3-based.
 </p>
 
 <div class="flasher__actions">
@@ -50,10 +42,10 @@ permalink: /flash/
 
     <esp-web-install-button
       id="factory-install-button"
-      manifest="{{ '/flash/manifest_factory_500mA.json' | relative_url }}"
+      manifest="{{ '/flash/development/manifest_factory_500mA.json' | relative_url }}"
     >
       <button id="factory-firmware" class="flasher__button" slot="activate" disabled>
-        Start full install
+        Install development build
       </button>
       <span slot="unsupported">
         Use a current desktop version of Firefox, Chrome, or Edge to flash
@@ -67,9 +59,7 @@ permalink: /flash/
 
   <section class="flasher__card">
     <h2>Update Redux</h2>
-    <p>
-      Keeps saved devices and settings.
-    </p>
+    <p>Keeps saved devices and settings.</p>
 
     <p>During installation, leave <strong>Erase device</strong> unchecked.</p>
 
@@ -81,10 +71,10 @@ permalink: /flash/
 
       <esp-web-install-button
         id="update-install-button"
-        manifest="{{ '/flash/manifest_update_500mA.json' | relative_url }}"
+        manifest="{{ '/flash/development/manifest_update_500mA.json' | relative_url }}"
       >
         <button id="update-firmware" class="flasher__button" slot="activate" disabled>
-          Update and keep settings
+          Update to development build
         </button>
         <span slot="unsupported">
           Use a current desktop version of Firefox, Chrome, or Edge to flash
@@ -113,7 +103,6 @@ permalink: /flash/
 
 <ol class="flasher__steps">
   <li>Connect the remote using a USB data cable.</li>
-  <li>Select the battery charge current above.</li>
   <li>Choose Full install or Update using the guidance above.</li>
   <li>Select the remote from the browser's serial-device list.</li>
   <li>In the flasher dialog, choose the displayed Redux action.</li>
@@ -131,10 +120,7 @@ permalink: /flash/
   src="https://unpkg.com/esp-web-tools@10.2.1/dist/web/install-button.js?module"
 ></script>
 <script>
-  const flasherBaseUrl = "{{ '/flash/' | relative_url }}";
-  const chargeCurrent = document.querySelector("#charge-current");
-  const updateInstallButton = document.querySelector("#update-install-button");
-  const factoryInstallButton = document.querySelector("#factory-install-button");
+  const flasherBaseUrl = "{{ '/flash/development/' | relative_url }}";
   const updateFirmware = document.querySelector("#update-firmware");
   const factoryFirmware = document.querySelector("#factory-firmware");
   const reduxInstalled = document.querySelector("#redux-installed");
@@ -159,35 +145,27 @@ permalink: /flash/
         !release.version ||
         !release.buildVersion ||
         !release.commit ||
-        !release.channel ||
-        !release.timestamp
+        release.channel !== "development" ||
+        !release.timestamp ||
+        !release.sourceRef
       ) {
-        throw new Error("Incomplete release information");
+        throw new Error("Incomplete development release information");
       }
 
       const date = release.timestamp.slice(0, 10);
-      if (release.channel === "release") {
-        releaseInfo.textContent =
-          `Firmware release: ${release.buildVersion} \u2014 published ${date}`;
-      } else {
-        throw new Error(`Unknown release channel: ${release.channel}`);
-      }
+      const shortCommit = release.commit.slice(0, 8);
+      releaseInfo.textContent =
+        `DEVELOPMENT ${release.buildVersion} \u2014 ${release.sourceRef} ` +
+        `(${shortCommit}) \u2014 built ${date}`;
       releaseAvailable = true;
       updateButtonAvailability();
       factoryFirmware.disabled = false;
     } catch (error) {
       releaseInfo.textContent =
-        "Firmware release information is unavailable. Flashing is disabled.";
-      console.error("Could not load firmware release information:", error);
+        "Development firmware is unavailable. Flashing is disabled.";
+      console.error("Could not load development firmware information:", error);
     }
   }
-
-  chargeCurrent.addEventListener("change", () => {
-    updateInstallButton.manifest =
-      `${flasherBaseUrl}manifest_update_${chargeCurrent.value}mA.json`;
-    factoryInstallButton.manifest =
-      `${flasherBaseUrl}manifest_factory_${chargeCurrent.value}mA.json`;
-  });
 
   reduxInstalled.addEventListener("change", updateButtonAvailability);
 

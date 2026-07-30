@@ -281,8 +281,12 @@ main th {
   font-weight: 600;
 }
 
-.flasher__release-info--preview {
+.flasher__release-info--development {
   color: var(--orange);
+}
+
+.flasher__development-warning {
+  border: 2px solid var(--orange);
 }
 
 .flasher__control {

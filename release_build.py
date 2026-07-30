@@ -1,5 +1,6 @@
 """Build factory-install and settings-preserving Redux release artifacts."""
 
+import argparse
 import hashlib
 import json
 import os
@@ -28,6 +29,29 @@ FIRMWARE_DIR = PROJECT_DIR / "build" / "firmware"
 CHARGE_CURRENT_ENV = "OSSM_CHARGE_CURRENT_MA"
 ARTIFACT_DESCRIPTOR_SCHEMA = 1
 ARTIFACT_TYPES = ("factory", "update")
+
+
+def parse_arguments(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--charge-current",
+        dest="charge_currents",
+        action="append",
+        type=int,
+        choices=CHARGE_CURRENTS,
+        help=(
+            "Build only the selected charge current. May be specified more "
+            "than once; defaults to all supported currents."
+        ),
+    )
+    return parser.parse_args(argv)
+
+
+def resolve_charge_currents(requested_currents):
+    if not requested_currents:
+        return list(CHARGE_CURRENTS)
+
+    return list(dict.fromkeys(requested_currents))
 
 
 def find_platformio():
@@ -267,7 +291,9 @@ def copy_release_files(metadata, env_name, charge_current):
     return release_artifacts
 
 
-def main():
+def main(argv=None):
+    args = parse_arguments(argv)
+    charge_currents = resolve_charge_currents(args.charge_currents)
     metadata = load_project_metadata(PROJECT_CONFIG)
     pio_exe = find_platformio()
 
@@ -281,12 +307,12 @@ def main():
 
     OUTPUT_DIR.mkdir(parents=True)
     firmware_artifacts = {
-        charge_current: {} for charge_current in CHARGE_CURRENTS
+        charge_current: {} for charge_current in charge_currents
     }
 
     try:
         for env_name in ENVS:
-            for charge_current in CHARGE_CURRENTS:
+            for charge_current in charge_currents:
                 print("")
                 print("========================================")
                 print(
@@ -309,7 +335,7 @@ def main():
                     metadata, env_name, charge_current
                 )
 
-        for charge_current in CHARGE_CURRENTS:
+        for charge_current in charge_currents:
             for artifact_type in ARTIFACT_TYPES:
                 create_webflasher_manifest(
                     metadata=metadata,
