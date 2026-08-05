@@ -839,6 +839,8 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     const JsonVariantConst pattern = document["pattern"];
     const JsonVariantConst position = document["position"];
     const JsonVariantConst sessionId = document["sessionId"];
+    const bool hasTimestamp = timestamp.is<JsonVariantConst>();
+    const bool hasBuffer = buffer.is<JsonVariantConst>();
     const bool hasPosition = position.is<JsonVariantConst>();
     const bool hasSessionId = sessionId.is<JsonVariantConst>();
     float speedValue = 0;
@@ -846,18 +848,20 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     float depthValue = 0;
     float sensationValue = 0;
     float bufferValue = 0;
+    float positionValue = 0;
     const bool speedValid = tryReadFloat(speed, speedValue);
     const bool strokeValid = tryReadFloat(stroke, strokeValue);
     const bool depthValid = tryReadFloat(depth, depthValue);
     const bool sensationValid = tryReadFloat(sensation, sensationValue);
-    const bool bufferValid = tryReadFloat(buffer, bufferValue);
+    const bool bufferValid = !hasBuffer || tryReadFloat(buffer, bufferValue);
+    const bool positionValid = !hasPosition || tryReadFloat(position, positionValue);
 
-    if (!timestamp.is<uint32_t>() || !state.is<const char*>() || !speedValid || !strokeValid ||
-        !depthValid || !sensationValid || !bufferValid || !pattern.is<int>() ||
-        (hasPosition && !position.is<float>()) || (hasSessionId && !sessionId.is<const char*>())) {
+    if ((hasTimestamp && !timestamp.is<uint32_t>()) || !state.is<const char*>() || !speedValid ||
+        !strokeValid || !depthValid || !sensationValid || !bufferValid || !pattern.is<int>() ||
+        !positionValid || (hasSessionId && !sessionId.is<const char*>())) {
         Serial.println("OSSM state notification parse failed: invalid field");
 #ifdef SERIAL_INFO
-        if (!timestamp.is<uint32_t>())
+        if (hasTimestamp && !timestamp.is<uint32_t>())
             Serial.println("OSSM invalid field: timestamp");
         if (!state.is<const char*>())
             Serial.println("OSSM invalid field: state");
@@ -873,7 +877,7 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
             Serial.println("OSSM invalid field: buffer");
         if (!pattern.is<int>())
             Serial.println("OSSM invalid field: pattern");
-        if (hasPosition && !position.is<float>())
+        if (!positionValid)
             Serial.println("OSSM invalid field: position");
         if (hasSessionId && !sessionId.is<const char*>())
             Serial.println("OSSM invalid field: sessionId");
@@ -899,16 +903,18 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     }
 
     OssmClient::ObservedState observed{};
-    observed.timestamp = timestamp.as<uint32_t>();
+    if (hasTimestamp)
+        observed.timestamp = timestamp.as<uint32_t>();
     std::memcpy(observed.state, stateText, stateLength + 1);
     observed.speed = speedValue;
     observed.stroke = strokeValue;
     observed.depth = depthValue;
     observed.sensation = sensationValue;
-    observed.buffer = bufferValue;
+    if (hasBuffer)
+        observed.buffer = bufferValue;
     observed.pattern = pattern.as<int>();
     if (hasPosition)
-        observed.position = position.as<float>();
+        observed.position = positionValue;
     if (hasSessionId) {
         const char* sessionIdText = sessionId.as<const char*>();
         const size_t sessionIdLength = std::strlen(sessionIdText);
@@ -954,12 +960,13 @@ OssmClientWorker::classifyMachineState(const char* state) const {
         return MachineStateCategory::NoUsableState;
     }
 
-    if (std::strcmp(state, "menu") == 0 || std::strcmp(state, "menu.idle") == 0 ||
-        std::strcmp(state, "idle") == 0) {
+    if (std::strcmp(state, "menu") == 0 ||  // OSSM-RS has no menu substates
+        std::strcmp(state, "menu.idle") == 0) {
         return MachineStateCategory::MenuReady;
     }
 
-    if (std::strcmp(state, "strokeEngine.idle") == 0 ||
+    if (std::strcmp(state, "strokeEngine") == 0 ||  // OSSM-RS has no Stroke Engine substates
+        std::strcmp(state, "strokeEngine.idle") == 0 ||
         std::strcmp(state, "strokeEngine.pattern") == 0) {
         return MachineStateCategory::MotionReady;
     }
@@ -968,7 +975,7 @@ OssmClientWorker::classifyMachineState(const char* state) const {
         return MachineStateCategory::SpeedKnobBlocked;
     }
 
-    if (std::strcmp(state, "strokeEngine") == 0 || startsWith(state, "homing")) {
+    if (startsWith(state, "homing")) {
         return MachineStateCategory::Waiting;
     }
 
