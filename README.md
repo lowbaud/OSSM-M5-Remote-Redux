@@ -5,12 +5,17 @@ firmware from the [original OSSM M5 Remote project](https://github.com/ortlof/OS
 It supports the same M5Stack Core2 and CoreS3 remote hardware, but replaces significant parts of
 the firmware and user interface.
 
-The goal of this project is to provide a clean, reliable remote that is easy to use and actively
-maintained for compatibility with the official OSSM firmware. Reliability and predictable behavior
-come before adding more features.
+Compatible with:
 
-**Redux supports the official OSSM BLE firmware, so you no longer need to flash
-custom firmware to the machine.**
+- Official OSSM BLE firmware
+- OSSM-Lite
+- OSSM-RS
+
+The goal of this project is to provide a clean, reliable, and easy-to-use remote that is actively
+maintained. Reliability and predictable behavior come before adding more features.
+
+**Because Redux works with the official OSSM BLE firmware, there is no need to flash custom
+firmware to the machine.**
 
 <p align="center">
   <img src="images/redux-remote.jpg"
