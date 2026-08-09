@@ -960,14 +960,17 @@ OssmClientWorker::classifyMachineState(const char* state) const {
         return MachineStateCategory::NoUsableState;
     }
 
-    if (std::strcmp(state, "menu") == 0 ||  // OSSM-RS has no menu substates
-        std::strcmp(state, "menu.idle") == 0) {
+    if (std::strcmp(state, "menu.idle") == 0 ||  // Official
+        std::strcmp(state, "menu") == 0 ||       // OSSM-RS (old)
+        std::strcmp(state, "idle") == 0 ||       // OSSM-RS (current)
+        std::strcmp(state, "ready") == 0) {      // OSSM-RS (current)
         return MachineStateCategory::MenuReady;
     }
 
-    if (std::strcmp(state, "strokeEngine") == 0 ||  // OSSM-RS has no Stroke Engine substates
-        std::strcmp(state, "strokeEngine.idle") == 0 ||
-        std::strcmp(state, "strokeEngine.pattern") == 0) {
+    if (std::strcmp(state, "strokeEngine.idle") == 0 ||     // Official
+        std::strcmp(state, "strokeEngine.pattern") == 0 ||  // Official
+        std::strcmp(state, "strokeEngine") == 0 ||          // OSSM-RS (old)
+        std::strcmp(state, "playing") == 0) {               // OSSM-RS (current)
         return MachineStateCategory::MotionReady;
     }
 
