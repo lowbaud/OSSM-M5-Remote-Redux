@@ -23,8 +23,8 @@ constexpr std::int32_t kOptionsPanelHeight = 154;
 constexpr std::int32_t kOptionsScrollbarWidth = 5;
 
 void styleSelectableRow(lv_obj_t* row, lv_obj_t* list) {
-    const lv_style_selector_t normal = LV_PART_MAIN | LV_STATE_DEFAULT;
-    const lv_style_selector_t selected = LV_PART_MAIN | LV_STATE_CHECKED;
+    const lv_style_selector_t normal = 0;
+    const lv_style_selector_t selected = LV_STATE_CHECKED;
 
     lv_obj_set_style_bg_color(row, lv_obj_get_style_bg_color(list, LV_PART_MAIN), normal);
     lv_obj_set_style_bg_opa(row, lv_obj_get_style_bg_opa(list, LV_PART_MAIN), normal);
@@ -281,7 +281,7 @@ void SettingsScreen::buildSettingRows() {
 }
 
 void SettingsScreen::buildOptionsPanel() {
-    const lv_style_selector_t mainStyle = LV_PART_MAIN | LV_STATE_DEFAULT;
+    const lv_style_selector_t mainStyle = LV_PART_MAIN;
 
     lv_obj_remove_flag(objects.settings_options, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_pad_all(objects.settings_options, 0, mainStyle);
@@ -333,8 +333,7 @@ void SettingsScreen::buildOptionsPanel() {
         option.checkLabel = lv_label_create(option.button);
         lv_obj_set_width(option.checkLabel, 18);
         lv_label_set_text_static(option.checkLabel, LV_SYMBOL_OK);
-        lv_obj_set_style_text_opa(
-            option.checkLabel, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_opa(option.checkLabel, LV_OPA_TRANSP, LV_PART_MAIN);
 
         option.textLabel = lv_label_create(option.button);
         lv_label_set_text_static(option.textLabel, "");
@@ -458,14 +457,12 @@ void SettingsScreen::selectOption(std::size_t index, bool preview) {
 
     for (std::size_t rowIndex = 0; rowIndex < optionRows_.size(); ++rowIndex) {
         lv_obj_remove_state(optionRows_[rowIndex].button, LV_STATE_CHECKED);
-        lv_obj_set_style_text_opa(
-            optionRows_[rowIndex].checkLabel, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_opa(optionRows_[rowIndex].checkLabel, LV_OPA_TRANSP, LV_PART_MAIN);
     }
 
     selectedOptionIndex_ = index;
     lv_obj_add_state(optionRows_[index].button, LV_STATE_CHECKED);
-    lv_obj_set_style_text_opa(
-        optionRows_[index].checkLabel, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(optionRows_[index].checkLabel, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_scroll_to_view(optionRows_[index].button, LV_ANIM_OFF);
 
     if (preview && selectedSettingIndex_ == kBrightnessSettingIndex) {
