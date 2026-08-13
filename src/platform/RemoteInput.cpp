@@ -45,6 +45,8 @@ void RemoteInput::begin() {
     previousCounts_.fill(0);
     countRemainders_.fill(0);
 
+    // The expansion board provides 10 kOhm pull-ups for the encoder signals.
+    ESP32Encoder::useInternalWeakPullResistors = puType::none;
     for (std::size_t index = 0; index < encoders_.size(); ++index) {
         encoders_[index].attachHalfQuad(kEncoderPins[index].clock, kEncoderPins[index].data);
         encoders_[index].setCount(0);
