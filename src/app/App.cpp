@@ -20,7 +20,6 @@
 #include "devices/ossm/OssmConnectionController.h"
 #include "devices/ossm/OssmControl.h"
 #include "devices/ossm/OssmDiscovery.h"
-#include "diagnostics/MigrationDiagnostics.h"
 #include "platform/LvglPort.h"
 #include "platform/M5Platform.h"
 #include "platform/RemoteInput.h"
@@ -321,7 +320,6 @@ void handleConnectionEvents(const OssmConnectionEvents& events) {
     }
 
     if (events.becameReady) {
-        migration_diagnostics::printSnapshot("ossm-ready");
         hasConnectionTarget = false;
         ossmControl.stop();
         ossm::OssmClient::PatternList catalog;
@@ -418,7 +416,6 @@ namespace app {
 
 void begin() {
     m5_platform::begin();
-    migration_diagnostics::printSnapshot("m5-initialized");
     if (!settingsStore.begin()) {
         Serial.println("Redux settings initialization failed");
     }
@@ -447,13 +444,10 @@ void begin() {
     ossmPatternsScreen.begin();
     settingsScreen.begin();
     updateBatteryIndicator(true);
-    migration_diagnostics::printSnapshot("ui-initialized");
     ossmConnection.begin(APP_DISPLAY_NAME);
     if (!ossmDiscovery.begin()) {
         Serial.println("OSSM discovery initialization failed");
     }
-    migration_diagnostics::printSnapshot("ble-initialized");
-
     connectAfterBoot = hasSavedConnection && autoConnectEnabled;
     if (connectAfterBoot) {
         startupConnection = savedConnection;
@@ -462,7 +456,6 @@ void begin() {
 
 void update() {
     m5_platform::update();
-    migration_diagnostics::printRuntimeSnapshotOnce(millis());
     updateBatteryIndicator();
 
     const bool connectedScreenWasReady =

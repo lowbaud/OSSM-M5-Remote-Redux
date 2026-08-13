@@ -5,8 +5,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include "diagnostics/MigrationDiagnostics.h"
-
 namespace ossm {
 
 namespace {
@@ -568,7 +566,6 @@ bool OssmClientWorker::connectNow(const NimBLEAddress& address) {
     if (!observedStateValid_) {
         Serial.println("OSSM connected; waiting for machine state");
     }
-    m5_redux::migration_diagnostics::printSnapshot("ble-session-initialized-worker");
     return true;
 }
 
@@ -607,7 +604,6 @@ void OssmClientWorker::handlePendingDisconnect() {
         connectionState_.store(OssmClient::ConnectionState::Disconnected);
         recordError(disconnectReason_.load());
     }
-    m5_redux::migration_diagnostics::printSnapshot("ble-disconnected-worker");
 }
 
 void OssmClientWorker::setModeState(OssmClient::ModeState state) {
