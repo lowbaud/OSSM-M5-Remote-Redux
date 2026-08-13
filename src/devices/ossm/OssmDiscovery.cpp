@@ -4,8 +4,6 @@
 #include <cstring>
 #include <string>
 
-#include "diagnostics/MigrationDiagnostics.h"
-
 namespace ossm {
 
 namespace {
@@ -59,8 +57,6 @@ bool OssmDiscovery::startScan(uint32_t durationMs) {
     scanDurationMs_ = durationMs;
 
     Serial.println("Scan started");
-    m5_redux::migration_diagnostics::printSnapshot("ble-scan-started");
-
     return true;
 }
 
