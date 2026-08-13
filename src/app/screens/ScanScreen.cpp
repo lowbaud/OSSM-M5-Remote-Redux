@@ -28,8 +28,8 @@ void formatDeviceText(
 }
 
 void styleDeviceRow(lv_obj_t* row, lv_obj_t* list) {
-    const lv_style_selector_t normal = LV_PART_MAIN | LV_STATE_DEFAULT;
-    const lv_style_selector_t selected = LV_PART_MAIN | LV_STATE_CHECKED;
+    const lv_style_selector_t normal = 0;
+    const lv_style_selector_t selected = LV_STATE_CHECKED;
 
     lv_obj_set_style_bg_color(row, lv_obj_get_style_bg_color(list, LV_PART_MAIN), normal);
     lv_obj_set_style_bg_opa(row, lv_obj_get_style_bg_opa(list, LV_PART_MAIN), normal);

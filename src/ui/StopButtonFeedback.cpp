@@ -23,8 +23,8 @@ void StopButtonFeedback::begin(lv_obj_t* button) {
         kTransitionDurationMs,
         0,
         nullptr);
-    lv_obj_set_style_transition(button_, &instantTransition_, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_transition(button_, &instantTransition_, LV_PART_MAIN | LV_STATE_CHECKED);
+    lv_obj_set_style_transition(button_, &instantTransition_, LV_PART_MAIN);
+    lv_obj_set_style_transition(button_, &instantTransition_, LV_STATE_CHECKED);
 }
 
 void StopButtonFeedback::setMotionActive(bool active) {
