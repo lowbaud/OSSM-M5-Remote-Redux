@@ -566,6 +566,9 @@ bool OssmClientWorker::connectNow(const NimBLEAddress& address) {
     if (!observedStateValid_) {
         Serial.println("OSSM connected; waiting for machine state");
     }
+
+    // Give the machine more time after initialization before issuing further commands.
+    vTaskDelay(pdMS_TO_TICKS(100));
     return true;
 }
 
