@@ -5,10 +5,18 @@
 
 namespace m5_redux {
 
+namespace {
+constexpr uint16_t kPreferredMtu = 512;
+}
+
 OssmConnectionController::OssmConnectionController(ossm::OssmClient& client) : client_(client) {}
 
 bool OssmConnectionController::begin(const char* localDeviceName) {
     NimBLEDevice::init(localDeviceName);
+    if (!NimBLEDevice::setMTU(kPreferredMtu)) {
+        Serial.printf("Failed to set preferred MTU to %u\n", kPreferredMtu);
+        return false;
+    }
 
     initialized_ = client_.begin();
 

@@ -1,7 +1,6 @@
 #include "OssmClientWorker.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -25,18 +24,6 @@ bool startsWith(const uint8_t* data, size_t length, const char* prefix) {
 
     const size_t prefixLength = std::strlen(prefix);
     return length >= prefixLength && std::memcmp(data, prefix, prefixLength) == 0;
-}
-
-bool tryReadFloat(JsonVariantConst value, float& result) {
-    if (!value.is<float>())
-        return false;
-
-    const float number = value.as<float>();
-    if (!std::isfinite(number))
-        return false;
-
-    result = number;
-    return true;
 }
 
 bool writeTextValue(
@@ -467,6 +454,7 @@ bool OssmClientWorker::connectNow(const NimBLEAddress& address) {
         recordError(client_->getLastError());
         return false;
     }
+    Serial.printf("OSSM negotiated MTU: %u\n", client_->getMTU());
 
     NimBLERemoteService* service = client_->getService(kOssmServiceUuid);
     if (!client_->isConnected()) {
@@ -828,58 +816,10 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
         return;
     }
 
-    const JsonVariantConst timestamp = document["timestamp"];
     const JsonVariantConst state = document["state"];
-    const JsonVariantConst speed = document["speed"];
-    const JsonVariantConst stroke = document["stroke"];
-    const JsonVariantConst depth = document["depth"];
-    const JsonVariantConst sensation = document["sensation"];
-    const JsonVariantConst buffer = document["buffer"];
-    const JsonVariantConst pattern = document["pattern"];
-    const JsonVariantConst position = document["position"];
-    const JsonVariantConst sessionId = document["sessionId"];
-    const bool hasTimestamp = timestamp.is<JsonVariantConst>();
-    const bool hasBuffer = buffer.is<JsonVariantConst>();
-    const bool hasPosition = position.is<JsonVariantConst>();
-    const bool hasSessionId = sessionId.is<JsonVariantConst>();
-    float speedValue = 0;
-    float strokeValue = 0;
-    float depthValue = 0;
-    float sensationValue = 0;
-    float bufferValue = 0;
-    float positionValue = 0;
-    const bool speedValid = tryReadFloat(speed, speedValue);
-    const bool strokeValid = tryReadFloat(stroke, strokeValue);
-    const bool depthValid = tryReadFloat(depth, depthValue);
-    const bool sensationValid = tryReadFloat(sensation, sensationValue);
-    const bool bufferValid = !hasBuffer || tryReadFloat(buffer, bufferValue);
-    const bool positionValid = !hasPosition || tryReadFloat(position, positionValue);
-
-    if ((hasTimestamp && !timestamp.is<uint32_t>()) || !state.is<const char*>() || !speedValid ||
-        !strokeValid || !depthValid || !sensationValid || !bufferValid || !pattern.is<int>() ||
-        !positionValid || (hasSessionId && !sessionId.is<const char*>())) {
-        Serial.println("OSSM state notification parse failed: invalid field");
+    if (!state.is<const char*>()) {
+        Serial.println("OSSM state notification parse failed: missing or invalid state");
 #ifdef SERIAL_INFO
-        if (hasTimestamp && !timestamp.is<uint32_t>())
-            Serial.println("OSSM invalid field: timestamp");
-        if (!state.is<const char*>())
-            Serial.println("OSSM invalid field: state");
-        if (!speedValid)
-            Serial.println("OSSM invalid field: speed");
-        if (!strokeValid)
-            Serial.println("OSSM invalid field: stroke");
-        if (!depthValid)
-            Serial.println("OSSM invalid field: depth");
-        if (!sensationValid)
-            Serial.println("OSSM invalid field: sensation");
-        if (!bufferValid)
-            Serial.println("OSSM invalid field: buffer");
-        if (!pattern.is<int>())
-            Serial.println("OSSM invalid field: pattern");
-        if (!positionValid)
-            Serial.println("OSSM invalid field: position");
-        if (hasSessionId && !sessionId.is<const char*>())
-            Serial.println("OSSM invalid field: sessionId");
         logPayload(notification.data, notification.length);
 #endif
         observedStateValid_ = false;
@@ -902,53 +842,14 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     }
 
     OssmClient::ObservedState observed{};
-    if (hasTimestamp)
-        observed.timestamp = timestamp.as<uint32_t>();
     std::memcpy(observed.state, stateText, stateLength + 1);
-    observed.speed = speedValue;
-    observed.stroke = strokeValue;
-    observed.depth = depthValue;
-    observed.sensation = sensationValue;
-    if (hasBuffer)
-        observed.buffer = bufferValue;
-    observed.pattern = pattern.as<int>();
-    if (hasPosition)
-        observed.position = positionValue;
-    if (hasSessionId) {
-        const char* sessionIdText = sessionId.as<const char*>();
-        const size_t sessionIdLength = std::strlen(sessionIdText);
-        if (sessionIdLength == 0 || sessionIdLength >= OssmClient::kObservedSessionIdCapacity) {
-            Serial.printf(
-                "OSSM state notification parse failed: invalid session length=%u\n",
-                static_cast<unsigned>(sessionIdLength));
-#ifdef SERIAL_INFO
-            logPayload(notification.data, notification.length);
-#endif
-            observedStateValid_ = false;
-            observedStateCategory_ = MachineStateCategory::NoUsableState;
-            return;
-        }
-        std::memcpy(observed.sessionId, sessionIdText, sessionIdLength + 1);
-    }
 
     observedStateValid_ = true;
     observedStateCategory_ = classifyMachineState(observed.state);
     xQueueOverwrite(observedStateMailbox_, &observed);
 
 #ifdef SERIAL_INFO
-    Serial.printf(
-        "OSSM observed: %s speed=%.2f stroke=%.2f depth=%.2f sensation=%.2f "
-        "buffer=%.2f pattern=%d position=%.2f session=%s timestamp=%lu\n",
-        observed.state,
-        observed.speed,
-        observed.stroke,
-        observed.depth,
-        observed.sensation,
-        observed.buffer,
-        observed.pattern,
-        observed.position,
-        observed.sessionId,
-        static_cast<unsigned long>(observed.timestamp));
+    Serial.printf("OSSM observed state: %s\n", observed.state);
 #endif
 }
 
