@@ -84,6 +84,7 @@ class OssmClient {
     bool patternList(PatternList& out) const;
 
     bool setSpeed(int speed);
+    void setMotionRange(int depth, int stroke);
     void setDepth(int depth);
     void setStroke(int stroke);
     void setSensation(int sensation);

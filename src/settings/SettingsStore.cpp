@@ -12,6 +12,7 @@ constexpr char kBrightnessKey[] = "brightness";
 constexpr char kIdleDimKey[] = "idle_dim";
 constexpr char kIdlePowerOffKey[] = "idle_power_off";
 constexpr char kAutoConnectKey[] = "auto_connect";
+constexpr char kDepthControlKey[] = "depth_control";
 constexpr char kStrokeDirectionKey[] = "stroke_reverse";
 constexpr char kOssmConnectionKey[] = "ossm_conn";
 constexpr std::uint8_t kOssmConnectionVersion = 1;
@@ -57,6 +58,11 @@ constexpr AutoConnectOption kAutoConnectOptions[] = {
     {false, "No"},
 };
 
+constexpr DepthControlOption kDepthControlOptions[] = {
+    {DepthControlMode::StrokeDepth, "Stroke / Depth"},
+    {DepthControlMode::MinMax, "Min / Max"},
+};
+
 constexpr StrokeDirectionOption kStrokeDirectionOptions[] = {
     {false, "Right decreases"},
     {true, "Right increases"},
@@ -68,8 +74,8 @@ static_assert(sizeof(kBrightnessKey) - 1 <= 15, "NVS key names are limited to 15
 static_assert(sizeof(kIdleDimKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kIdlePowerOffKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kAutoConnectKey) - 1 <= 15, "NVS key names are limited to 15 characters");
-static_assert(
-    sizeof(kStrokeDirectionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
+static_assert(sizeof(kDepthControlKey) - 1 <= 15, "NVS key names are limited to 15 characters");
+static_assert(sizeof(kStrokeDirectionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kOssmConnectionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(
     sizeof(kBrightnessOptions) / sizeof(kBrightnessOptions[0]) ==
@@ -86,6 +92,10 @@ static_assert(
     sizeof(kAutoConnectOptions) / sizeof(kAutoConnectOptions[0]) ==
         SettingsStore::kAutoConnectOptionCount,
     "Auto-connect option count does not match its catalog");
+static_assert(
+    sizeof(kDepthControlOptions) / sizeof(kDepthControlOptions[0]) ==
+        SettingsStore::kDepthControlOptionCount,
+    "Depth control option count does not match its catalog");
 static_assert(
     sizeof(kStrokeDirectionOptions) / sizeof(kStrokeDirectionOptions[0]) ==
         SettingsStore::kStrokeDirectionOptionCount,
@@ -129,6 +139,11 @@ bool SettingsStore::begin() {
     }
 
     autoConnectEnabled_ = preferences_.getBool(kAutoConnectKey, kDefaultAutoConnectEnabled);
+    const std::uint8_t storedDepthControl = preferences_.getUChar(
+        kDepthControlKey, static_cast<std::uint8_t>(kDefaultDepthControlMode));
+    if (isValidDepthControlMode(storedDepthControl)) {
+        depthControlMode_ = static_cast<DepthControlMode>(storedDepthControl);
+    }
     strokeEncoderReversed_ =
         preferences_.getBool(kStrokeDirectionKey, kDefaultStrokeEncoderReversed);
 
@@ -237,6 +252,28 @@ bool SettingsStore::setAutoConnectEnabled(bool enabled) {
     }
 
     autoConnectEnabled_ = enabled;
+    return true;
+}
+
+DepthControlMode SettingsStore::depthControlMode() const {
+    return depthControlMode_;
+}
+
+bool SettingsStore::setDepthControlMode(DepthControlMode mode) {
+    const std::uint8_t value = static_cast<std::uint8_t>(mode);
+    if (!initialized_ || !isValidDepthControlMode(value)) {
+        return false;
+    }
+
+    if (mode == depthControlMode_) {
+        return true;
+    }
+
+    if (preferences_.putUChar(kDepthControlKey, value) != sizeof(value)) {
+        return false;
+    }
+
+    depthControlMode_ = mode;
     return true;
 }
 
@@ -361,6 +398,22 @@ std::size_t SettingsStore::autoConnectOptionIndex(bool enabled) {
     return 0;
 }
 
+const DepthControlOption& SettingsStore::depthControlOption(std::size_t index) {
+    if (index >= kDepthControlOptionCount) {
+        index = depthControlOptionIndex(kDefaultDepthControlMode);
+    }
+    return kDepthControlOptions[index];
+}
+
+std::size_t SettingsStore::depthControlOptionIndex(DepthControlMode mode) {
+    for (std::size_t index = 0; index < kDepthControlOptionCount; ++index) {
+        if (kDepthControlOptions[index].mode == mode) {
+            return index;
+        }
+    }
+    return 0;
+}
+
 const StrokeDirectionOption& SettingsStore::strokeDirectionOption(std::size_t index) {
     if (index >= kStrokeDirectionOptionCount) {
         index = strokeDirectionOptionIndex(kDefaultStrokeEncoderReversed);
@@ -397,6 +450,10 @@ bool SettingsStore::isValidIdlePowerOffTimeout(std::uint32_t seconds) {
         }
     }
     return false;
+}
+
+bool SettingsStore::isValidDepthControlMode(std::uint8_t value) {
+    return value <= static_cast<std::uint8_t>(DepthControlMode::MinMax);
 }
 
 bool SettingsStore::isValidSavedOssmConnection(const SavedOssmConnection& connection) {

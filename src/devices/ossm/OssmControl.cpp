@@ -6,8 +6,7 @@ OssmControl::OssmControl(ossm::OssmClient& client) : client_(client) {}
 
 void OssmControl::resetDefaults() {
     values_ = {};
-    client_.setDepth(values_.depth);
-    client_.setStroke(values_.stroke);
+    client_.setMotionRange(values_.depth, values_.stroke);
     client_.setSensation(values_.sensation);
     client_.setPattern(values_.pattern);
     client_.setSpeed(0);
@@ -39,16 +38,24 @@ bool OssmControl::apply(const OssmControlAdjustments& adjustments) {
         }
     }
 
-    if (nextStroke != values_.stroke) {
+    const bool strokeChanged = nextStroke != values_.stroke;
+    const bool depthChanged = nextDepth != values_.depth;
+    if (strokeChanged) {
         values_.stroke = nextStroke;
-        client_.setStroke(values_.stroke);
         changed = true;
     }
 
-    if (nextDepth != values_.depth) {
+    if (depthChanged) {
         values_.depth = nextDepth;
-        client_.setDepth(values_.depth);
         changed = true;
+    }
+
+    if (strokeChanged && depthChanged) {
+        client_.setMotionRange(values_.depth, values_.stroke);
+    } else if (strokeChanged) {
+        client_.setStroke(values_.stroke);
+    } else if (depthChanged) {
+        client_.setDepth(values_.depth);
     }
 
     const int nextSensation = adjustPercent(values_.sensation, adjustments.sensation);

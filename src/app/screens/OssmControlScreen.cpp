@@ -9,6 +9,20 @@
 
 namespace m5_redux {
 
+namespace {
+
+int clampEndpoint(std::int64_t value, int minimum, int maximum) {
+    if (value < minimum) {
+        return minimum;
+    }
+    if (value > maximum) {
+        return maximum;
+    }
+    return static_cast<int>(value);
+}
+
+}  // namespace
+
 OssmControlScreen::OssmControlScreen(OssmControl& control) : control_(control) {}
 
 void OssmControlScreen::begin() {
@@ -45,13 +59,23 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
     const std::uint32_t now = millis();
     const std::int64_t strokeAdjustment =
         static_cast<std::int64_t>(events.encoderSteps[1]) * (strokeEncoderReversed_ ? 1 : -1);
+    const std::int64_t rightMotionAdjustment = accelerate(
+        events.encoderSteps[2], accelerationStates_[2], AccelerationPolicy::DecreaseOnly, now);
 
     OssmControlAdjustments adjustments;
     adjustments.speed = accelerate(
         events.encoderSteps[0], accelerationStates_[0], AccelerationPolicy::BothDirections, now);
-    adjustments.stroke = strokeAdjustment;
-    adjustments.depth = accelerate(
-        events.encoderSteps[2], accelerationStates_[2], AccelerationPolicy::DecreaseOnly, now);
+    if (depthControlMode_ == DepthControlMode::MinMax) {
+        const OssmControlValues& values = control_.values();
+        const int currentMin = values.depth - values.stroke;
+        const int nextMin = clampEndpoint(currentMin - strokeAdjustment, 0, values.depth);
+        const int nextMax = clampEndpoint(values.depth + rightMotionAdjustment, nextMin, 100);
+        adjustments.stroke = (nextMax - nextMin) - values.stroke;
+        adjustments.depth = nextMax - values.depth;
+    } else {
+        adjustments.stroke = strokeAdjustment;
+        adjustments.depth = rightMotionAdjustment;
+    }
     adjustments.sensation = accelerate(
         events.encoderSteps[3], accelerationStates_[3], AccelerationPolicy::BothDirections, now);
 
@@ -133,6 +157,9 @@ void OssmControlScreen::refresh() {
     stopButtonFeedback_.setMotionActive(values.speed > 0);
 
     const int strokeStart = values.depth - values.stroke;
+    lv_label_set_text_static(
+        objects.ossm_control_motion_range_lbl,
+        depthControlMode_ == DepthControlMode::MinMax ? "MIN / MAX" : "STROKE / DEPTH");
     lv_slider_set_value(objects.ossm_control_motion_range_slider, values.depth, LV_ANIM_OFF);
     lv_slider_set_start_value(objects.ossm_control_motion_range_slider, strokeStart, LV_ANIM_OFF);
 }
@@ -147,6 +174,11 @@ void OssmControlScreen::setPatternLabel(int patternId, const char* patternName) 
     } else {
         lv_label_set_text_fmt(objects.ossm_control_pattern_lbl, "Pattern %d", patternId);
     }
+}
+
+void OssmControlScreen::setDepthControlMode(DepthControlMode mode) {
+    depthControlMode_ = mode;
+    resetAcceleration();
 }
 
 void OssmControlScreen::setStrokeEncoderReversed(bool reversed) {
