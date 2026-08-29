@@ -11,12 +11,14 @@ constexpr char kBrightnessSettingName[] = "Display brightness";
 constexpr char kIdleDimSettingName[] = "Dim after";
 constexpr char kIdlePowerOffSettingName[] = "Power off after";
 constexpr char kAutoConnectSettingName[] = "Auto-connect";
+constexpr char kDepthControlSettingName[] = "Depth control";
 constexpr char kStrokeDirectionSettingName[] = "Stroke direction";
 constexpr std::size_t kBrightnessSettingIndex = 0;
 constexpr std::size_t kIdleDimSettingIndex = 1;
 constexpr std::size_t kIdlePowerOffSettingIndex = 2;
 constexpr std::size_t kAutoConnectSettingIndex = 3;
-constexpr std::size_t kStrokeDirectionSettingIndex = 4;
+constexpr std::size_t kDepthControlSettingIndex = 4;
+constexpr std::size_t kStrokeDirectionSettingIndex = 5;
 constexpr std::int32_t kOptionsTitleHeight = 28;
 constexpr std::int32_t kOptionsPanelWidth = 263;
 constexpr std::int32_t kOptionsPanelHeight = 154;
@@ -129,6 +131,12 @@ void SettingsScreen::refresh() {
         settingRows_[kAutoConnectSettingIndex].valueLabel,
         SettingsStore::autoConnectOption(autoConnectIndex).name);
 
+    const std::size_t depthControlIndex =
+        SettingsStore::depthControlOptionIndex(settings_.depthControlMode());
+    lv_label_set_text_static(
+        settingRows_[kDepthControlSettingIndex].valueLabel,
+        SettingsStore::depthControlOption(depthControlIndex).name);
+
     const std::size_t strokeDirectionIndex =
         SettingsStore::strokeDirectionOptionIndex(settings_.strokeEncoderReversed());
     lv_label_set_text_static(
@@ -192,6 +200,11 @@ void SettingsScreen::requestSelect() {
             pendingEvent_.action = SettingsScreenAction::CommitAutoConnect;
             pendingEvent_.autoConnectEnabled =
                 SettingsStore::autoConnectOption(selectedOptionIndex_).enabled;
+            break;
+        case kDepthControlSettingIndex:
+            pendingEvent_.action = SettingsScreenAction::CommitDepthControl;
+            pendingEvent_.depthControlMode =
+                SettingsStore::depthControlOption(selectedOptionIndex_).mode;
             break;
         case kStrokeDirectionSettingIndex:
             pendingEvent_.action = SettingsScreenAction::CommitStrokeDirection;
@@ -264,6 +277,19 @@ void SettingsScreen::buildSettingRows() {
     lv_label_set_text_static(autoConnectSetting.valueLabel, "");
 
     lv_obj_add_event_cb(autoConnectSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
+
+    SettingRow& depthControlSetting = settingRows_[kDepthControlSettingIndex];
+    depthControlSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
+    styleSelectableRow(depthControlSetting.button, objects.settings_list);
+
+    lv_obj_t* depthControlNameLabel = lv_label_create(depthControlSetting.button);
+    lv_label_set_text_static(depthControlNameLabel, kDepthControlSettingName);
+    lv_obj_set_flex_grow(depthControlNameLabel, 1);
+
+    depthControlSetting.valueLabel = lv_label_create(depthControlSetting.button);
+    lv_label_set_text_static(depthControlSetting.valueLabel, "");
+
+    lv_obj_add_event_cb(depthControlSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
 
     SettingRow& strokeDirectionSetting = settingRows_[kStrokeDirectionSettingIndex];
     strokeDirectionSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
@@ -358,6 +384,9 @@ void SettingsScreen::configureOptions() {
         case kAutoConnectSettingIndex:
             lv_label_set_text_static(optionsTitle_, kAutoConnectSettingName);
             break;
+        case kDepthControlSettingIndex:
+            lv_label_set_text_static(optionsTitle_, kDepthControlSettingName);
+            break;
         case kStrokeDirectionSettingIndex:
             lv_label_set_text_static(optionsTitle_, kStrokeDirectionSettingName);
             break;
@@ -387,6 +416,9 @@ void SettingsScreen::configureOptions() {
                 break;
             case kAutoConnectSettingIndex:
                 name = SettingsStore::autoConnectOption(index).name;
+                break;
+            case kDepthControlSettingIndex:
+                name = SettingsStore::depthControlOption(index).name;
                 break;
             case kStrokeDirectionSettingIndex:
                 name = SettingsStore::strokeDirectionOption(index).name;
@@ -426,6 +458,8 @@ std::size_t SettingsScreen::currentOptionCount() const {
             return SettingsStore::kIdlePowerOffOptionCount;
         case kAutoConnectSettingIndex:
             return SettingsStore::kAutoConnectOptionCount;
+        case kDepthControlSettingIndex:
+            return SettingsStore::kDepthControlOptionCount;
         case kStrokeDirectionSettingIndex:
             return SettingsStore::kStrokeDirectionOptionCount;
         default:
@@ -443,6 +477,8 @@ std::size_t SettingsScreen::currentStoredOptionIndex() const {
             return SettingsStore::idlePowerOffOptionIndex(settings_.idlePowerOffTimeout());
         case kAutoConnectSettingIndex:
             return SettingsStore::autoConnectOptionIndex(settings_.autoConnectEnabled());
+        case kDepthControlSettingIndex:
+            return SettingsStore::depthControlOptionIndex(settings_.depthControlMode());
         case kStrokeDirectionSettingIndex:
             return SettingsStore::strokeDirectionOptionIndex(settings_.strokeEncoderReversed());
         default:
@@ -482,6 +518,7 @@ void SettingsScreen::selectSetting(std::size_t index) {
 
     selectedSettingIndex_ = index;
     lv_obj_add_state(settingRows_[selectedSettingIndex_].button, LV_STATE_CHECKED);
+    lv_obj_scroll_to_view(settingRows_[selectedSettingIndex_].button, LV_ANIM_OFF);
     lv_obj_remove_state(objects.settings_select_btn, LV_STATE_DISABLED);
 }
 

@@ -276,6 +276,15 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 Serial.println("Unable to save auto-connect setting");
             }
             break;
+        case SettingsScreenAction::CommitDepthControl:
+            if (settingsStore.setDepthControlMode(event.depthControlMode)) {
+                ossmControlScreen.setDepthControlMode(event.depthControlMode);
+                settingsScreen.commitSucceeded();
+            } else {
+                settingsScreen.commitFailed();
+                Serial.println("Unable to save depth control setting");
+            }
+            break;
         case SettingsScreenAction::CommitStrokeDirection:
             if (settingsStore.setStrokeEncoderReversed(event.strokeEncoderReversed)) {
                 ossmControlScreen.setStrokeEncoderReversed(event.strokeEncoderReversed);
@@ -420,6 +429,7 @@ void begin() {
         Serial.println("Redux settings initialization failed");
     }
     ossmControlScreen.setStrokeEncoderReversed(settingsStore.strokeEncoderReversed());
+    ossmControlScreen.setDepthControlMode(settingsStore.depthControlMode());
     const std::uint32_t now = millis();
     idleTimer.begin(now);
     backlightController.begin(

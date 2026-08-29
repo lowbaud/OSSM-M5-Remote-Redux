@@ -5,6 +5,7 @@
 
 #include "devices/ossm/OssmControl.h"
 #include "platform/RemoteInput.h"
+#include "settings/SettingsStore.h"
 #include "ui/BatteryIndicator.h"
 #include "ui/StopButtonFeedback.h"
 
@@ -27,6 +28,7 @@ class OssmControlScreen {
     void refresh();
     void setBatteryLevel(int percent);
     void setPatternLabel(int patternId, const char* patternName);
+    void setDepthControlMode(DepthControlMode mode);
     void setStrokeEncoderReversed(bool reversed);
 
   private:
@@ -54,6 +56,7 @@ class OssmControlScreen {
     std::array<AccelerationState, RemoteInputEvents::kEncoderCount> accelerationStates_{};
     BatteryIndicator batteryIndicator_;
     StopButtonFeedback stopButtonFeedback_;
+    DepthControlMode depthControlMode_ = SettingsStore::kDefaultDepthControlMode;
     bool strokeEncoderReversed_ = false;
 
     void resetAcceleration();

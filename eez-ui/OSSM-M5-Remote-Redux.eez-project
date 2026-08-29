@@ -2185,9 +2185,9 @@
             {
               "objID": "61a925f2-8b64-4bf6-dc2a-a3ddc395b1e3",
               "type": "LVGLLabelWidget",
-              "left": 100,
+              "left": 60,
               "top": 145,
-              "width": 121,
+              "width": 200,
               "height": 16,
               "customInputs": [],
               "customOutputs": [],
@@ -2199,6 +2199,7 @@
               },
               "timeline": [],
               "eventHandlers": [],
+              "identifier": "ossm_control_motion_range_lbl",
               "leftUnit": "px",
               "topUnit": "px",
               "widthUnit": "content",
@@ -2220,7 +2221,9 @@
                   "MAIN": {
                     "DEFAULT": {
                       "text_font": "MONTSERRAT_14",
-                      "text_color": "#BDBDBD"
+                      "text_color": "#BDBDBD",
+                      "width": 200,
+                      "text_align": "CENTER"
                     }
                   }
                 }

@@ -28,6 +28,11 @@ enum class IdlePowerOffTimeout : std::uint32_t {
     Minutes60 = 3600,
 };
 
+enum class DepthControlMode : std::uint8_t {
+    StrokeDepth = 0,
+    MinMax = 1,
+};
+
 struct BrightnessOption {
     BrightnessLevel level;
     const char* name;
@@ -54,6 +59,11 @@ struct StrokeDirectionOption {
     const char* name;
 };
 
+struct DepthControlOption {
+    DepthControlMode mode;
+    const char* name;
+};
+
 struct SavedOssmConnection {
     std::uint64_t address = 0;
     std::uint8_t addressType = 0;
@@ -67,12 +77,14 @@ class SettingsStore {
     static constexpr IdlePowerOffTimeout kDefaultIdlePowerOffTimeout =
         IdlePowerOffTimeout::Minutes30;
     static constexpr bool kDefaultAutoConnectEnabled = true;
+    static constexpr DepthControlMode kDefaultDepthControlMode = DepthControlMode::StrokeDepth;
     static constexpr bool kDefaultStrokeEncoderReversed = false;
 
     static constexpr std::size_t kBrightnessOptionCount = 4;
     static constexpr std::size_t kIdleDimOptionCount = 4;
     static constexpr std::size_t kIdlePowerOffOptionCount = 4;
     static constexpr std::size_t kAutoConnectOptionCount = 2;
+    static constexpr std::size_t kDepthControlOptionCount = 2;
     static constexpr std::size_t kStrokeDirectionOptionCount = 2;
 
     bool begin();
@@ -84,6 +96,8 @@ class SettingsStore {
     bool setIdlePowerOffTimeout(IdlePowerOffTimeout timeout);
     bool autoConnectEnabled() const;
     bool setAutoConnectEnabled(bool enabled);
+    DepthControlMode depthControlMode() const;
+    bool setDepthControlMode(DepthControlMode mode);
     bool strokeEncoderReversed() const;
     bool setStrokeEncoderReversed(bool reversed);
     bool savedOssmConnection(SavedOssmConnection& connection) const;
@@ -97,6 +111,8 @@ class SettingsStore {
     static std::size_t idlePowerOffOptionIndex(IdlePowerOffTimeout timeout);
     static const AutoConnectOption& autoConnectOption(std::size_t index);
     static std::size_t autoConnectOptionIndex(bool enabled);
+    static const DepthControlOption& depthControlOption(std::size_t index);
+    static std::size_t depthControlOptionIndex(DepthControlMode mode);
     static const StrokeDirectionOption& strokeDirectionOption(std::size_t index);
     static std::size_t strokeDirectionOptionIndex(bool reversed);
 
@@ -106,6 +122,7 @@ class SettingsStore {
     IdleDimTimeout idleDimTimeout_ = kDefaultIdleDimTimeout;
     IdlePowerOffTimeout idlePowerOffTimeout_ = kDefaultIdlePowerOffTimeout;
     bool autoConnectEnabled_ = kDefaultAutoConnectEnabled;
+    DepthControlMode depthControlMode_ = kDefaultDepthControlMode;
     bool strokeEncoderReversed_ = kDefaultStrokeEncoderReversed;
     SavedOssmConnection savedOssmConnection_{};
     bool hasSavedOssmConnection_ = false;
@@ -114,6 +131,7 @@ class SettingsStore {
     static bool isValidBrightnessLevel(std::uint8_t value);
     static bool isValidIdleDimTimeout(std::uint32_t seconds);
     static bool isValidIdlePowerOffTimeout(std::uint32_t seconds);
+    static bool isValidDepthControlMode(std::uint8_t value);
     static bool isValidSavedOssmConnection(const SavedOssmConnection& connection);
 };
 

@@ -183,6 +183,15 @@ void OssmClient::setDepth(int depth) {
     publishRequestedState();
 }
 
+void OssmClient::setMotionRange(int depth, int stroke) {
+    if (!initialized_)
+        return;
+
+    requestedState_.depth = clampPercent(depth);
+    requestedState_.stroke = clampPercent(stroke);
+    publishRequestedState();
+}
+
 void OssmClient::setStroke(int stroke) {
     if (!initialized_)
         return;

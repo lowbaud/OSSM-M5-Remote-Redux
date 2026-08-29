@@ -409,12 +409,15 @@ void create_screen_ossm_control() {
             lv_label_set_text_static(obj, "");
         }
         {
+            // ossm_control_motion_range_lbl
             lv_obj_t *obj = lv_label_create(parent_obj);
-            objects.obj2 = obj;
-            lv_obj_set_pos(obj, 100, 145);
+            objects.ossm_control_motion_range_lbl = obj;
+            lv_obj_set_pos(obj, 60, 145);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_obj_set_style_text_font(obj, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_text_color(obj, lv_color_hex(0xbdbdbd), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_width(obj, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_text_static(obj, "STROKE / DEPTH");
         }
         {
