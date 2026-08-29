@@ -36,7 +36,7 @@ class OssmClientWorker {
     void noteDisconnectedFromCallback(int reason);
 
   private:
-    static constexpr size_t kStateNotificationCapacity = 256;
+    static constexpr size_t kStateNotificationCapacity = 512;
     static constexpr TickType_t kModeTimeout = pdMS_TO_TICKS(60000);
     struct StateNotification {
         size_t length = 0;
