@@ -105,7 +105,7 @@ void OssmControl::stop() {
 }
 
 void OssmControl::handleReadinessLost() {
-    stop();
+    resetDefaults();
 }
 
 const OssmControlValues& OssmControl::values() const {

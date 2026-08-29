@@ -21,6 +21,16 @@ int clampEndpoint(std::int64_t value, int minimum, int maximum) {
     return static_cast<int>(value);
 }
 
+void setMotionRangeSlider(lv_obj_t* slider, int start, int end) {
+    if (end < lv_slider_get_left_value(slider)) {
+        lv_slider_set_start_value(slider, start, LV_ANIM_OFF);
+        lv_slider_set_value(slider, end, LV_ANIM_OFF);
+    } else {
+        lv_slider_set_value(slider, end, LV_ANIM_OFF);
+        lv_slider_set_start_value(slider, start, LV_ANIM_OFF);
+    }
+}
+
 }  // namespace
 
 OssmControlScreen::OssmControlScreen(OssmControl& control) : control_(control) {}
@@ -160,8 +170,7 @@ void OssmControlScreen::refresh() {
     lv_label_set_text_static(
         objects.ossm_control_motion_range_lbl,
         depthControlMode_ == DepthControlMode::MinMax ? "MIN / MAX" : "STROKE / DEPTH");
-    lv_slider_set_value(objects.ossm_control_motion_range_slider, values.depth, LV_ANIM_OFF);
-    lv_slider_set_start_value(objects.ossm_control_motion_range_slider, strokeStart, LV_ANIM_OFF);
+    setMotionRangeSlider(objects.ossm_control_motion_range_slider, strokeStart, values.depth);
 }
 
 void OssmControlScreen::setBatteryLevel(int percent) {
