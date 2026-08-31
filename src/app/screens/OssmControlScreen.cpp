@@ -78,8 +78,17 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
     if (depthControlMode_ == DepthControlMode::MinMax) {
         const OssmControlValues& values = control_.values();
         const int currentMin = values.depth - values.stroke;
-        const int nextMin = clampEndpoint(currentMin - strokeAdjustment, 0, values.depth);
-        const int nextMax = clampEndpoint(values.depth + rightMotionAdjustment, nextMin, 100);
+        int nextMin = clampEndpoint(currentMin - strokeAdjustment, 0, 100);
+        int nextMax = values.depth;
+        if (nextMin > nextMax) {
+            nextMax = nextMin;
+        }
+
+        nextMax = clampEndpoint(nextMax + rightMotionAdjustment, 0, 100);
+        if (nextMax < nextMin) {
+            nextMin = nextMax;
+        }
+
         adjustments.stroke = (nextMax - nextMin) - values.stroke;
         adjustments.depth = nextMax - values.depth;
     } else {
