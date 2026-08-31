@@ -31,9 +31,8 @@ bool writeTextValue(
     return payload && characteristic.writeValue(payload, std::strlen(payload), response);
 }
 
-#ifdef SERIAL_INFO
-void logPayload(const uint8_t* data, size_t length) {
-    Serial.print("OSSM state payload text: \"");
+void logPayload(const char* label, const uint8_t* data, size_t length) {
+    Serial.printf("%s text: \"", label);
     for (size_t index = 0; index < length; ++index) {
         const uint8_t byte = data[index];
         if (byte == '\\' || byte == '"') {
@@ -47,13 +46,12 @@ void logPayload(const uint8_t* data, size_t length) {
     }
     Serial.println("\"");
 
-    Serial.print("OSSM state payload hex:");
+    Serial.printf("%s hex:", label);
     for (size_t index = 0; index < length; ++index) {
         Serial.printf(" %02X", static_cast<unsigned>(data[index]));
     }
     Serial.println();
 }
-#endif
 }  // namespace
 
 OssmClientCallbacks::OssmClientCallbacks(OssmClientWorker& worker) : worker_(worker) {}
@@ -689,11 +687,13 @@ bool OssmClientWorker::loadPatterns() {
     const DeserializationError error = deserializeJson(document, value.data(), length);
     if (error) {
         Serial.printf("OSSM pattern list parse failed: %s\n", error.c_str());
+        logPayload("OSSM pattern list contents", value.data(), length);
         return false;
     }
 
     if (!document.is<JsonArray>()) {
         Serial.println("OSSM pattern list parse failed: root is not an array");
+        logPayload("OSSM pattern list contents", value.data(), length);
         return false;
     }
 
@@ -799,7 +799,7 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
             firstByte,
             lastByte);
 #ifdef SERIAL_INFO
-        logPayload(notification.data, notification.length);
+        logPayload("OSSM state payload", notification.data, notification.length);
 #endif
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
@@ -809,7 +809,7 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     if (!document.is<JsonObject>()) {
         Serial.println("OSSM state notification parse failed: root is not an object");
 #ifdef SERIAL_INFO
-        logPayload(notification.data, notification.length);
+        logPayload("OSSM state payload", notification.data, notification.length);
 #endif
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
@@ -820,7 +820,7 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     if (!state.is<const char*>()) {
         Serial.println("OSSM state notification parse failed: missing or invalid state");
 #ifdef SERIAL_INFO
-        logPayload(notification.data, notification.length);
+        logPayload("OSSM state payload", notification.data, notification.length);
 #endif
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
@@ -834,7 +834,7 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
             "OSSM state notification parse failed: invalid state length=%u\n",
             static_cast<unsigned>(stateLength));
 #ifdef SERIAL_INFO
-        logPayload(notification.data, notification.length);
+        logPayload("OSSM state payload", notification.data, notification.length);
 #endif
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
