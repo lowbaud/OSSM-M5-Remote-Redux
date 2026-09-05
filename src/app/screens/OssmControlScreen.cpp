@@ -78,13 +78,24 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
     if (depthControlMode_ == DepthControlMode::MinMax) {
         const OssmControlValues& values = control_.values();
         const int currentMin = values.depth - values.stroke;
-        int nextMin = clampEndpoint(currentMin - strokeAdjustment, 0, 100);
+        const bool minCanPush = allowBoundaryPush(
+            events.encoderSteps[1],
+            currentMin - strokeAdjustment > values.depth,
+            boundaryPushStates_[0],
+            now);
+        int nextMin =
+            clampEndpoint(currentMin - strokeAdjustment, 0, minCanPush ? 100 : values.depth);
         int nextMax = values.depth;
         if (nextMin > nextMax) {
             nextMax = nextMin;
         }
 
-        nextMax = clampEndpoint(nextMax + rightMotionAdjustment, 0, 100);
+        const bool maxCanPush = allowBoundaryPush(
+            events.encoderSteps[2],
+            nextMax + rightMotionAdjustment < nextMin,
+            boundaryPushStates_[1],
+            now);
+        nextMax = clampEndpoint(nextMax + rightMotionAdjustment, maxCanPush ? 0 : nextMin, 100);
         if (nextMax < nextMin) {
             nextMin = nextMax;
         }
@@ -107,6 +118,33 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
 
 void OssmControlScreen::resetAcceleration() {
     accelerationStates_.fill(AccelerationState{});
+    boundaryPushStates_.fill(BoundaryPushState{});
+}
+
+bool OssmControlScreen::allowBoundaryPush(
+    std::int64_t rawSteps, bool crossesBoundary, BoundaryPushState& state, std::uint32_t nowMs) {
+    if (rawSteps == 0) {
+        return false;
+    }
+
+    const std::int8_t direction = rawSteps > 0 ? 1 : -1;
+    const std::uint32_t interval = nowMs - state.lastStepAtMs;
+    if (!crossesBoundary || direction != state.direction || interval >= kBoundaryPushResetMs) {
+        state.pushing = false;
+    }
+
+    // A deliberate push unlocks the rest of this turn, including fast or batched steps.
+    // Blocked steps still update the timer so a fast approach must slow down first.
+    const bool singleStep = rawSteps == 1 || rawSteps == -1;
+    const bool deliberateStep =
+        singleStep && (!state.hasPreviousStep || interval >= kBoundaryPushIntervalMs);
+    if (crossesBoundary && deliberateStep) {
+        state.pushing = true;
+    }
+    state.lastStepAtMs = nowMs;
+    state.direction = direction;
+    state.hasPreviousStep = true;
+    return state.pushing;
 }
 
 std::int64_t OssmControlScreen::accelerate(
