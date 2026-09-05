@@ -47,13 +47,11 @@ class OssmControlScreen {
 
     struct BoundaryPushState {
         std::uint32_t lastStepAtMs = 0;
-        std::int8_t direction = 0;
         bool hasPreviousStep = false;
         bool pushing = false;
     };
 
-    static constexpr std::uint32_t kBoundaryPushIntervalMs = 500;
-    static constexpr std::uint32_t kBoundaryPushResetMs = 500;
+    static constexpr std::uint32_t kBoundaryPushIntervalMs = 750;
     static constexpr std::uint32_t kAccelerationStepIntervalMs = 200;
     static constexpr std::uint32_t kTopAccelerationStepIntervalMs = 100;
     static constexpr std::uint32_t kUnacceleratedDetents = 5;
@@ -63,15 +61,15 @@ class OssmControlScreen {
 
     OssmControl& control_;
     std::array<AccelerationState, RemoteInputEvents::kEncoderCount> accelerationStates_{};
-    std::array<BoundaryPushState, 2> boundaryPushStates_{};
+    BoundaryPushState boundaryPushState_{};
     BatteryIndicator batteryIndicator_;
     StopButtonFeedback stopButtonFeedback_;
     DepthControlMode depthControlMode_ = SettingsStore::kDefaultDepthControlMode;
     bool strokeEncoderReversed_ = false;
 
     void resetAcceleration();
-    static bool allowBoundaryPush(
-        std::int64_t rawSteps, bool crossesBoundary, BoundaryPushState& state, std::uint32_t nowMs);
+    bool allowBoundaryPush(
+        std::int64_t rawSteps, bool hasRange, bool crossesBoundary, std::uint32_t nowMs);
     static std::int64_t accelerate(
         std::int64_t adjustment,
         AccelerationState& state,
