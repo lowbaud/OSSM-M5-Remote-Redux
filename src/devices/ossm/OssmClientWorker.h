@@ -101,6 +101,7 @@ class OssmClientWorker {
     void applyRequestedState(const OssmClient::RequestedState& incoming);
     bool motionReady() const;
     bool hasDirtyMotion() const;
+    int requestedStrokeForFirmware() const;
     TickType_t nextWakeAt() const;
 
     bool connectNow(const NimBLEAddress& address);
@@ -155,6 +156,7 @@ class OssmClientWorker {
     NimBLERemoteCharacteristic* patternListCharacteristic_ = nullptr;
 
     bool observedStateValid_ = false;
+    bool strokeRelativeToDepth_ = false;
     MachineStateCategory observedStateCategory_ = MachineStateCategory::NoUsableState;
     ModeOperation modeOperation_{};
 

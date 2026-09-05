@@ -365,38 +365,72 @@ void OssmClientWorker::reconcileMotion() {
     if (now < nextMotionWriteAt_) {
         return;
     }
+    nextMotionWriteAt_ = now + OssmClient::kMotionWriteInterval;
 
-    if (!motionWriteState_.speed.matchesLastWrite(requested_.speed)) {
-        if (writeSetCommand("speed", requested_.speed)) {
-            motionWriteState_.speed.recordSuccessfulWrite(requested_.speed);
+    // Don't let failed motion updates hold up a stop or speed reduction.
+    if ((requested_.speed == 0 || (motionWriteState_.speed.valid &&
+                                   requested_.speed < motionWriteState_.speed.lastWrittenValue)) &&
+        !motionWriteState_.speed.matchesLastWrite(requested_.speed)) {
+        if (!writeSetCommand("speed", requested_.speed)) {
+            return;
         }
-    }
-
-    if (!motionWriteState_.stroke.matchesLastWrite(requested_.stroke)) {
-        if (writeSetCommand("stroke", requested_.stroke)) {
-            motionWriteState_.stroke.recordSuccessfulWrite(requested_.stroke);
-        }
-    }
-
-    if (!motionWriteState_.depth.matchesLastWrite(requested_.depth)) {
-        if (writeSetCommand("depth", requested_.depth)) {
-            motionWriteState_.depth.recordSuccessfulWrite(requested_.depth);
-        }
-    }
-
-    if (!motionWriteState_.sensation.matchesLastWrite(requested_.sensation)) {
-        if (writeSetCommand("sensation", requested_.sensation)) {
-            motionWriteState_.sensation.recordSuccessfulWrite(requested_.sensation);
-        }
+        motionWriteState_.speed.recordSuccessfulWrite(requested_.speed);
     }
 
     if (!motionWriteState_.pattern.matchesLastWrite(requested_.pattern)) {
-        if (writePatternCommand(requested_.pattern)) {
-            motionWriteState_.pattern.recordSuccessfulWrite(requested_.pattern);
+        if (!writePatternCommand(requested_.pattern)) {
+            return;
         }
+        motionWriteState_.pattern.recordSuccessfulWrite(requested_.pattern);
     }
 
-    nextMotionWriteAt_ = xTaskGetTickCount() + OssmClient::kMotionWriteInterval;
+    if (!motionWriteState_.sensation.matchesLastWrite(requested_.sensation)) {
+        if (!writeSetCommand("sensation", requested_.sensation)) {
+            return;
+        }
+        motionWriteState_.sensation.recordSuccessfulWrite(requested_.sensation);
+    }
+
+    const int stroke = requestedStrokeForFirmware();
+    auto writeStroke = [&]() {
+        if (motionWriteState_.stroke.matchesLastWrite(stroke)) {
+            return true;
+        }
+        if (!writeSetCommand("stroke", stroke)) {
+            return false;
+        }
+        motionWriteState_.stroke.recordSuccessfulWrite(stroke);
+        return true;
+    };
+    auto writeDepth = [&]() {
+        if (motionWriteState_.depth.matchesLastWrite(requested_.depth)) {
+            return true;
+        }
+        if (!writeSetCommand("depth", requested_.depth)) {
+            return false;
+        }
+        motionWriteState_.depth.recordSuccessfulWrite(requested_.depth);
+        return true;
+    };
+
+    // Order the writes to avoid a temporary stroke overshoot.
+    bool rangeWritten;
+    if (!motionWriteState_.stroke.valid || stroke < motionWriteState_.stroke.lastWrittenValue) {
+        rangeWritten = writeStroke() && writeDepth();
+    } else {
+        rangeWritten = writeDepth() && writeStroke();
+    }
+
+    if (!rangeWritten) {
+        return;
+    }
+
+    if (!motionWriteState_.speed.matchesLastWrite(requested_.speed)) {
+        if (!writeSetCommand("speed", requested_.speed)) {
+            return;
+        }
+        motionWriteState_.speed.recordSuccessfulWrite(requested_.speed);
+    }
 }
 
 void OssmClientWorker::applyRequestedState(const OssmClient::RequestedState& incoming) {
@@ -420,10 +454,25 @@ bool OssmClientWorker::motionReady() const {
 
 bool OssmClientWorker::hasDirtyMotion() const {
     return !motionWriteState_.speed.matchesLastWrite(requested_.speed) ||
-           !motionWriteState_.stroke.matchesLastWrite(requested_.stroke) ||
+           !motionWriteState_.stroke.matchesLastWrite(requestedStrokeForFirmware()) ||
            !motionWriteState_.depth.matchesLastWrite(requested_.depth) ||
            !motionWriteState_.sensation.matchesLastWrite(requested_.sensation) ||
            !motionWriteState_.pattern.matchesLastWrite(requested_.pattern);
+}
+
+int OssmClientWorker::requestedStrokeForFirmware() const {
+    if (!strokeRelativeToDepth_) {
+        return requested_.stroke;
+    }
+
+    // Current OSSM-RS expresses stroke as a percentage of depth, not rail length.
+    if (requested_.depth == 0) {
+        return 0;
+    }
+    if (requested_.stroke >= requested_.depth) {
+        return 100;
+    }
+    return (requested_.stroke * 100 + requested_.depth / 2) / requested_.depth;
 }
 
 TickType_t OssmClientWorker::nextWakeAt() const {
@@ -568,6 +617,7 @@ void OssmClientWorker::clearConnectionState() {
     observedStateValid_ = false;
     observedStateCategory_ = MachineStateCategory::NoUsableState;
     motionWriteState_ = {};
+    strokeRelativeToDepth_ = false;
     nextMotionWriteAt_ = 0;
 
     if (initialized_) {
@@ -843,6 +893,12 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
 
     OssmClient::ObservedState observed{};
     std::memcpy(observed.state, stateText, stateLength + 1);
+
+    // OSSM-RS 0.9 currently defines stroke as percentage of depth. Until that is fixed,
+    // we need this quirk. I wish there was a better way to identify it than by the states.
+    if (std::strcmp(stateText, "playing") == 0 || std::strcmp(stateText, "idle") == 0) {
+        strokeRelativeToDepth_ = true;
+    }
 
     observedStateValid_ = true;
     observedStateCategory_ = classifyMachineState(observed.state);
