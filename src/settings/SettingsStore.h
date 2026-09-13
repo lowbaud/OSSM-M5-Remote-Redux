@@ -54,6 +54,11 @@ struct AutoConnectOption {
     const char* name;
 };
 
+struct TouchscreenOption {
+    bool enabled;
+    const char* name;
+};
+
 struct StrokeDirectionOption {
     bool reversed;
     const char* name;
@@ -77,6 +82,7 @@ class SettingsStore {
     static constexpr IdlePowerOffTimeout kDefaultIdlePowerOffTimeout =
         IdlePowerOffTimeout::Minutes30;
     static constexpr bool kDefaultAutoConnectEnabled = true;
+    static constexpr bool kDefaultTouchscreenEnabled = true;
     static constexpr DepthControlMode kDefaultDepthControlMode = DepthControlMode::StrokeDepth;
     static constexpr bool kDefaultStrokeEncoderReversed = false;
 
@@ -84,6 +90,7 @@ class SettingsStore {
     static constexpr std::size_t kIdleDimOptionCount = 4;
     static constexpr std::size_t kIdlePowerOffOptionCount = 4;
     static constexpr std::size_t kAutoConnectOptionCount = 2;
+    static constexpr std::size_t kTouchscreenOptionCount = 2;
     static constexpr std::size_t kDepthControlOptionCount = 2;
     static constexpr std::size_t kStrokeDirectionOptionCount = 2;
 
@@ -96,6 +103,8 @@ class SettingsStore {
     bool setIdlePowerOffTimeout(IdlePowerOffTimeout timeout);
     bool autoConnectEnabled() const;
     bool setAutoConnectEnabled(bool enabled);
+    bool touchscreenEnabled() const;
+    bool setTouchscreenEnabled(bool enabled);
     DepthControlMode depthControlMode() const;
     bool setDepthControlMode(DepthControlMode mode);
     bool strokeEncoderReversed() const;
@@ -111,6 +120,8 @@ class SettingsStore {
     static std::size_t idlePowerOffOptionIndex(IdlePowerOffTimeout timeout);
     static const AutoConnectOption& autoConnectOption(std::size_t index);
     static std::size_t autoConnectOptionIndex(bool enabled);
+    static const TouchscreenOption& touchscreenOption(std::size_t index);
+    static std::size_t touchscreenOptionIndex(bool enabled);
     static const DepthControlOption& depthControlOption(std::size_t index);
     static std::size_t depthControlOptionIndex(DepthControlMode mode);
     static const StrokeDirectionOption& strokeDirectionOption(std::size_t index);
@@ -122,6 +133,7 @@ class SettingsStore {
     IdleDimTimeout idleDimTimeout_ = kDefaultIdleDimTimeout;
     IdlePowerOffTimeout idlePowerOffTimeout_ = kDefaultIdlePowerOffTimeout;
     bool autoConnectEnabled_ = kDefaultAutoConnectEnabled;
+    bool touchscreenEnabled_ = kDefaultTouchscreenEnabled;
     DepthControlMode depthControlMode_ = kDefaultDepthControlMode;
     bool strokeEncoderReversed_ = kDefaultStrokeEncoderReversed;
     SavedOssmConnection savedOssmConnection_{};

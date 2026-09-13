@@ -294,6 +294,15 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 Serial.println("Unable to save stroke direction setting");
             }
             break;
+        case SettingsScreenAction::CommitTouchscreen:
+            if (settingsStore.setTouchscreenEnabled(event.touchscreenEnabled)) {
+                lvgl_port::setTouchscreenEnabled(event.touchscreenEnabled);
+                settingsScreen.commitSucceeded();
+            } else {
+                settingsScreen.commitFailed();
+                Serial.println("Unable to save touchscreen setting");
+            }
+            break;
         case SettingsScreenAction::None:
             break;
     }
@@ -444,6 +453,7 @@ void begin() {
     const bool hasSavedConnection = settingsStore.savedOssmConnection(savedConnection);
     const bool autoConnectEnabled = settingsStore.autoConnectEnabled();
     lvgl_port::begin();
+    lvgl_port::setTouchscreenEnabled(settingsStore.touchscreenEnabled());
     ui_init();
 
     bootScreen.enter(hasSavedConnection && autoConnectEnabled);

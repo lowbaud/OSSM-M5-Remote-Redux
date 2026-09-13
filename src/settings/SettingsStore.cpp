@@ -12,6 +12,7 @@ constexpr char kBrightnessKey[] = "brightness";
 constexpr char kIdleDimKey[] = "idle_dim";
 constexpr char kIdlePowerOffKey[] = "idle_power_off";
 constexpr char kAutoConnectKey[] = "auto_connect";
+constexpr char kTouchscreenKey[] = "touchscreen";
 constexpr char kDepthControlKey[] = "depth_control";
 constexpr char kStrokeDirectionKey[] = "stroke_reverse";
 constexpr char kOssmConnectionKey[] = "ossm_conn";
@@ -58,6 +59,11 @@ constexpr AutoConnectOption kAutoConnectOptions[] = {
     {false, "No"},
 };
 
+constexpr TouchscreenOption kTouchscreenOptions[] = {
+    {true, "Enabled"},
+    {false, "Disabled"},
+};
+
 constexpr DepthControlOption kDepthControlOptions[] = {
     {DepthControlMode::StrokeDepth, "Stroke / Depth"},
     {DepthControlMode::MinMax, "Min / Max"},
@@ -74,6 +80,7 @@ static_assert(sizeof(kBrightnessKey) - 1 <= 15, "NVS key names are limited to 15
 static_assert(sizeof(kIdleDimKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kIdlePowerOffKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kAutoConnectKey) - 1 <= 15, "NVS key names are limited to 15 characters");
+static_assert(sizeof(kTouchscreenKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kDepthControlKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kStrokeDirectionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kOssmConnectionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
@@ -92,6 +99,10 @@ static_assert(
     sizeof(kAutoConnectOptions) / sizeof(kAutoConnectOptions[0]) ==
         SettingsStore::kAutoConnectOptionCount,
     "Auto-connect option count does not match its catalog");
+static_assert(
+    sizeof(kTouchscreenOptions) / sizeof(kTouchscreenOptions[0]) ==
+        SettingsStore::kTouchscreenOptionCount,
+    "Touchscreen option count does not match its catalog");
 static_assert(
     sizeof(kDepthControlOptions) / sizeof(kDepthControlOptions[0]) ==
         SettingsStore::kDepthControlOptionCount,
@@ -139,6 +150,7 @@ bool SettingsStore::begin() {
     }
 
     autoConnectEnabled_ = preferences_.getBool(kAutoConnectKey, kDefaultAutoConnectEnabled);
+    touchscreenEnabled_ = preferences_.getBool(kTouchscreenKey, kDefaultTouchscreenEnabled);
     const std::uint8_t storedDepthControl = preferences_.getUChar(
         kDepthControlKey, static_cast<std::uint8_t>(kDefaultDepthControlMode));
     if (isValidDepthControlMode(storedDepthControl)) {
@@ -252,6 +264,27 @@ bool SettingsStore::setAutoConnectEnabled(bool enabled) {
     }
 
     autoConnectEnabled_ = enabled;
+    return true;
+}
+
+bool SettingsStore::touchscreenEnabled() const {
+    return touchscreenEnabled_;
+}
+
+bool SettingsStore::setTouchscreenEnabled(bool enabled) {
+    if (!initialized_) {
+        return false;
+    }
+
+    if (enabled == touchscreenEnabled_) {
+        return true;
+    }
+
+    if (preferences_.putBool(kTouchscreenKey, enabled) != sizeof(enabled)) {
+        return false;
+    }
+
+    touchscreenEnabled_ = enabled;
     return true;
 }
 
@@ -392,6 +425,22 @@ const AutoConnectOption& SettingsStore::autoConnectOption(std::size_t index) {
 std::size_t SettingsStore::autoConnectOptionIndex(bool enabled) {
     for (std::size_t index = 0; index < kAutoConnectOptionCount; ++index) {
         if (kAutoConnectOptions[index].enabled == enabled) {
+            return index;
+        }
+    }
+    return 0;
+}
+
+const TouchscreenOption& SettingsStore::touchscreenOption(std::size_t index) {
+    if (index >= kTouchscreenOptionCount) {
+        index = touchscreenOptionIndex(kDefaultTouchscreenEnabled);
+    }
+    return kTouchscreenOptions[index];
+}
+
+std::size_t SettingsStore::touchscreenOptionIndex(bool enabled) {
+    for (std::size_t index = 0; index < kTouchscreenOptionCount; ++index) {
+        if (kTouchscreenOptions[index].enabled == enabled) {
             return index;
         }
     }

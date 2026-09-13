@@ -17,7 +17,9 @@ constexpr int32_t kDisplayHeight = 240;
 constexpr int32_t kBufferRows = 15;
 
 alignas(LV_DRAW_BUF_ALIGN) lv_color_t displayBuffer[kDisplayWidth * kBufferRows];
+lv_indev_t* touchInput = nullptr;
 bool touchActivity = false;
+bool touchscreenEnabled = true;
 
 uint32_t tickMilliseconds() {
     return static_cast<uint32_t>(esp_timer_get_time() / 1000LL);
@@ -34,7 +36,7 @@ void flushDisplay(lv_display_t* display, const lv_area_t* area, uint8_t* pixels)
 }
 
 void readTouch(lv_indev_t*, lv_indev_data_t* data) {
-    if (M5.Touch.getCount() == 0) {
+    if (!touchscreenEnabled || M5.Touch.getCount() == 0) {
         data->state = LV_INDEV_STATE_RELEASED;
         return;
     }
@@ -60,9 +62,9 @@ void begin() {
     lv_display_set_buffers(
         display, displayBuffer, nullptr, sizeof(displayBuffer), LV_DISPLAY_RENDER_MODE_PARTIAL);
 
-    lv_indev_t* touch = lv_indev_create();
-    lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
-    lv_indev_set_read_cb(touch, readTouch);
+    touchInput = lv_indev_create();
+    lv_indev_set_type(touchInput, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(touchInput, readTouch);
 }
 
 void update() {
@@ -74,6 +76,19 @@ bool takeTouchActivity() {
     const bool activity = touchActivity;
     touchActivity = false;
     return activity;
+}
+
+void setTouchscreenEnabled(bool enabled) {
+    if (touchscreenEnabled == enabled) {
+        return;
+    }
+    touchscreenEnabled = enabled;
+    touchActivity = false;
+    if (touchInput != nullptr) {
+        // Cancel any pending gesture so disabling touch cannot turn it into a click.
+        lv_indev_reset(touchInput, nullptr);
+        lv_indev_wait_release(touchInput);
+    }
 }
 
 }  // namespace lvgl_port
