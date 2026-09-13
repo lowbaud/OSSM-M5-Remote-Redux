@@ -5,6 +5,7 @@ namespace lvgl_port {
 
 void begin();
 void update();
+void setTouchscreenEnabled(bool enabled);
 bool takeTouchActivity();
 
 }  // namespace lvgl_port
