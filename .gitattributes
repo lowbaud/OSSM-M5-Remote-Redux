@@ -1,0 +1,7 @@
+# Keep normalized line endings for these handwritten C/C++ files.
+src/app/screens/OssmControlScreen.cpp text eol=lf
+src/devices/ossm/OssmControl.cpp text eol=lf
+src/platform/LvglPort.cpp text eol=lf
+src/platform/LvglPort.h text eol=lf
+src/platform/M5Platform.cpp text eol=lf
+src/platform/RemoteInput.cpp text eol=lf
