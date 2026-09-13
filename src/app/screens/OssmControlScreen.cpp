@@ -76,30 +76,36 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
     adjustments.speed = accelerate(
         events.encoderSteps[0], accelerationStates_[0], AccelerationPolicy::BothDirections, now);
     if (depthControlMode_ == DepthControlMode::MinMax) {
+        constexpr int minimumStroke = OssmControl::kMinimumStroke;
         const OssmControlValues& values = control_.values();
         const int currentMin = values.depth - values.stroke;
         const bool minCanPush = allowBoundaryPush(
             events.encoderSteps[1],
-            values.stroke > 0,
-            currentMin - strokeAdjustment > values.depth,
+            values.stroke > minimumStroke,
+            currentMin - strokeAdjustment > values.depth - minimumStroke,
             now);
-        int nextMin =
-            clampEndpoint(currentMin - strokeAdjustment, 0, minCanPush ? 100 : values.depth);
+        int nextMin = clampEndpoint(
+            currentMin - strokeAdjustment,
+            0,
+            minCanPush ? 100 - minimumStroke : values.depth - minimumStroke);
         int nextMax = values.depth;
-        if (nextMin > nextMax) {
-            nextMax = nextMin;
+        if (nextMin + minimumStroke > nextMax) {
+            nextMax = nextMin + minimumStroke;
         }
 
         const bool maxCanPush = allowBoundaryPush(
             events.encoderSteps[2],
-            nextMax > nextMin,
-            nextMax + rightMotionAdjustment < nextMin,
+            nextMax - nextMin > minimumStroke,
+            nextMax + rightMotionAdjustment < nextMin + minimumStroke,
             now);
-        nextMax = clampEndpoint(nextMax + rightMotionAdjustment, maxCanPush ? 0 : nextMin, 100);
-        if (nextMax < nextMin) {
-            nextMin = nextMax;
+        nextMax = clampEndpoint(
+            nextMax + rightMotionAdjustment,
+            maxCanPush ? minimumStroke : nextMin + minimumStroke,
+            100);
+        if (nextMax - nextMin < minimumStroke) {
+            nextMin = nextMax - minimumStroke;
         }
-        if (nextMax > nextMin) {
+        if (nextMax - nextMin > minimumStroke) {
             boundaryPushState_.pushing = false;
         }
 
@@ -122,7 +128,7 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
 void OssmControlScreen::resetAcceleration() {
     accelerationStates_.fill(AccelerationState{});
     boundaryPushState_ = BoundaryPushState{};
-    boundaryPushState_.pushing = control_.values().stroke == 0;
+    boundaryPushState_.pushing = control_.values().stroke == OssmControl::kMinimumStroke;
 }
 
 bool OssmControlScreen::allowBoundaryPush(
@@ -137,7 +143,7 @@ bool OssmControlScreen::allowBoundaryPush(
 
     const std::uint32_t interval = nowMs - state.lastStepAtMs;
 
-    // Both encoders share the unlock until a range opens again, even across pauses.
+    // Both encoders share the unlock until the range exceeds the minimum, even across pauses.
     // Share blocked-step timing too so switching encoders cannot bypass the guard.
     const bool singleStep = rawSteps == 1 || rawSteps == -1;
     const bool deliberateStep =

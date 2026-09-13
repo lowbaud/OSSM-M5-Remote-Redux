@@ -21,21 +21,14 @@ bool OssmControl::apply(const OssmControlAdjustments& adjustments) {
 
     int nextStroke = adjustPercent(values_.stroke, adjustments.stroke);
     int nextDepth = adjustPercent(values_.depth, adjustments.depth);
+    if (nextStroke < kMinimumStroke) {
+        nextStroke = kMinimumStroke;
+    }
+    if (nextDepth < kMinimumStroke) {
+        nextDepth = kMinimumStroke;
+    }
     if (nextStroke > nextDepth) {
-        if (nextDepth < values_.depth) {
-            // Depth may shorten the stroke automatically, but crossing the configured floor
-            // requires an explicit stroke adjustment.
-            const int strokeFloor =
-                nextStroke < kAutomaticStrokeFloor ? nextStroke : kAutomaticStrokeFloor;
-            if (nextDepth < strokeFloor) {
-                nextStroke = strokeFloor;
-                nextDepth = strokeFloor;
-            } else {
-                nextStroke = nextDepth;
-            }
-        } else {
-            nextStroke = nextDepth;
-        }
+        nextStroke = nextDepth;
     }
 
     const bool strokeChanged = nextStroke != values_.stroke;
