@@ -7,6 +7,8 @@ namespace m5_redux {
 
 namespace {
 
+constexpr std::size_t kDefaultPatternSettingIndex = 0;
+constexpr char kDefaultPatternSettingName[] = "Default pattern";
 constexpr char kBrightnessSettingName[] = "Display brightness";
 constexpr char kIdleDimSettingName[] = "Dim after";
 constexpr char kIdlePowerOffSettingName[] = "Power off after";
@@ -14,13 +16,13 @@ constexpr char kAutoConnectSettingName[] = "Auto-connect";
 constexpr char kDepthControlSettingName[] = "Depth control";
 constexpr char kStrokeDirectionSettingName[] = "Stroke direction";
 constexpr char kTouchscreenSettingName[] = "Touchscreen";
-constexpr std::size_t kBrightnessSettingIndex = 0;
-constexpr std::size_t kIdleDimSettingIndex = 1;
-constexpr std::size_t kIdlePowerOffSettingIndex = 2;
-constexpr std::size_t kAutoConnectSettingIndex = 3;
-constexpr std::size_t kDepthControlSettingIndex = 4;
-constexpr std::size_t kStrokeDirectionSettingIndex = 5;
-constexpr std::size_t kTouchscreenSettingIndex = 6;
+constexpr std::size_t kBrightnessSettingIndex = 1;
+constexpr std::size_t kIdleDimSettingIndex = 2;
+constexpr std::size_t kIdlePowerOffSettingIndex = 3;
+constexpr std::size_t kAutoConnectSettingIndex = 4;
+constexpr std::size_t kDepthControlSettingIndex = 5;
+constexpr std::size_t kStrokeDirectionSettingIndex = 6;
+constexpr std::size_t kTouchscreenSettingIndex = 7;
 constexpr std::int32_t kOptionsTitleHeight = 28;
 constexpr std::int32_t kOptionsPanelWidth = 263;
 constexpr std::int32_t kOptionsPanelHeight = 154;
@@ -55,16 +57,35 @@ void SettingsScreen::begin() {
     setStopAvailable(false);
     buildSettingRows();
     buildOptionsPanel();
-    selectSetting(0);
+    selectSetting(
+        patternCatalog_.count > 0 ? kDefaultPatternSettingIndex : kBrightnessSettingIndex);
     closeOptions();
     refresh();
 }
 
+void SettingsScreen::setPatternCatalog(const ossm::OssmClient::PatternList& catalog) {
+    patternCatalog_ = catalog;
+}
+
+std::size_t SettingsScreen::defaultPatternOptionIndex() const {
+    std::size_t fallback = 0;
+    for (std::size_t index = 0; index < patternCatalog_.count; ++index) {
+        if (settings_.matchesDefaultPattern(patternCatalog_.patterns[index].name)) {
+            return index;
+        }
+        if (patternCatalog_.patterns[index].id == 0) {
+            fallback = index;
+        }
+    }
+    return fallback;
+}
+
 void SettingsScreen::enter() {
     pendingEvent_ = {};
-    selectSetting(0);
     closeOptions();
     refresh();
+    selectSetting(
+        patternCatalog_.count > 0 ? kDefaultPatternSettingIndex : kBrightnessSettingIndex);
 
     if (lv_screen_active() != objects.settings) {
         loadScreen(SCREEN_ID_SETTINGS);
@@ -110,6 +131,15 @@ SettingsScreenEvent SettingsScreen::update(const RemoteInputEvents& events) {
 }
 
 void SettingsScreen::refresh() {
+    SettingRow& pattern = settingRows_[kDefaultPatternSettingIndex];
+    if (patternCatalog_.count > 0) {
+        lv_obj_remove_flag(pattern.button, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(
+            pattern.valueLabel, patternCatalog_.patterns[defaultPatternOptionIndex()].name);
+    } else {
+        lv_obj_add_flag(pattern.button, LV_OBJ_FLAG_HIDDEN);
+    }
+
     const std::size_t brightnessIndex =
         SettingsStore::brightnessOptionIndex(settings_.brightnessLevel());
     lv_label_set_text_static(
@@ -189,6 +219,10 @@ void SettingsScreen::requestSelect() {
     }
 
     switch (selectedSettingIndex_) {
+        case kDefaultPatternSettingIndex:
+            pendingEvent_.action = SettingsScreenAction::CommitDefaultPattern;
+            pendingEvent_.defaultPattern = patternCatalog_.patterns[selectedOptionIndex_].name;
+            break;
         case kBrightnessSettingIndex:
             pendingEvent_.action = SettingsScreenAction::CommitBrightness;
             pendingEvent_.brightnessLevel =
@@ -239,6 +273,16 @@ void SettingsScreen::commitFailed() {
 }
 
 void SettingsScreen::buildSettingRows() {
+    SettingRow& pattern = settingRows_[kDefaultPatternSettingIndex];
+    pattern.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
+    styleSelectableRow(pattern.button, objects.settings_list);
+    lv_obj_t* patternName = lv_label_create(pattern.button);
+    lv_label_set_text_static(patternName, kDefaultPatternSettingName);
+    lv_obj_set_flex_grow(patternName, 1);
+    pattern.valueLabel = lv_label_create(pattern.button);
+    lv_label_set_text_static(pattern.valueLabel, "");
+    lv_obj_add_event_cb(pattern.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
+
     SettingRow& brightnessSetting = settingRows_[kBrightnessSettingIndex];
     brightnessSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
     styleSelectableRow(brightnessSetting.button, objects.settings_list);
@@ -398,6 +442,9 @@ void SettingsScreen::buildOptionsPanel() {
 
 void SettingsScreen::configureOptions() {
     switch (selectedSettingIndex_) {
+        case kDefaultPatternSettingIndex:
+            lv_label_set_text_static(optionsTitle_, kDefaultPatternSettingName);
+            break;
         case kBrightnessSettingIndex:
             lv_label_set_text_static(optionsTitle_, kBrightnessSettingName);
             break;
@@ -434,6 +481,9 @@ void SettingsScreen::configureOptions() {
 
         const char* name = "";
         switch (selectedSettingIndex_) {
+            case kDefaultPatternSettingIndex:
+                name = patternCatalog_.patterns[index].name;
+                break;
             case kBrightnessSettingIndex:
                 name = SettingsStore::brightnessOption(index).name;
                 break;
@@ -482,6 +532,8 @@ void SettingsScreen::closeOptions() {
 
 std::size_t SettingsScreen::currentOptionCount() const {
     switch (selectedSettingIndex_) {
+        case kDefaultPatternSettingIndex:
+            return patternCatalog_.count;
         case kBrightnessSettingIndex:
             return SettingsStore::kBrightnessOptionCount;
         case kIdleDimSettingIndex:
@@ -503,6 +555,8 @@ std::size_t SettingsScreen::currentOptionCount() const {
 
 std::size_t SettingsScreen::currentStoredOptionIndex() const {
     switch (selectedSettingIndex_) {
+        case kDefaultPatternSettingIndex:
+            return defaultPatternOptionIndex();
         case kBrightnessSettingIndex:
             return SettingsStore::brightnessOptionIndex(settings_.brightnessLevel());
         case kIdleDimSettingIndex:
@@ -544,6 +598,9 @@ void SettingsScreen::selectOption(std::size_t index, bool preview) {
 }
 
 void SettingsScreen::selectSetting(std::size_t index) {
+    if (index == kDefaultPatternSettingIndex && patternCatalog_.count == 0) {
+        index = kBrightnessSettingIndex;
+    }
     if (index >= settingRows_.size()) {
         return;
     }

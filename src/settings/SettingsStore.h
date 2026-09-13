@@ -4,6 +4,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
+#include <string_view>
 
 namespace m5_redux {
 
@@ -95,6 +97,9 @@ class SettingsStore {
     static constexpr std::size_t kStrokeDirectionOptionCount = 2;
 
     bool begin();
+    const std::string& defaultPattern() const;
+    bool matchesDefaultPattern(std::string_view name) const;
+    bool setDefaultPattern(const std::string& name);
     BrightnessLevel brightnessLevel() const;
     bool setBrightnessLevel(BrightnessLevel level);
     IdleDimTimeout idleDimTimeout() const;
@@ -129,6 +134,7 @@ class SettingsStore {
 
   private:
     Preferences preferences_;
+    std::string defaultPattern_;
     BrightnessLevel brightnessLevel_ = kDefaultBrightnessLevel;
     IdleDimTimeout idleDimTimeout_ = kDefaultIdleDimTimeout;
     IdlePowerOffTimeout idlePowerOffTimeout_ = kDefaultIdlePowerOffTimeout;

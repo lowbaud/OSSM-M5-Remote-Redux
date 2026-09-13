@@ -154,12 +154,18 @@ void enterScreen(Screen screen) {
         case Screen::OssmPatterns:
             ossmPatternsScreen.enter();
             break;
-        case Screen::Settings:
+        case Screen::Settings: {
+            ossm::OssmClient::PatternList catalog{};
+            if (settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady()) {
+                ossmClient.patternList(catalog);
+            }
+            settingsScreen.setPatternCatalog(catalog);
             settingsScreen.setStopAvailable(
                 settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady());
             settingsScreen.setMotionActive(ossmControl.values().speed > 0);
             settingsScreen.enter();
             break;
+        }
     }
 }
 
@@ -303,6 +309,14 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 Serial.println("Unable to save touchscreen setting");
             }
             break;
+        case SettingsScreenAction::CommitDefaultPattern:
+            if (settingsStore.setDefaultPattern(event.defaultPattern)) {
+                settingsScreen.commitSucceeded();
+            } else {
+                settingsScreen.commitFailed();
+                Serial.println("Unable to save default pattern setting");
+            }
+            break;
         case SettingsScreenAction::None:
             break;
     }
@@ -340,13 +354,22 @@ void handleConnectionEvents(const OssmConnectionEvents& events) {
     if (events.becameReady) {
         hasConnectionTarget = false;
         ossmControl.stop();
+        // Resolve by name for this firmware; an unavailable preference remains stored.
+        int defaultPatternId = 0;
         ossm::OssmClient::PatternList catalog;
         if (ossmClient.patternList(catalog)) {
             ossmPatternsScreen.setCatalog(catalog);
+            for (std::size_t index = 0; index < catalog.count; ++index) {
+                if (settingsStore.matchesDefaultPattern(catalog.patterns[index].name)) {
+                    defaultPatternId = catalog.patterns[index].id;
+                    break;
+                }
+            }
         } else {
             ossmPatternsScreen.invalidateCatalog();
             Serial.println("OSSM pattern catalog unavailable after readiness");
         }
+        ossmControl.setPattern(defaultPatternId);
         refreshControlPatternLabel();
         navigateTo(Screen::OssmControl);
     }
