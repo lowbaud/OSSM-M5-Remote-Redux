@@ -1,5 +1,6 @@
 #include "SettingsStore.h"
 
+#include <cctype>
 #include <cstring>
 #include <type_traits>
 
@@ -8,6 +9,7 @@ namespace m5_redux {
 namespace {
 
 constexpr char kPreferencesNamespace[] = "m5-redux";
+constexpr char kDefaultPatternKey[] = "default_pattern";
 constexpr char kBrightnessKey[] = "brightness";
 constexpr char kIdleDimKey[] = "idle_dim";
 constexpr char kIdlePowerOffKey[] = "idle_power_off";
@@ -131,6 +133,7 @@ bool SettingsStore::begin() {
     }
 
     initialized_ = true;
+    defaultPattern_ = preferences_.getString(kDefaultPatternKey, "").c_str();
     const std::uint8_t stored =
         preferences_.getUChar(kBrightnessKey, static_cast<std::uint8_t>(kDefaultBrightnessLevel));
     if (isValidBrightnessLevel(stored)) {
@@ -177,6 +180,49 @@ bool SettingsStore::begin() {
         }
     }
 
+    return true;
+}
+
+const std::string& SettingsStore::defaultPattern() const {
+    return defaultPattern_;
+}
+
+bool SettingsStore::matchesDefaultPattern(std::string_view name) const {
+    const auto trim = [](std::string_view value) {
+        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front()))) {
+            value.remove_prefix(1);
+        }
+        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back()))) {
+            value.remove_suffix(1);
+        }
+        return value;
+    };
+
+    const std::string_view stored = trim(defaultPattern_);
+    name = trim(name);
+    if (stored.empty() || stored.size() != name.size()) {
+        return false;
+    }
+    for (std::size_t index = 0; index < stored.size(); ++index) {
+        if (std::tolower(static_cast<unsigned char>(stored[index])) !=
+            std::tolower(static_cast<unsigned char>(name[index]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool SettingsStore::setDefaultPattern(const std::string& name) {
+    if (!initialized_ || name.empty()) {
+        return false;
+    }
+    if (name == defaultPattern_) {
+        return true;
+    }
+    if (preferences_.putString(kDefaultPatternKey, name.c_str()) != name.size()) {
+        return false;
+    }
+    defaultPattern_ = name;
     return true;
 }
 

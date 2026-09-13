@@ -16,7 +16,7 @@ regenerate the UI.
 
 ## C/C++ Formatting
 
-All changed handwritten C/C++ files must be clang-format 22 compliant using
+All changed handwritten C/C++ files must be clang-format 23 compliant using
 the repository-root `.clang-format`. Format only the changed handwritten files
 before completing the task. If no compatible formatter is available, report
 that instead of installing tooling without permission.

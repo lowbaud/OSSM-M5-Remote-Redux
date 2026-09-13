@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "devices/ossm/OssmClient.h"
 #include "platform/RemoteInput.h"
 #include "settings/SettingsStore.h"
 #include "ui/StopButtonFeedback.h"
@@ -17,6 +18,7 @@ enum class SettingsScreenAction : std::uint8_t {
     Back,
     PreviewBrightness,
     RestoreBrightness,
+    CommitDefaultPattern,
     CommitBrightness,
     CommitIdleDimTimeout,
     CommitIdlePowerOffTimeout,
@@ -28,6 +30,7 @@ enum class SettingsScreenAction : std::uint8_t {
 
 struct SettingsScreenEvent {
     SettingsScreenAction action = SettingsScreenAction::None;
+    std::string defaultPattern;
     BrightnessLevel brightnessLevel = SettingsStore::kDefaultBrightnessLevel;
     IdleDimTimeout idleDimTimeout = SettingsStore::kDefaultIdleDimTimeout;
     IdlePowerOffTimeout idlePowerOffTimeout = SettingsStore::kDefaultIdlePowerOffTimeout;
@@ -43,6 +46,7 @@ class SettingsScreen {
 
     void begin();
     void enter();
+    void setPatternCatalog(const ossm::OssmClient::PatternList& catalog);
     void leave();
     SettingsScreenEvent update(const RemoteInputEvents& events);
     void refresh();
@@ -66,8 +70,8 @@ class SettingsScreen {
         lv_obj_t* textLabel = nullptr;
     };
 
-    static constexpr std::size_t kSettingCount = 7;
-    static constexpr std::size_t kMaxOptionRows = 4;
+    static constexpr std::size_t kSettingCount = 8;
+    static constexpr std::size_t kMaxOptionRows = ossm::OssmClient::kMaxPatternCount;
     static constexpr std::size_t kNoSelection = static_cast<std::size_t>(-1);
     static_assert(
         kMaxOptionRows >= SettingsStore::kBrightnessOptionCount,
@@ -91,6 +95,8 @@ class SettingsScreen {
         "Settings option pool is too small");
 
     SettingsStore& settings_;
+    ossm::OssmClient::PatternList patternCatalog_{};
+    std::size_t defaultPatternOptionIndex() const;
     std::array<SettingRow, kSettingCount> settingRows_{};
     std::array<OptionRow, kMaxOptionRows> optionRows_{};
     lv_obj_t* optionsTitle_ = nullptr;

@@ -1,4 +1,4 @@
-# Reference formatter: clang-format 22 (validated with 22.1.3).
+# Reference formatter: clang-format 23 (validated with 23.1.0).
 BasedOnStyle: LLVM
 Language: Cpp
 
