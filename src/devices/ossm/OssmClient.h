@@ -95,7 +95,7 @@ class OssmClient {
   private:
     friend class OssmClientWorker;
 
-    static constexpr uint32_t kWorkerStackSize = 4096;
+    static constexpr uint32_t kWorkerStackSize = 5120;
     static constexpr UBaseType_t kWorkerPriority = 1;
     static constexpr TickType_t kWorkerTickInterval = pdMS_TO_TICKS(100);
     static constexpr TickType_t kMotionWriteInterval = pdMS_TO_TICKS(50);
