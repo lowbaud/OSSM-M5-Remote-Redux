@@ -136,8 +136,24 @@ bool OssmClientWorker::begin() {
 }
 
 void OssmClientWorker::loop() {
+    constexpr TickType_t kStackSampleInterval = pdMS_TO_TICKS(10000);
+    TickType_t lastStackSampleAt = xTaskGetTickCount() - kStackSampleInterval;
+    uint32_t minimumFreeStackBytes = OssmClient::kWorkerStackSize + 1;
+
     for (;;) {
         const TickType_t now = xTaskGetTickCount();
+        if (now - lastStackSampleAt >= kStackSampleInterval) {
+            lastStackSampleAt = now;
+            // ESP32 reports lifetime minimum unused stack in bytes, including completed calls.
+            const uint32_t freeStackBytes = uxTaskGetStackHighWaterMark(nullptr);
+            if (freeStackBytes < minimumFreeStackBytes) {
+                minimumFreeStackBytes = freeStackBytes;
+                Serial.printf(
+                    "OSSM worker minimum free stack: %u bytes\n",
+                    static_cast<unsigned>(freeStackBytes));
+            }
+        }
+
         const TickType_t wakeAt = nextWakeAt();
         const TickType_t waitTicks = wakeAt > now ? wakeAt - now : 0;
 
