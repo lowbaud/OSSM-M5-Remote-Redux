@@ -9,6 +9,7 @@ namespace {
 
 constexpr std::size_t kDefaultPatternSettingIndex = 0;
 constexpr char kDefaultPatternSettingName[] = "Default pattern";
+constexpr char kAutoPatternOptionName[] = "Auto";
 constexpr char kBrightnessSettingName[] = "Display brightness";
 constexpr char kIdleDimSettingName[] = "Dim after";
 constexpr char kIdlePowerOffSettingName[] = "Power off after";
@@ -68,16 +69,15 @@ void SettingsScreen::setPatternCatalog(const ossm::OssmClient::PatternList& cata
 }
 
 std::size_t SettingsScreen::defaultPatternOptionIndex() const {
-    std::size_t fallback = 0;
+    if (settings_.defaultPattern().empty()) {
+        return 0;
+    }
     for (std::size_t index = 0; index < patternCatalog_.count; ++index) {
         if (settings_.matchesDefaultPattern(patternCatalog_.patterns[index].name)) {
-            return index;
-        }
-        if (patternCatalog_.patterns[index].id == 0) {
-            fallback = index;
+            return index + 1;
         }
     }
-    return fallback;
+    return kNoSelection;
 }
 
 void SettingsScreen::enter() {
@@ -134,8 +134,10 @@ void SettingsScreen::refresh() {
     SettingRow& pattern = settingRows_[kDefaultPatternSettingIndex];
     if (patternCatalog_.count > 0) {
         lv_obj_remove_flag(pattern.button, LV_OBJ_FLAG_HIDDEN);
+        const std::string& defaultPattern = settings_.defaultPattern();
         lv_label_set_text(
-            pattern.valueLabel, patternCatalog_.patterns[defaultPatternOptionIndex()].name);
+            pattern.valueLabel,
+            defaultPattern.empty() ? kAutoPatternOptionName : defaultPattern.c_str());
     } else {
         lv_obj_add_flag(pattern.button, LV_OBJ_FLAG_HIDDEN);
     }
@@ -221,7 +223,9 @@ void SettingsScreen::requestSelect() {
     switch (selectedSettingIndex_) {
         case kDefaultPatternSettingIndex:
             pendingEvent_.action = SettingsScreenAction::CommitDefaultPattern;
-            pendingEvent_.defaultPattern = patternCatalog_.patterns[selectedOptionIndex_].name;
+            pendingEvent_.defaultPattern =
+                selectedOptionIndex_ == 0 ? ""
+                                          : patternCatalog_.patterns[selectedOptionIndex_ - 1].name;
             break;
         case kBrightnessSettingIndex:
             pendingEvent_.action = SettingsScreenAction::CommitBrightness;
@@ -482,7 +486,8 @@ void SettingsScreen::configureOptions() {
         const char* name = "";
         switch (selectedSettingIndex_) {
             case kDefaultPatternSettingIndex:
-                name = patternCatalog_.patterns[index].name;
+                name =
+                    index == 0 ? kAutoPatternOptionName : patternCatalog_.patterns[index - 1].name;
                 break;
             case kBrightnessSettingIndex:
                 name = SettingsStore::brightnessOption(index).name;
@@ -533,7 +538,7 @@ void SettingsScreen::closeOptions() {
 std::size_t SettingsScreen::currentOptionCount() const {
     switch (selectedSettingIndex_) {
         case kDefaultPatternSettingIndex:
-            return patternCatalog_.count;
+            return patternCatalog_.count + 1;
         case kBrightnessSettingIndex:
             return SettingsStore::kBrightnessOptionCount;
         case kIdleDimSettingIndex:
@@ -577,15 +582,15 @@ std::size_t SettingsScreen::currentStoredOptionIndex() const {
 }
 
 void SettingsScreen::selectOption(std::size_t index, bool preview) {
-    if (index >= currentOptionCount()) {
-        return;
-    }
-
     for (std::size_t rowIndex = 0; rowIndex < optionRows_.size(); ++rowIndex) {
         lv_obj_remove_state(optionRows_[rowIndex].button, LV_STATE_CHECKED);
         lv_obj_set_style_text_opa(optionRows_[rowIndex].checkLabel, LV_OPA_TRANSP, LV_PART_MAIN);
     }
 
+    selectedOptionIndex_ = kNoSelection;
+    if (index >= currentOptionCount()) {
+        return;
+    }
     selectedOptionIndex_ = index;
     lv_obj_add_state(optionRows_[index].button, LV_STATE_CHECKED);
     lv_obj_set_style_text_opa(optionRows_[index].checkLabel, LV_OPA_COVER, LV_PART_MAIN);
