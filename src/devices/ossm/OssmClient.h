@@ -47,7 +47,7 @@ class OssmClient {
 
     static constexpr size_t kObservedStateCapacity = 48;
     static constexpr size_t kObservedSessionIdCapacity = 37;
-    static constexpr size_t kMaxPatternCount = 16;
+    static constexpr size_t kMaxPatternCount = 32;
     static constexpr size_t kPatternNameCapacity = 32;
 
     struct ObservedState {
