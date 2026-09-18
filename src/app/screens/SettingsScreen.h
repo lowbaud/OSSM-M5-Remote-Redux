@@ -71,7 +71,7 @@ class SettingsScreen {
     };
 
     static constexpr std::size_t kSettingCount = 8;
-    static constexpr std::size_t kMaxOptionRows = ossm::OssmClient::kMaxPatternCount;
+    static constexpr std::size_t kMaxOptionRows = ossm::OssmClient::kMaxPatternCount + 1;
     static constexpr std::size_t kNoSelection = static_cast<std::size_t>(-1);
     static_assert(
         kMaxOptionRows >= SettingsStore::kBrightnessOptionCount,

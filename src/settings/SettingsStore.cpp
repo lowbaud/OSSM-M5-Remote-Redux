@@ -213,13 +213,18 @@ bool SettingsStore::matchesDefaultPattern(std::string_view name) const {
 }
 
 bool SettingsStore::setDefaultPattern(const std::string& name) {
-    if (!initialized_ || name.empty()) {
+    if (!initialized_) {
         return false;
     }
     if (name == defaultPattern_) {
         return true;
     }
-    if (preferences_.putString(kDefaultPatternKey, name.c_str()) != name.size()) {
+    // Removing the key restores the unset default and reports persistence failures reliably.
+    if (name.empty()) {
+        if (!preferences_.remove(kDefaultPatternKey)) {
+            return false;
+        }
+    } else if (preferences_.putString(kDefaultPatternKey, name.c_str()) != name.size()) {
         return false;
     }
     defaultPattern_ = name;
