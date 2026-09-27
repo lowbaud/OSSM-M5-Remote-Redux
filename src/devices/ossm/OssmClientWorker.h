@@ -25,7 +25,8 @@ class OssmClientWorker {
         std::atomic<OssmClient::ModeState>& modeState,
         std::atomic<bool>& ready,
         std::atomic<uint32_t>& speedValidityEpoch,
-        std::atomic<int>& lastError);
+        std::atomic<int>& lastError,
+        std::atomic<bool>& collapsedRangeSupported);
 
     bool begin();
     void loop();
@@ -41,6 +42,21 @@ class OssmClientWorker {
     struct StateNotification {
         size_t length = 0;
         uint8_t data[kStateNotificationCapacity] = {};
+    };
+
+    // Firmware identified from the Device Information Service.
+    enum class FirmwareFamily : uint8_t {
+        Unknown,
+        Official,
+        Lite,
+    };
+
+    // Motion values as written to the firmware.
+    struct MotionTarget {
+        int stroke = 0;
+        int depth = 0;
+        int sensation = 0;
+        int pattern = 0;
     };
 
     // Internal classification of OSSM-reported state strings.
@@ -101,7 +117,9 @@ class OssmClientWorker {
     void applyRequestedState(const OssmClient::RequestedState& incoming);
     bool motionReady() const;
     bool hasDirtyMotion() const;
-    int requestedStrokeForFirmware() const;
+    MotionTarget motionTarget() const;
+    bool usesGoToPoint() const;
+    void updateCollapsedRangeSupport();
     TickType_t nextWakeAt() const;
 
     bool connectNow(const NimBLEAddress& address);
@@ -116,6 +134,7 @@ class OssmClientWorker {
 
     bool drainLatestStateNotification();
     void readInitialState();
+    void readDeviceInformation();
     bool loadPatterns();
     void parseStateNotification(const StateNotification& notification);
     MachineStateCategory classifyMachineState(const char* state) const;
@@ -139,6 +158,7 @@ class OssmClientWorker {
     std::atomic<bool>& ready_;
     std::atomic<uint32_t>& speedValidityEpoch_;
     std::atomic<int>& lastError_;
+    std::atomic<bool>& collapsedRangeSupported_;
     OssmClientCallbacks callbacks_;
 
     OssmClient::RequestedState requested_{};
@@ -157,6 +177,8 @@ class OssmClientWorker {
 
     bool observedStateValid_ = false;
     bool strokeRelativeToDepth_ = false;
+    FirmwareFamily firmwareFamily_ = FirmwareFamily::Unknown;
+    int goToPointPatternId_ = -1;
     MachineStateCategory observedStateCategory_ = MachineStateCategory::NoUsableState;
     ModeOperation modeOperation_{};
 

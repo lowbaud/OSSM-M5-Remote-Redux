@@ -18,10 +18,14 @@ class FakeOssmClient : public ossm::OssmControlClient {
   public:
     bool ready = true;
     bool acceptSpeed = true;
+    bool collapsedRangeSupported = false;
     std::vector<Command> commands;
 
     bool isReady() const override {
         return ready;
+    }
+    bool supportsCollapsedRange() const override {
+        return collapsedRangeSupported;
     }
     bool setSpeed(int value) override {
         commands.push_back({CommandKind::Speed, value});

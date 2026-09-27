@@ -61,6 +61,19 @@ void test_adjustments_clamp_percentages_and_minimum_motion_range() {
     TEST_ASSERT_TRUE(client.commands.empty());
 }
 
+void test_collapsed_range_support_lowers_the_stroke_floor_to_zero() {
+    FakeOssmClient client;
+    client.collapsedRangeSupported = true;
+    OssmControl control(client);
+    TEST_ASSERT_EQUAL_INT(0, control.minimumStroke());
+    TEST_ASSERT_TRUE(control.apply({0, -1000, -1000, 0}));
+    TEST_ASSERT_EQUAL_INT(0, control.values().stroke);
+    TEST_ASSERT_EQUAL_INT(0, control.values().depth);
+    assertSingleCommand(client.commands, CommandKind::Range, 0, 0);
+    client.collapsedRangeSupported = false;
+    TEST_ASSERT_EQUAL_INT(ossm::OssmControlClient::kMinimumOpenStroke, control.minimumStroke());
+}
+
 void test_depth_reduction_clamps_stroke_and_sends_one_combined_range() {
     FakeOssmClient client;
     OssmControl control(client);
@@ -185,6 +198,7 @@ int main() {
     UNITY_BEGIN();
     RUN_TEST(test_disconnected_changes_are_rejected_without_commands);
     RUN_TEST(test_adjustments_clamp_percentages_and_minimum_motion_range);
+    RUN_TEST(test_collapsed_range_support_lowers_the_stroke_floor_to_zero);
     RUN_TEST(test_depth_reduction_clamps_stroke_and_sends_one_combined_range);
     RUN_TEST(test_individual_range_changes_use_individual_commands);
     RUN_TEST(test_unchanged_values_do_not_send_commands);
