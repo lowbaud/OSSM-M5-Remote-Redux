@@ -11,6 +11,12 @@ namespace m5_redux {
 
 namespace {
 
+constexpr std::uint32_t kHoldPingDurationMs = 900;
+constexpr std::uint32_t kHoldPingPauseMs = 500;
+constexpr std::int32_t kHoldPingWidth = 2;
+constexpr std::int32_t kHoldPingMaximumPad = 7;
+constexpr std::int32_t kHoldPingProgressEnd = 255;
+
 int clampEndpoint(std::int64_t value, int minimum, int maximum) {
     if (value < minimum) {
         return minimum;
@@ -29,6 +35,15 @@ void setMotionRangeSlider(lv_obj_t* slider, int start, int end) {
         lv_slider_set_value(slider, end, LV_ANIM_OFF);
         lv_slider_set_start_value(slider, start, LV_ANIM_OFF);
     }
+}
+
+// Expands a ring outward from the range knob while fading it out.
+void setRangeKnobPing(void* object, std::int32_t progress) {
+    lv_obj_t* slider = static_cast<lv_obj_t*>(object);
+    const std::int32_t pad = (kHoldPingMaximumPad * progress) / kHoldPingProgressEnd;
+    const lv_opa_t opacity = static_cast<lv_opa_t>(LV_OPA_COVER - progress);
+    lv_obj_set_style_outline_pad(slider, pad, LV_PART_KNOB);
+    lv_obj_set_style_outline_opa(slider, opacity, LV_PART_KNOB);
 }
 
 }  // namespace
@@ -56,6 +71,7 @@ void OssmControlScreen::enter() {
 void OssmControlScreen::leave() {
     resetAcceleration();
     stopButtonFeedback_.reset();
+    setHoldPulse(false);
 }
 
 OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& events) {
@@ -222,11 +238,49 @@ void OssmControlScreen::refresh() {
 
     stopButtonFeedback_.setMotionActive(values.speed > 0);
 
+    // A collapsed range holds the machine in place even though the speed is set.
+    const bool holding = values.stroke == 0 && values.speed > 0;
+    const char* rangeLabel = "HOLD";
+    if (!holding) {
+        rangeLabel = depthControlMode_ == DepthControlMode::MinMax ? "MIN / MAX" : "STROKE / DEPTH";
+    }
+
     const int strokeStart = values.depth - values.stroke;
-    lv_label_set_text_static(
-        objects.ossm_control_motion_range_lbl,
-        depthControlMode_ == DepthControlMode::MinMax ? "MIN / MAX" : "STROKE / DEPTH");
+    lv_label_set_text_static(objects.ossm_control_motion_range_lbl, rangeLabel);
     setMotionRangeSlider(objects.ossm_control_motion_range_slider, strokeStart, values.depth);
+    setHoldPulse(holding);
+}
+
+void OssmControlScreen::setHoldPulse(bool active) {
+    if (active == holdPulseActive_) {
+        return;
+    }
+    holdPulseActive_ = active;
+
+    lv_obj_t* slider = objects.ossm_control_motion_range_slider;
+    if (!active) {
+        lv_anim_delete(slider, setRangeKnobPing);
+        lv_obj_remove_local_style_prop(slider, LV_STYLE_OUTLINE_WIDTH, LV_PART_KNOB);
+        lv_obj_remove_local_style_prop(slider, LV_STYLE_OUTLINE_PAD, LV_PART_KNOB);
+        lv_obj_remove_local_style_prop(slider, LV_STYLE_OUTLINE_OPA, LV_PART_KNOB);
+        lv_obj_remove_local_style_prop(slider, LV_STYLE_OUTLINE_COLOR, LV_PART_KNOB);
+        return;
+    }
+
+    lv_obj_set_style_outline_color(
+        slider, lv_obj_get_style_bg_color(slider, LV_PART_KNOB), LV_PART_KNOB);
+    lv_obj_set_style_outline_width(slider, kHoldPingWidth, LV_PART_KNOB);
+
+    lv_anim_t ping;
+    lv_anim_init(&ping);
+    lv_anim_set_var(&ping, slider);
+    lv_anim_set_exec_cb(&ping, setRangeKnobPing);
+    lv_anim_set_values(&ping, 0, kHoldPingProgressEnd);
+    lv_anim_set_duration(&ping, kHoldPingDurationMs);
+    lv_anim_set_path_cb(&ping, lv_anim_path_ease_out);
+    lv_anim_set_repeat_count(&ping, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_repeat_delay(&ping, kHoldPingPauseMs);
+    lv_anim_start(&ping);
 }
 
 void OssmControlScreen::setBatteryLevel(int percent) {
