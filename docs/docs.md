@@ -87,11 +87,10 @@ Choose **Depth control** in Settings to select how the two middle encoders adjus
 The **Stroke direction** setting controls the direction of the left middle encoder.
 **Right decreases** is the default.
 
-For easy positioning in **Min / Max** mode, Min can push Max and Max can push Min. When an
-adjustment reaches the minimum stroke length, pause briefly before continuing to turn in the same
-direction.
-Both ends of the range then move together. In **Stroke / Depth** mode, Stroke can only increase as
-far as the current Depth allows. Changing Depth moves the whole stroke range with it.
+Once the range reaches its minimum length, one end can push the other: pause briefly, then keep
+turning in the same direction to move both ends together. In **Min / Max** mode, Min and Max can
+push each other. In **Stroke / Depth** mode, only Stroke can push Depth, since changing Depth
+already moves the whole range.
 
 To change the active pattern, press the right encoder, turn it to select a
 pattern, and press it again to confirm.

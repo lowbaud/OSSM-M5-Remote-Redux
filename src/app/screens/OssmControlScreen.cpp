@@ -128,8 +128,22 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
         adjustments.stroke = (nextMax - nextMin) - values.stroke;
         adjustments.depth = nextMax - values.depth;
     } else {
+        const int minimumStroke = control_.minimumStroke();
+        const OssmControlValues& values = control_.values();
+        const std::int64_t nextStroke = values.stroke + strokeAdjustment;
+        const bool strokeCanPush = allowBoundaryPush(
+            events.encoderSteps[1], values.stroke > minimumStroke, nextStroke < minimumStroke, now);
+
         adjustments.stroke = strokeAdjustment;
         adjustments.depth = rightMotionAdjustment;
+        if (strokeCanPush && nextStroke < minimumStroke) {
+            // Like min pushing max, shortening past the minimum stroke moves the range deeper.
+            adjustments.stroke = minimumStroke - values.stroke;
+            adjustments.depth += minimumStroke - nextStroke;
+        }
+        if (values.stroke + adjustments.stroke > minimumStroke) {
+            boundaryPushState_.pushing = false;
+        }
     }
     adjustments.sensation = accelerate(
         events.encoderSteps[3], accelerationStates_[3], AccelerationPolicy::BothDirections, now);
@@ -238,17 +252,14 @@ void OssmControlScreen::refresh() {
 
     stopButtonFeedback_.setMotionActive(values.speed > 0);
 
-    // A collapsed range holds the machine in place even though the speed is set.
-    const bool holding = values.stroke == 0 && values.speed > 0;
-    const char* rangeLabel = "HOLD";
-    if (!holding) {
-        rangeLabel = depthControlMode_ == DepthControlMode::MinMax ? "MIN / MAX" : "STROKE / DEPTH";
-    }
-
     const int strokeStart = values.depth - values.stroke;
-    lv_label_set_text_static(objects.ossm_control_motion_range_lbl, rangeLabel);
+    lv_label_set_text_static(
+        objects.ossm_control_motion_range_lbl,
+        depthControlMode_ == DepthControlMode::MinMax ? "MIN / MAX" : "STROKE / DEPTH");
     setMotionRangeSlider(objects.ossm_control_motion_range_slider, strokeStart, values.depth);
-    setHoldPulse(holding);
+
+    // A collapsed range holds the machine in place even though the speed is set.
+    setHoldPulse(values.stroke == 0 && values.speed > 0);
 }
 
 void OssmControlScreen::setHoldPulse(bool active) {
