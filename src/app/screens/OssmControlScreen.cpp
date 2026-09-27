@@ -76,7 +76,7 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
     adjustments.speed = accelerate(
         events.encoderSteps[0], accelerationStates_[0], AccelerationPolicy::BothDirections, now);
     if (depthControlMode_ == DepthControlMode::MinMax) {
-        constexpr int minimumStroke = OssmControl::kMinimumStroke;
+        const int minimumStroke = control_.minimumStroke();
         const OssmControlValues& values = control_.values();
         const int currentMin = values.depth - values.stroke;
         const bool minCanPush = allowBoundaryPush(
@@ -128,7 +128,7 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
 void OssmControlScreen::resetAcceleration() {
     accelerationStates_.fill(AccelerationState{});
     boundaryPushState_ = BoundaryPushState{};
-    boundaryPushState_.pushing = control_.values().stroke == OssmControl::kMinimumStroke;
+    boundaryPushState_.pushing = control_.values().stroke == control_.minimumStroke();
 }
 
 bool OssmControlScreen::allowBoundaryPush(

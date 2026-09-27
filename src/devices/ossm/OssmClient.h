@@ -46,6 +46,7 @@ class OssmClient : public OssmControlClient {
     ModeState modeState() const;
     bool isReady() const override;
     int lastError() const;
+    bool supportsCollapsedRange() const override;
 
     static constexpr size_t kObservedStateCapacity = 48;
     static constexpr size_t kObservedSessionIdCapacity = 37;
@@ -161,6 +162,7 @@ class OssmClient : public OssmControlClient {
     std::atomic<bool> ready_{false};
     std::atomic<uint32_t> speedValidityEpoch_{0};
     std::atomic<int> lastError_{0};
+    std::atomic<bool> collapsedRangeSupported_{false};
 
     static void workerEntry(void* context);
     bool publishRequestedState();

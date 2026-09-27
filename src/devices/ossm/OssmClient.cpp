@@ -19,8 +19,13 @@ bool OssmClient::begin() {
         return true;
 
     if (!worker_) {
-        worker_ = new (std::nothrow)
-            OssmClientWorker(connectionState_, modeState_, ready_, speedValidityEpoch_, lastError_);
+        worker_ = new (std::nothrow) OssmClientWorker(
+            connectionState_,
+            modeState_,
+            ready_,
+            speedValidityEpoch_,
+            lastError_,
+            collapsedRangeSupported_);
         if (!worker_) {
             lastError_.store(kWorkerStartError);
             return false;
@@ -140,6 +145,10 @@ bool OssmClient::isReady() const {
 
 int OssmClient::lastError() const {
     return lastError_.load();
+}
+
+bool OssmClient::supportsCollapsedRange() const {
+    return collapsedRangeSupported_.load();
 }
 
 bool OssmClient::latestObservedState(ObservedState& out) const {

@@ -23,11 +23,10 @@ struct OssmControlAdjustments {
 
 class OssmControl {
   public:
-    static constexpr int kMinimumStroke = 3;
-
     explicit OssmControl(ossm::OssmControlClient& client);
 
     void resetDefaults();
+    int minimumStroke() const;
     bool apply(const OssmControlAdjustments& adjustments);
     bool setPattern(int patternId);
     void stop();

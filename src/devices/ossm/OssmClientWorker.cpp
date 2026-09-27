@@ -12,10 +12,33 @@ const NimBLEUUID kCommandCharacteristicUuid("522B443A-4F53-534D-1000-420BADBABE6
 const NimBLEUUID kSpeedKnobCharacteristicUuid("522B443A-4F53-534D-1010-420BADBABE69");
 const NimBLEUUID kStateCharacteristicUuid("522B443A-4F53-534D-2000-420BADBABE69");
 const NimBLEUUID kPatternListCharacteristicUuid("522B443A-4F53-534D-3000-420BADBABE69");
+const NimBLEUUID kDeviceInformationServiceUuid(static_cast<uint16_t>(0x180A));
+const NimBLEUUID kModelNumberCharacteristicUuid(static_cast<uint16_t>(0x2A24));
+const NimBLEUUID kManufacturerNameCharacteristicUuid(static_cast<uint16_t>(0x2A29));
 constexpr const char* kSpeedKnobDisabled = "false";
+constexpr const char* kLiteModelNumber = "OSSM Lite";
+constexpr const char* kOfficialManufacturerName = "Research And Desire";
+constexpr const char* kGoToPointPatternName = "Go to Point";
 
 bool startsWith(const char* value, const char* prefix) {
     return value && prefix && std::strncmp(value, prefix, std::strlen(prefix)) == 0;
+}
+
+// Compares a readable text characteristic, ignoring trailing NUL padding.
+bool characteristicTextEquals(
+    NimBLERemoteService& service, const NimBLEUUID& uuid, const char* expected) {
+    NimBLERemoteCharacteristic* characteristic = service.getCharacteristic(uuid);
+    if (!characteristic || !characteristic->canRead())
+        return false;
+
+    const NimBLEAttValue value = characteristic->readValue();
+    size_t length = value.length();
+    while (length > 0 && value.data()[length - 1] == '\0') {
+        --length;
+    }
+
+    const size_t expectedLength = std::strlen(expected);
+    return length == expectedLength && std::memcmp(value.data(), expected, length) == 0;
 }
 
 bool startsWith(const uint8_t* data, size_t length, const char* prefix) {
@@ -65,9 +88,11 @@ OssmClientWorker::OssmClientWorker(
     std::atomic<OssmClient::ModeState>& modeState,
     std::atomic<bool>& ready,
     std::atomic<uint32_t>& speedValidityEpoch,
-    std::atomic<int>& lastError)
+    std::atomic<int>& lastError,
+    std::atomic<bool>& collapsedRangeSupported)
     : connectionState_(connectionState), modeState_(modeState), ready_(ready),
-      speedValidityEpoch_(speedValidityEpoch), lastError_(lastError), callbacks_(*this) {}
+      speedValidityEpoch_(speedValidityEpoch), lastError_(lastError),
+      collapsedRangeSupported_(collapsedRangeSupported), callbacks_(*this) {}
 
 bool OssmClientWorker::begin() {
     if (initialized_)
@@ -393,45 +418,34 @@ void OssmClientWorker::reconcileMotion() {
         motionWriteState_.speed.recordSuccessfulWrite(requested_.speed);
     }
 
-    if (!motionWriteState_.pattern.matchesLastWrite(requested_.pattern)) {
-        if (!writePatternCommand(requested_.pattern)) {
-            return;
-        }
-        motionWriteState_.pattern.recordSuccessfulWrite(requested_.pattern);
-    }
-
-    if (!motionWriteState_.sensation.matchesLastWrite(requested_.sensation)) {
-        if (!writeSetCommand("sensation", requested_.sensation)) {
-            return;
-        }
-        motionWriteState_.sensation.recordSuccessfulWrite(requested_.sensation);
-    }
-
-    const int stroke = requestedStrokeForFirmware();
+    const MotionTarget target = motionTarget();
     auto writeStroke = [&]() {
-        if (motionWriteState_.stroke.matchesLastWrite(stroke)) {
+        if (motionWriteState_.stroke.matchesLastWrite(target.stroke)) {
             return true;
         }
-        if (!writeSetCommand("stroke", stroke)) {
+        if (!writeSetCommand("stroke", target.stroke)) {
             return false;
         }
-        motionWriteState_.stroke.recordSuccessfulWrite(stroke);
+        motionWriteState_.stroke.recordSuccessfulWrite(target.stroke);
         return true;
     };
     auto writeDepth = [&]() {
-        if (motionWriteState_.depth.matchesLastWrite(requested_.depth)) {
+        if (motionWriteState_.depth.matchesLastWrite(target.depth)) {
             return true;
         }
-        if (!writeSetCommand("depth", requested_.depth)) {
+        if (!writeSetCommand("depth", target.depth)) {
             return false;
         }
-        motionWriteState_.depth.recordSuccessfulWrite(requested_.depth);
+        motionWriteState_.depth.recordSuccessfulWrite(target.depth);
         return true;
     };
 
-    // Order the writes to avoid a temporary stroke overshoot.
+    // Write the range before pattern and sensation so switching into or out of Go to Point
+    // happens inside the range that is already in effect. Order the range writes to avoid a
+    // temporary stroke overshoot.
     bool rangeWritten;
-    if (!motionWriteState_.stroke.valid || stroke < motionWriteState_.stroke.lastWrittenValue) {
+    if (!motionWriteState_.stroke.valid ||
+        target.stroke < motionWriteState_.stroke.lastWrittenValue) {
         rangeWritten = writeStroke() && writeDepth();
     } else {
         rangeWritten = writeDepth() && writeStroke();
@@ -439,6 +453,20 @@ void OssmClientWorker::reconcileMotion() {
 
     if (!rangeWritten) {
         return;
+    }
+
+    if (!motionWriteState_.pattern.matchesLastWrite(target.pattern)) {
+        if (!writePatternCommand(target.pattern)) {
+            return;
+        }
+        motionWriteState_.pattern.recordSuccessfulWrite(target.pattern);
+    }
+
+    if (!motionWriteState_.sensation.matchesLastWrite(target.sensation)) {
+        if (!writeSetCommand("sensation", target.sensation)) {
+            return;
+        }
+        motionWriteState_.sensation.recordSuccessfulWrite(target.sensation);
     }
 
     if (!motionWriteState_.speed.matchesLastWrite(requested_.speed)) {
@@ -469,26 +497,65 @@ bool OssmClientWorker::motionReady() const {
 }
 
 bool OssmClientWorker::hasDirtyMotion() const {
+    const MotionTarget target = motionTarget();
     return !motionWriteState_.speed.matchesLastWrite(requested_.speed) ||
-           !motionWriteState_.stroke.matchesLastWrite(requestedStrokeForFirmware()) ||
-           !motionWriteState_.depth.matchesLastWrite(requested_.depth) ||
-           !motionWriteState_.sensation.matchesLastWrite(requested_.sensation) ||
-           !motionWriteState_.pattern.matchesLastWrite(requested_.pattern);
+           !motionWriteState_.stroke.matchesLastWrite(target.stroke) ||
+           !motionWriteState_.depth.matchesLastWrite(target.depth) ||
+           !motionWriteState_.sensation.matchesLastWrite(target.sensation) ||
+           !motionWriteState_.pattern.matchesLastWrite(target.pattern);
 }
 
-int OssmClientWorker::requestedStrokeForFirmware() const {
-    if (!strokeRelativeToDepth_) {
-        return requested_.stroke;
+OssmClientWorker::MotionTarget OssmClientWorker::motionTarget() const {
+    MotionTarget target;
+    target.stroke = requested_.stroke;
+    target.depth = requested_.depth;
+    target.sensation = requested_.sensation;
+    target.pattern = requested_.pattern;
+
+    if (target.stroke == 0 && usesGoToPoint()) {
+        // Ordinary patterns cannot run a zero stroke safely, so hold the point with Go to Point
+        // inside a 1% window. Sensation 100 selects the deep end and 0 the shallow end.
+        target.pattern = goToPointPatternId_;
+        target.stroke = 1;
+        if (target.depth > 0) {
+            target.sensation = 100;
+        } else {
+            target.depth = 1;
+            target.sensation = 0;
+        }
+        return target;
     }
 
-    // Current OSSM-RS expresses stroke as a percentage of depth, not rail length.
-    if (requested_.depth == 0) {
-        return 0;
+    if (!collapsedRangeSupported_.load()) {
+        if (target.stroke < OssmClient::kMinimumOpenStroke) {
+            target.stroke = OssmClient::kMinimumOpenStroke;
+        }
+        if (target.depth < target.stroke) {
+            target.depth = target.stroke;
+        }
     }
-    if (requested_.stroke >= requested_.depth) {
-        return 100;
+
+    if (strokeRelativeToDepth_) {
+        // Current OSSM-RS expresses stroke as a percentage of depth, not rail length.
+        if (target.depth == 0) {
+            target.stroke = 0;
+        } else if (target.stroke >= target.depth) {
+            target.stroke = 100;
+        } else {
+            target.stroke = (target.stroke * 100 + target.depth / 2) / target.depth;
+        }
     }
-    return (requested_.stroke * 100 + requested_.depth / 2) / requested_.depth;
+    return target;
+}
+
+bool OssmClientWorker::usesGoToPoint() const {
+    return goToPointPatternId_ >= 0 &&
+           (firmwareFamily_ == FirmwareFamily::Official || firmwareFamily_ == FirmwareFamily::Lite);
+}
+
+void OssmClientWorker::updateCollapsedRangeSupport() {
+    // OSSM-RS holds a zero stroke at depth; official and Lite firmware need Go to Point.
+    collapsedRangeSupported_.store(strokeRelativeToDepth_ || usesGoToPoint());
 }
 
 TickType_t OssmClientWorker::nextWakeAt() const {
@@ -606,10 +673,18 @@ bool OssmClientWorker::connectNow(const NimBLEAddress& address) {
         return false;
     }
 
+    readDeviceInformation();
+    if (!client_->isConnected()) {
+        clearConnectionState();
+        recordError(client_->getLastError());
+        return false;
+    }
+
     if (!loadPatterns()) {
         abortInitialization(OssmClient::kPatternListCharacteristicError);
         return false;
     }
+    updateCollapsedRangeSupport();
 
     resetModeOperation();
     Serial.println("OSSM connected; reading machine state");
@@ -634,6 +709,9 @@ void OssmClientWorker::clearConnectionState() {
     observedStateCategory_ = MachineStateCategory::NoUsableState;
     motionWriteState_ = {};
     strokeRelativeToDepth_ = false;
+    firmwareFamily_ = FirmwareFamily::Unknown;
+    goToPointPatternId_ = -1;
+    collapsedRangeSupported_.store(false);
     nextMotionWriteAt_ = 0;
 
     if (initialized_) {
@@ -731,6 +809,29 @@ void OssmClientWorker::readInitialState() {
     parseStateNotification(notification);
 }
 
+// Identifies firmware that offers Go to Point; unidentified firmware keeps conservative behavior.
+void OssmClientWorker::readDeviceInformation() {
+    firmwareFamily_ = FirmwareFamily::Unknown;
+
+    NimBLERemoteService* service = client_->getService(kDeviceInformationServiceUuid);
+    if (!service) {
+        Serial.println("OSSM device information service missing");
+        return;
+    }
+
+    if (characteristicTextEquals(*service, kModelNumberCharacteristicUuid, kLiteModelNumber)) {
+        firmwareFamily_ = FirmwareFamily::Lite;
+        Serial.println("OSSM firmware identified as OSSM Lite");
+    } else if (
+        characteristicTextEquals(
+            *service, kManufacturerNameCharacteristicUuid, kOfficialManufacturerName)) {
+        firmwareFamily_ = FirmwareFamily::Official;
+        Serial.println("OSSM firmware identified as official");
+    } else {
+        Serial.println("OSSM firmware not identified from device information");
+    }
+}
+
 bool OssmClientWorker::loadPatterns() {
     if (!patternListCharacteristic_) {
         Serial.println("OSSM pattern load failed: missing characteristic");
@@ -763,6 +864,7 @@ bool OssmClientWorker::loadPatterns() {
         return false;
     }
 
+    goToPointPatternId_ = -1;
     OssmClient::PatternList patterns{};
     size_t inspectedEntries = 0;
     size_t skippedEntries = 0;
@@ -798,6 +900,14 @@ bool OssmClientWorker::loadPatterns() {
 
         if (nameLength == 0 || nameLength >= OssmClient::kPatternNameCapacity) {
             ++skippedEntries;
+            continue;
+        }
+
+        if ((firmwareFamily_ == FirmwareFamily::Official ||
+             firmwareFamily_ == FirmwareFamily::Lite) &&
+            std::strcmp(patternName, kGoToPointPatternName) == 0) {
+            // Reserved for holding a collapsed range, so it is not offered for selection.
+            goToPointPatternId_ = patternId;
             continue;
         }
 
@@ -911,9 +1021,11 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     std::memcpy(observed.state, stateText, stateLength + 1);
 
     // OSSM-RS 0.9 currently defines stroke as percentage of depth. Until that is fixed,
-    // we need this quirk. I wish there was a better way to identify it than by the states.
-    if (std::strcmp(stateText, "playing") == 0 || std::strcmp(stateText, "idle") == 0) {
+    // we need this quirk. OSSM Lite also reports "idle" before homing, so it is excluded.
+    if (firmwareFamily_ != FirmwareFamily::Lite && !strokeRelativeToDepth_ &&
+        (std::strcmp(stateText, "playing") == 0 || std::strcmp(stateText, "idle") == 0)) {
         strokeRelativeToDepth_ = true;
+        updateCollapsedRangeSupport();
     }
 
     observedStateValid_ = true;

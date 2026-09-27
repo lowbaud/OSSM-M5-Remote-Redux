@@ -12,6 +12,11 @@ void OssmControl::resetDefaults() {
     client_.setSpeed(0);
 }
 
+// Firmware that can hold a collapsed range allows min and max to meet.
+int OssmControl::minimumStroke() const {
+    return client_.supportsCollapsedRange() ? 0 : ossm::OssmControlClient::kMinimumOpenStroke;
+}
+
 bool OssmControl::apply(const OssmControlAdjustments& adjustments) {
     if (!client_.isReady()) {
         return false;
@@ -19,13 +24,14 @@ bool OssmControl::apply(const OssmControlAdjustments& adjustments) {
 
     bool changed = false;
 
+    const int strokeFloor = minimumStroke();
     int nextStroke = adjustPercent(values_.stroke, adjustments.stroke);
     int nextDepth = adjustPercent(values_.depth, adjustments.depth);
-    if (nextStroke < kMinimumStroke) {
-        nextStroke = kMinimumStroke;
+    if (nextStroke < strokeFloor) {
+        nextStroke = strokeFloor;
     }
-    if (nextDepth < kMinimumStroke) {
-        nextDepth = kMinimumStroke;
+    if (nextDepth < strokeFloor) {
+        nextDepth = strokeFloor;
     }
     if (nextStroke > nextDepth) {
         nextStroke = nextDepth;
