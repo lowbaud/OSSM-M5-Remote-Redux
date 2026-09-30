@@ -101,6 +101,8 @@ class SettingsScreen {
     std::array<OptionRow, kMaxOptionRows> optionRows_{};
     lv_obj_t* optionsTitle_ = nullptr;
     lv_obj_t* optionsList_ = nullptr;
+    lv_obj_t* saveFailureLabel_ = nullptr;
+    std::uint32_t saveFailureShownAtMs_ = 0;
     std::size_t selectedSettingIndex_ = 0;
     std::size_t selectedOptionIndex_ = kNoSelection;
     SettingsScreenEvent pendingEvent_{};
@@ -113,6 +115,7 @@ class SettingsScreen {
     void configureOptions();
     void openSelectedSetting();
     void closeOptions();
+    void clearSaveFailure();
     std::size_t currentOptionCount() const;
     std::size_t currentStoredOptionIndex() const;
     void selectOption(std::size_t index, bool preview);
