@@ -120,6 +120,12 @@ pio run -e m5stack-cores3
 Release builds produce 500 mA and 1000 mA variants explicitly and do not rely on this local
 default.
 
+## Testing
+
+Native unit tests use Unity through PlatformIO and run on a development computer
+without connected hardware. Run `pio test -e native` with a native C++ compiler
+installed. See [test/README.md](test/README.md) for setup, suite selection, and scope.
+
 ## Original project documentation
 
 > The hardware and assembly information below still applies. References to the
