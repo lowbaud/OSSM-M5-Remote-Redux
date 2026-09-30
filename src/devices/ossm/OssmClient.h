@@ -8,11 +8,13 @@
 #include <freertos/task.h>
 #include <type_traits>
 
+#include "OssmControlClient.h"
+
 namespace ossm {
 
 class OssmClientWorker;
 
-class OssmClient {
+class OssmClient : public OssmControlClient {
   public:
     enum class ConnectionState : uint32_t {
         Disconnected,
@@ -42,7 +44,7 @@ class OssmClient {
     bool enterStrokeEngine();
     ConnectionState connectionState() const;
     ModeState modeState() const;
-    bool isReady() const;
+    bool isReady() const override;
     int lastError() const;
 
     static constexpr size_t kObservedStateCapacity = 48;
@@ -83,14 +85,14 @@ class OssmClient {
     bool latestObservedState(ObservedState& out) const;
     bool patternList(PatternList& out) const;
 
-    bool setSpeed(int speed);
-    void setMotionRange(int depth, int stroke);
-    void setDepth(int depth);
-    void setStroke(int stroke);
-    void setSensation(int sensation);
-    void setPattern(int patternId);
+    bool setSpeed(int speed) override;
+    void setMotionRange(int depth, int stroke) override;
+    void setDepth(int depth) override;
+    void setStroke(int stroke) override;
+    void setSensation(int sensation) override;
+    void setPattern(int patternId) override;
 
-    void stop();
+    void stop() override;
 
   private:
     friend class OssmClientWorker;

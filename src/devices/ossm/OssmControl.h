@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "OssmClient.h"
+#include "OssmControlClient.h"
 
 namespace m5_redux {
 
@@ -25,7 +25,7 @@ class OssmControl {
   public:
     static constexpr int kMinimumStroke = 3;
 
-    explicit OssmControl(ossm::OssmClient& client);
+    explicit OssmControl(ossm::OssmControlClient& client);
 
     void resetDefaults();
     bool apply(const OssmControlAdjustments& adjustments);
@@ -38,7 +38,7 @@ class OssmControl {
     static constexpr int kMinimum = 0;
     static constexpr int kMaximum = 100;
 
-    ossm::OssmClient& client_;
+    ossm::OssmControlClient& client_;
     OssmControlValues values_{};
 
     static int adjustPercent(int value, std::int64_t adjustment);
