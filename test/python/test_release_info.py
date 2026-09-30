@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 
-PROJECT_DIR = Path(__file__).resolve().parent.parent
+PROJECT_DIR = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_DIR / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 

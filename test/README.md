@@ -41,3 +41,11 @@ For controller tests, provide small fakes at hardware boundaries instead of
 compiling the complete BLE/UI stack. ArduinoFake can be added when a tested
 component needs supported Arduino calls. Device integration tests are not yet
 configured.
+
+## Python tooling tests
+
+Python tests live in `test/python/`. Run them from the repository root:
+
+```sh
+python -m unittest discover -s test/python -p "test_*.py"
+```
