@@ -332,9 +332,6 @@ void handleConnectionEvents(const OssmConnectionEvents& events) {
     }
 
     if (events.becameConnected && hasConnectionTarget) {
-        if (!settingsStore.setSavedOssmConnection(connectionTarget)) {
-            Serial.println("Unable to save OSSM connection");
-        }
         if (currentScreen == Screen::Connect) {
             connectScreen.connectionEstablished();
         }
@@ -352,6 +349,9 @@ void handleConnectionEvents(const OssmConnectionEvents& events) {
     }
 
     if (events.becameReady) {
+        if (hasConnectionTarget && !settingsStore.setSavedOssmConnection(connectionTarget)) {
+            Serial.println("Unable to save OSSM connection");
+        }
         hasConnectionTarget = false;
         ossmControl.stop();
         // Resolve by name for this firmware; an unavailable preference remains stored.
