@@ -70,13 +70,28 @@ low speed. Press the center MX button to stop motion.
 | Control | Function |
 | --- | --- |
 | Left encoder | Adjusts speed; press to enter the Settings screen. |
-| Left middle encoder | Adjusts stroke. |
-| Right middle encoder | Adjusts depth. |
+| Left middle encoder | Adjusts stroke or the minimum position, depending on **Depth control**. |
+| Right middle encoder | Adjusts depth or the maximum position, depending on **Depth control**. |
 | Right encoder | Adjusts sensation; press to select a pattern. |
 | Center MX button | Stops motion. |
 
-The **Stroke direction** setting controls how the left middle encoder adjusts stroke. By default,
-turning it right decreases the stroke, matching the slider motion and machine travel.
+Choose **Depth control** in Settings to select how the two middle encoders adjust the motion range:
+
+- **Stroke / Depth:** The left middle encoder adjusts **Stroke**, which controls how far the machine
+  moves back from the deepest position. The right middle encoder adjusts **Depth**, which sets the
+  deepest position. Changing Depth also moves the whole stroke range with it.
+- **Min / Max:** The left middle encoder adjusts the shallowest position (**Min**), while the right
+  middle encoder adjusts the deepest position (**Max**). The distance between them is the stroke
+  length.
+
+The **Stroke direction** setting controls the direction of the left middle encoder.
+**Right decreases** is the default.
+
+For easy positioning in **Min / Max** mode, Min can push Max and Max can push Min. When an
+adjustment reaches the minimum stroke length, pause briefly before continuing to turn in the same
+direction.
+Both ends of the range then move together. In **Stroke / Depth** mode, Stroke can only increase as
+far as the current Depth allows. Changing Depth moves the whole stroke range with it.
 
 To change the active pattern, press the right encoder, turn it to select a
 pattern, and press it again to confirm.
