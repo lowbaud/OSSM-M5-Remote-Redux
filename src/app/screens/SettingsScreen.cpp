@@ -1,5 +1,7 @@
 #include "SettingsScreen.h"
 
+#include <Arduino.h>
+
 #include "ui/generated/screens.h"
 #include "ui/generated/ui.h"
 
@@ -28,6 +30,7 @@ constexpr std::int32_t kOptionsTitleHeight = 28;
 constexpr std::int32_t kOptionsPanelWidth = 263;
 constexpr std::int32_t kOptionsPanelHeight = 154;
 constexpr std::int32_t kOptionsScrollbarWidth = 5;
+constexpr std::uint32_t kSaveFailureDurationMs = 2000;
 
 void styleSelectableRow(lv_obj_t* row, lv_obj_t* list) {
     const lv_style_selector_t normal = 0;
@@ -99,6 +102,11 @@ void SettingsScreen::leave() {
 }
 
 SettingsScreenEvent SettingsScreen::update(const RemoteInputEvents& events) {
+    if (!lv_obj_has_flag(saveFailureLabel_, LV_OBJ_FLAG_HIDDEN) &&
+        millis() - saveFailureShownAtMs_ >= kSaveFailureDurationMs) {
+        clearSaveFailure();
+    }
+
     if (events.encoderSteps[3] != 0) {
         if (optionsOpen_) {
             const std::int64_t current =
@@ -211,6 +219,7 @@ void SettingsScreen::requestBack() {
 }
 
 void SettingsScreen::requestSelect() {
+    clearSaveFailure();
     if (!optionsOpen_) {
         openSelectedSetting();
         return;
@@ -274,6 +283,10 @@ void SettingsScreen::commitSucceeded() {
 
 void SettingsScreen::commitFailed() {
     selectOption(currentStoredOptionIndex(), false);
+    if (optionsOpen_) {
+        saveFailureShownAtMs_ = millis();
+        lv_obj_remove_flag(saveFailureLabel_, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 void SettingsScreen::buildSettingRows() {
@@ -442,6 +455,25 @@ void SettingsScreen::buildOptionsPanel() {
 
         lv_obj_add_event_cb(option.button, handleOptionRowEvent, LV_EVENT_CLICKED, this);
     }
+
+    // Overlay the choices without intercepting touch input or changing their layout.
+    saveFailureLabel_ = lv_label_create(objects.settings_options);
+    lv_label_set_text_static(saveFailureLabel_, "Couldn't save. Try again.");
+    lv_obj_set_width(saveFailureLabel_, kOptionsPanelWidth - 24);
+    lv_obj_set_style_text_align(saveFailureLabel_, LV_TEXT_ALIGN_CENTER, mainStyle);
+    lv_obj_set_style_bg_color(
+        saveFailureLabel_,
+        lv_obj_get_style_bg_color(objects.settings_options, LV_PART_MAIN),
+        mainStyle);
+    lv_obj_set_style_bg_opa(saveFailureLabel_, LV_OPA_COVER, mainStyle);
+    lv_obj_set_style_pad_all(saveFailureLabel_, 8, mainStyle);
+    lv_obj_set_style_radius(saveFailureLabel_, 6, mainStyle);
+    lv_obj_set_style_border_width(saveFailureLabel_, 1, mainStyle);
+    lv_obj_set_style_border_color(saveFailureLabel_, lv_palette_main(LV_PALETTE_RED), mainStyle);
+    lv_obj_add_flag(saveFailureLabel_, LV_OBJ_FLAG_FLOATING);
+    lv_obj_remove_flag(saveFailureLabel_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_center(saveFailureLabel_);
+    lv_obj_add_flag(saveFailureLabel_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void SettingsScreen::configureOptions() {
@@ -530,9 +562,16 @@ void SettingsScreen::openSelectedSetting() {
 }
 
 void SettingsScreen::closeOptions() {
+    clearSaveFailure();
     optionsOpen_ = false;
     selectedOptionIndex_ = kNoSelection;
     lv_obj_add_flag(objects.settings_options, LV_OBJ_FLAG_HIDDEN);
+}
+
+void SettingsScreen::clearSaveFailure() {
+    if (saveFailureLabel_) {
+        lv_obj_add_flag(saveFailureLabel_, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 std::size_t SettingsScreen::currentOptionCount() const {
@@ -582,6 +621,9 @@ std::size_t SettingsScreen::currentStoredOptionIndex() const {
 }
 
 void SettingsScreen::selectOption(std::size_t index, bool preview) {
+    if (index != selectedOptionIndex_) {
+        clearSaveFailure();
+    }
     for (std::size_t rowIndex = 0; rowIndex < optionRows_.size(); ++rowIndex) {
         lv_obj_remove_state(optionRows_[rowIndex].button, LV_STATE_CHECKED);
         lv_obj_set_style_text_opa(optionRows_[rowIndex].checkLabel, LV_OPA_TRANSP, LV_PART_MAIN);
