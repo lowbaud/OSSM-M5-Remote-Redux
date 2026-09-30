@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -153,6 +154,7 @@ void ScanScreen::startFreshScan() {
     }
 
     setState(State::Scanning);
+    statusDeviceCount_ = 0;
     lv_label_set_text(objects.scan_status_label, "Scanning for OSSM...");
 }
 
@@ -205,17 +207,19 @@ void ScanScreen::updateScanResults() {
         const bool nameChanged = std::strcmp(displayed.latest.name, device.name) != 0;
 
         if (displayed.latest.lastSeenMs != device.lastSeenMs) {
+            // Keep fractional changes so small RSSI shifts can accumulate.
             displayed.filteredRssi += (device.rssi - displayed.filteredRssi) / kRssiFilterDivisor;
         }
         displayed.latest = device;
 
-        const bool rssiRefreshDue = displayed.filteredRssi != displayed.renderedRssi &&
+        const int roundedRssi = static_cast<int>(std::lround(displayed.filteredRssi));
+        const bool rssiRefreshDue = roundedRssi != displayed.renderedRssi &&
                                     now - displayed.renderedAtMs >= kRssiRefreshIntervalMs;
         if (nameChanged || rssiRefreshDue) {
             char text[64];
-            formatDeviceText(device, displayed.filteredRssi, text, sizeof(text));
+            formatDeviceText(device, roundedRssi, text, sizeof(text));
             lv_list_set_button_text(objects.scan_device_list, deviceRows_[index], text);
-            displayed.renderedRssi = displayed.filteredRssi;
+            displayed.renderedRssi = roundedRssi;
             displayed.renderedAtMs = now;
         }
     }
@@ -247,10 +251,11 @@ void ScanScreen::updateConnectButton() {
 }
 
 void ScanScreen::setStatusForDeviceCount(std::size_t count) {
-    if (state_ != State::Scanning) {
+    if (state_ != State::Scanning || count == statusDeviceCount_) {
         return;
     }
 
+    statusDeviceCount_ = count;
     if (count == 0) {
         lv_label_set_text(objects.scan_status_label, "Scanning for OSSM...");
     } else {

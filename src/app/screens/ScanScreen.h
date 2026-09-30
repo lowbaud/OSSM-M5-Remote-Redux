@@ -39,7 +39,7 @@ class ScanScreen {
 
     struct DisplayedDevice {
         ossm::DiscoveredOssm latest{};
-        int filteredRssi = 0;
+        float filteredRssi = 0.0f;
         int renderedRssi = 0;
         std::uint32_t renderedAtMs = 0;
     };
@@ -53,6 +53,7 @@ class ScanScreen {
     std::vector<DisplayedDevice> displayedDevices_;
     lv_obj_t* activitySpinner_ = nullptr;
     std::size_t selectedIndex_ = kNoSelection;
+    std::size_t statusDeviceCount_ = 0;
     ScanScreenAction pendingAction_ = ScanScreenAction::None;
     State state_ = State::Idle;
 
