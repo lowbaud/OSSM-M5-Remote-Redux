@@ -2,7 +2,7 @@
 
 namespace m5_redux {
 
-OssmControl::OssmControl(ossm::OssmClient& client) : client_(client) {}
+OssmControl::OssmControl(ossm::OssmControlClient& client) : client_(client) {}
 
 void OssmControl::resetDefaults() {
     values_ = {};

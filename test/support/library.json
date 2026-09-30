@@ -1,0 +1,9 @@
+{
+  "name": "ReduxTestSupport",
+  "version": "0.1.0",
+  "description": "Native-only fakes for Redux unit tests",
+  "build": {
+    "includeDir": "include",
+    "srcDir": "src"
+  }
+}

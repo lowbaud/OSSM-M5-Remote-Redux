@@ -30,6 +30,9 @@ Add native suites under `test/native/test_<component>/`, each with a Unity
 `main()` and `setUp()` / `tearDown()` hooks. Include any additional production
 sources explicitly in the native environment's `build_src_filter`.
 
+Shared fakes live in `test/support/`, a local library loaded only by the native
+environment. Its `Preferences.h` replaces the ESP32 storage API for native tests.
+
 The native environment is independent of the firmware settings so it does not
 load ESP32 libraries, the application entry point, generated UI, or firmware
 packaging scripts. The firmware remains the default build environment.
