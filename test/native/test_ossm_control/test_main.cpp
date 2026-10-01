@@ -1,5 +1,7 @@
 #include <unity.h>
 
+#include <vector>
+
 #include "FakeOssmClient.h"
 #include "devices/ossm/OssmControl.h"
 
@@ -12,6 +14,19 @@ void assertCommand(const Command& command, CommandKind kind, int value, int seco
     TEST_ASSERT_EQUAL_INT(static_cast<int>(kind), static_cast<int>(command.kind));
     TEST_ASSERT_EQUAL_INT(value, command.value);
     TEST_ASSERT_EQUAL_INT(secondValue, command.secondValue);
+}
+
+void assertSingleCommand(
+    const std::vector<Command>& commands, CommandKind kind, int value, int secondValue = 0) {
+    const Command* match = nullptr;
+    for (const Command& command : commands) {
+        if (command.kind == kind) {
+            TEST_ASSERT_NULL_MESSAGE(match, "Command kind was requested more than once");
+            match = &command;
+        }
+    }
+    TEST_ASSERT_NOT_NULL_MESSAGE(match, "Command kind was not requested");
+    assertCommand(*match, kind, value, secondValue);
 }
 
 void test_disconnected_changes_are_rejected_without_commands() {
@@ -75,15 +90,23 @@ void test_unchanged_values_do_not_send_commands() {
     TEST_ASSERT_TRUE(client.commands.empty());
 }
 
-void test_motion_parameters_are_sent_before_speed() {
+// Each setter publishes the full requested state, and the worker decides BLE write order, so
+// tests that check several values do not assert call order.
+void test_combined_adjustment_requests_each_changed_value() {
     FakeOssmClient client;
     OssmControl control(client);
     TEST_ASSERT_TRUE(control.apply({20, 5, 10, -10}));
     TEST_ASSERT_EQUAL_UINT(3, client.commands.size());
-    assertCommand(client.commands[0], CommandKind::Range, 20, 15);
-    assertCommand(client.commands[1], CommandKind::Sensation, 40);
-    assertCommand(client.commands[2], CommandKind::Speed, 20);
+    assertSingleCommand(client.commands, CommandKind::Range, 20, 15);
+    assertSingleCommand(client.commands, CommandKind::Sensation, 40);
+    assertSingleCommand(client.commands, CommandKind::Speed, 20);
     TEST_ASSERT_EQUAL_INT(20, control.values().speed);
+}
+
+void test_rejected_zero_speed_does_not_request_stop() {
+    FakeOssmClient client;
+    OssmControl control(client);
+    TEST_ASSERT_TRUE(control.apply({20, 0, 0, 0}));
     client.commands.clear();
     client.acceptSpeed = false;
     TEST_ASSERT_TRUE(control.apply({-20, 0, 0, 0}));
@@ -126,8 +149,8 @@ void test_pattern_change_resets_sensation_and_repeated_selection_is_noop() {
     TEST_ASSERT_EQUAL_INT(7, control.values().pattern);
     TEST_ASSERT_EQUAL_INT(50, control.values().sensation);
     TEST_ASSERT_EQUAL_UINT(2, client.commands.size());
-    assertCommand(client.commands[0], CommandKind::Pattern, 7);
-    assertCommand(client.commands[1], CommandKind::Sensation, 50);
+    assertSingleCommand(client.commands, CommandKind::Pattern, 7);
+    assertSingleCommand(client.commands, CommandKind::Sensation, 50);
     client.commands.clear();
     TEST_ASSERT_TRUE(control.setPattern(7));
     TEST_ASSERT_TRUE(client.commands.empty());
@@ -147,10 +170,10 @@ void test_readiness_loss_restores_defaults_and_requests_zero_speed() {
     TEST_ASSERT_EQUAL_INT(50, control.values().sensation);
     TEST_ASSERT_EQUAL_INT(0, control.values().pattern);
     TEST_ASSERT_EQUAL_UINT(4, client.commands.size());
-    assertCommand(client.commands[0], CommandKind::Range, 10, 10);
-    assertCommand(client.commands[1], CommandKind::Sensation, 50);
-    assertCommand(client.commands[2], CommandKind::Pattern, 0);
-    assertCommand(client.commands[3], CommandKind::Speed, 0);
+    assertSingleCommand(client.commands, CommandKind::Range, 10, 10);
+    assertSingleCommand(client.commands, CommandKind::Sensation, 50);
+    assertSingleCommand(client.commands, CommandKind::Pattern, 0);
+    assertSingleCommand(client.commands, CommandKind::Speed, 0);
 }
 
 }  // namespace
@@ -165,7 +188,8 @@ int main() {
     RUN_TEST(test_depth_reduction_clamps_stroke_and_sends_one_combined_range);
     RUN_TEST(test_individual_range_changes_use_individual_commands);
     RUN_TEST(test_unchanged_values_do_not_send_commands);
-    RUN_TEST(test_motion_parameters_are_sent_before_speed);
+    RUN_TEST(test_combined_adjustment_requests_each_changed_value);
+    RUN_TEST(test_rejected_zero_speed_does_not_request_stop);
     RUN_TEST(test_rejected_speed_resets_local_speed_and_requests_stop);
     RUN_TEST(test_stop_requests_zero_speed_even_when_not_ready);
     RUN_TEST(test_pattern_change_resets_sensation_and_repeated_selection_is_noop);
