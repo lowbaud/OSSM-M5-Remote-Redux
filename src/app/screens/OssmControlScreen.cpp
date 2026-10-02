@@ -16,6 +16,7 @@ constexpr std::uint32_t kHoldPingPauseMs = 500;
 constexpr std::int32_t kHoldPingWidth = 2;
 constexpr std::int32_t kHoldPingMaximumPad = 7;
 constexpr std::int32_t kHoldPingProgressEnd = 255;
+constexpr lv_opa_t kHeldSpeedOpacity = LV_OPA_40;
 
 int clampEndpoint(std::int64_t value, int minimum, int maximum) {
     if (value < minimum) {
@@ -71,7 +72,7 @@ void OssmControlScreen::enter() {
 void OssmControlScreen::leave() {
     resetAcceleration();
     stopButtonFeedback_.reset();
-    setHoldPulse(false);
+    setHoldFeedback(false);
 }
 
 OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& events) {
@@ -259,17 +260,20 @@ void OssmControlScreen::refresh() {
     setMotionRangeSlider(objects.ossm_control_motion_range_slider, strokeStart, values.depth);
 
     // A collapsed range holds the machine in place even though the speed is set.
-    setHoldPulse(values.stroke == 0 && values.speed > 0);
+    setHoldFeedback(values.stroke == 0 && values.speed > 0);
 }
 
-void OssmControlScreen::setHoldPulse(bool active) {
-    if (active == holdPulseActive_) {
+// Pings the range knob and dims the speed, which has no effect while the range is collapsed.
+void OssmControlScreen::setHoldFeedback(bool active) {
+    if (active == holdFeedbackActive_) {
         return;
     }
-    holdPulseActive_ = active;
+    holdFeedbackActive_ = active;
 
     lv_obj_t* slider = objects.ossm_control_motion_range_slider;
+    lv_obj_t* speedLabel = objects.ossm_control_speed_value_lbl;
     if (!active) {
+        lv_obj_remove_local_style_prop(speedLabel, LV_STYLE_TEXT_OPA, LV_PART_MAIN);
         lv_anim_delete(slider, setRangeKnobPing);
         lv_obj_remove_local_style_prop(slider, LV_STYLE_OUTLINE_WIDTH, LV_PART_KNOB);
         lv_obj_remove_local_style_prop(slider, LV_STYLE_OUTLINE_PAD, LV_PART_KNOB);
@@ -278,6 +282,7 @@ void OssmControlScreen::setHoldPulse(bool active) {
         return;
     }
 
+    lv_obj_set_style_text_opa(speedLabel, kHeldSpeedOpacity, LV_PART_MAIN);
     lv_obj_set_style_outline_color(
         slider, lv_obj_get_style_bg_color(slider, LV_PART_KNOB), LV_PART_KNOB);
     lv_obj_set_style_outline_width(slider, kHoldPingWidth, LV_PART_KNOB);
