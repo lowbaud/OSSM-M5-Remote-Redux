@@ -906,9 +906,7 @@ bool OssmClientWorker::loadPatterns() {
         if ((firmwareFamily_ == FirmwareFamily::Official ||
              firmwareFamily_ == FirmwareFamily::Lite) &&
             std::strcmp(patternName, kGoToPointPatternName) == 0) {
-            // Reserved for holding a collapsed range, so it is not offered for selection.
             goToPointPatternId_ = patternId;
-            continue;
         }
 
         if (patterns.count >= OssmClient::kMaxPatternCount) {
