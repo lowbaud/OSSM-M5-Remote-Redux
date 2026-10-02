@@ -1,0 +1,14 @@
+# Ignore rules for tokei (https://github.com/XAMPPRocky/tokei) LOC counts.
+# Run `tokei` from the repo root. Counts only shipped firmware and its native tests.
+/*
+!/src/
+!/test/
+
+# Generated or library-provided
+src/ui/generated/
+src/lv_conf.h
+
+# Release-tooling tests, test docs, and PlatformIO manifests
+test/python/
+*.md
+*.json
