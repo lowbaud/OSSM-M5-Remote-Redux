@@ -22,7 +22,19 @@ void begin() {
 #endif
 
     Serial.println("Serial diagnostics ready");
+    M5.Power.setChargeVoltage(4200);
     M5.Power.setChargeCurrent(BATTERY_CHARGE_CURRENT);
+
+    // TODO: Re-enable if M5Unified doesn't fix AXP2101 TS-pin handling upstream,
+    // or if a user reports charging blocked on CoreS3/Core2 v1.1.
+#if 0
+    if (M5.Power.getType() == m5::Power_Class::pmic_axp2101) {
+        // The battery has no thermistor and the CoreS3 wires TS to a bus voltage
+        // divider, which can block charging, so treat TS as a plain ADC input
+        // that does not affect the charger.
+        M5.Power.Axp2101.bitOn(0x50, 0x10);
+    }
+#endif
 }
 
 void update() {
