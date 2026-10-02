@@ -2,7 +2,8 @@
   "files": [
     "actions.h",
     "fonts.h",
-    "fonts/ui_font_font_chivo_mono_60.c",
+    "fonts/ui_font_ami_ega_8x8.c",
+    "fonts/ui_font_chivo_mono_60.c",
     "images.c",
     "images.h",
     "images/ui_image_redux_logo.c",

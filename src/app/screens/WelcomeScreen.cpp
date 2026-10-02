@@ -27,8 +27,8 @@ WelcomeScreenAction WelcomeScreen::update(const RemoteInputEvents& events) {
     return WelcomeScreenAction::None;
 }
 
-void WelcomeScreen::setBatteryLevel(int percent) {
-    batteryIndicator_.setLevel(percent);
+void WelcomeScreen::setBatteryLevel(int percent, bool charging) {
+    batteryIndicator_.setLevel(percent, charging);
 }
 
 }  // namespace m5_redux

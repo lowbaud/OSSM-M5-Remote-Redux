@@ -26,7 +26,7 @@ class OssmControlScreen {
     void leave();
     OssmControlScreenAction update(const RemoteInputEvents& events);
     void refresh();
-    void setBatteryLevel(int percent);
+    void setBatteryLevel(int percent, bool charging);
     void setPatternLabel(int patternId, const char* patternName);
     void setDepthControlMode(DepthControlMode mode);
     void setStrokeEncoderReversed(bool reversed);

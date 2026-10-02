@@ -299,8 +299,8 @@ void OssmControlScreen::setHoldFeedback(bool active) {
     lv_anim_start(&ping);
 }
 
-void OssmControlScreen::setBatteryLevel(int percent) {
-    batteryIndicator_.setLevel(percent);
+void OssmControlScreen::setBatteryLevel(int percent, bool charging) {
+    batteryIndicator_.setLevel(percent, charging);
 }
 
 void OssmControlScreen::setPatternLabel(int patternId, const char* patternName) {
