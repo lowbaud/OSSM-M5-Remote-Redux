@@ -19,7 +19,7 @@ class WelcomeScreen {
     void enter();
     void leave();
     WelcomeScreenAction update(const RemoteInputEvents& events);
-    void setBatteryLevel(int percent);
+    void setBatteryLevel(int percent, bool charging);
 
   private:
     BatteryIndicator batteryIndicator_;

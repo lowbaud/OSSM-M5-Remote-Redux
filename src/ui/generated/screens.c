@@ -99,7 +99,7 @@ void create_screen_welcome() {
             // welcome_battery_lbl
             lv_obj_t *obj = lv_label_create(parent_obj);
             objects.welcome_battery_lbl = obj;
-            lv_obj_set_pos(obj, 282, 2);
+            lv_obj_set_pos(obj, 282, 4);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_obj_set_style_text_font(obj, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_text_static(obj, "");
@@ -304,7 +304,7 @@ void create_screen_ossm_control() {
             objects.ossm_control_speed_value_lbl = obj;
             lv_obj_set_pos(obj, 40, 81);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-            lv_obj_set_style_text_font(obj, &ui_font_font_chivo_mono_60, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_font(obj, &ui_font_chivo_mono_60, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_width(obj, 110, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_text_static(obj, "100");
@@ -315,7 +315,7 @@ void create_screen_ossm_control() {
             objects.ossm_control_sensation_value_lbl = obj;
             lv_obj_set_pos(obj, 167, 81);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-            lv_obj_set_style_text_font(obj, &ui_font_font_chivo_mono_60, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_font(obj, &ui_font_chivo_mono_60, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_width(obj, 119, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_text_static(obj, "100");
@@ -403,7 +403,7 @@ void create_screen_ossm_control() {
             // ossm_control_battery_lbl
             lv_obj_t *obj = lv_label_create(parent_obj);
             objects.ossm_control_battery_lbl = obj;
-            lv_obj_set_pos(obj, 282, 2);
+            lv_obj_set_pos(obj, 282, 4);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_obj_set_style_text_font(obj, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_text_static(obj, "");
@@ -639,7 +639,8 @@ void tick_screen_by_id(enum ScreensEnum screenId) {
 //
 
 ext_font_desc_t fonts[] = {
-    { "font_chivo_mono_60", &ui_font_font_chivo_mono_60 },
+    { "chivo_mono_60", &ui_font_chivo_mono_60 },
+    { "ami_ega_8x8", &ui_font_ami_ega_8x8 },
 #if LV_FONT_MONTSERRAT_8
     { "MONTSERRAT_8", &lv_font_montserrat_8 },
 #endif

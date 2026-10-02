@@ -6,6 +6,7 @@ namespace m5_platform {
 void begin();
 void update();
 int batteryLevelPercent();
+bool batteryCharging();
 bool externalPowerPresent();
 void setDisplayBrightnessPercent(int percent);
 void powerOff();

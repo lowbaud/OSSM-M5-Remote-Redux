@@ -31,6 +31,7 @@ namespace m5_redux {
 namespace {
 
 constexpr std::uint32_t kBatteryUpdateIntervalMs = 10000;
+constexpr std::uint32_t kExternalPowerPollIntervalMs = 1000;
 
 enum class Screen : std::uint8_t {
     Boot,
@@ -72,6 +73,9 @@ SavedOssmConnection startupConnection{};
 bool hasConnectionTarget = false;
 bool connectAfterBoot = false;
 std::uint32_t lastBatteryUpdateAtMs = 0;
+std::uint32_t lastExternalPowerPollAtMs = 0;
+bool externalPowerPresent = false;
+bool batteryRefreshPending = false;
 
 SavedOssmConnection makeSavedConnection(const ossm::DiscoveredOssm& device) {
     SavedOssmConnection connection;
@@ -103,8 +107,33 @@ void updateBatteryIndicator(bool force = false) {
 
     lastBatteryUpdateAtMs = now;
     const int batteryLevel = m5_platform::batteryLevelPercent();
-    welcomeScreen.setBatteryLevel(batteryLevel);
-    ossmControlScreen.setBatteryLevel(batteryLevel);
+    const bool batteryCharging = m5_platform::batteryCharging();
+    welcomeScreen.setBatteryLevel(batteryLevel, batteryCharging);
+    ossmControlScreen.setBatteryLevel(batteryLevel, batteryCharging);
+}
+
+// Reads the PMIC over I2C, so poll it at a fixed interval and share the cached
+// value instead of reading it on every loop pass.
+void updateExternalPower() {
+    const std::uint32_t now = millis();
+    if (now - lastExternalPowerPollAtMs < kExternalPowerPollIntervalMs) {
+        return;
+    }
+
+    lastExternalPowerPollAtMs = now;
+    const bool present = m5_platform::externalPowerPresent();
+    // Plugging in or unplugging changes the charging state. Refresh the
+    // battery on the following poll so the PMIC has had time to report it.
+    const bool refreshBattery = batteryRefreshPending;
+    batteryRefreshPending = present != externalPowerPresent;
+    if (present && !externalPowerPresent) {
+        // Wake the screen to show it is charging.
+        idleTimer.reset(now);
+    }
+    externalPowerPresent = present;
+    if (refreshBattery) {
+        updateBatteryIndicator(true);
+    }
 }
 
 void leaveScreen(Screen screen) {
@@ -467,10 +496,10 @@ void begin() {
     backlightController.begin(
         settingsStore.brightnessLevel(),
         static_cast<std::uint32_t>(settingsStore.idleDimTimeout()));
+    externalPowerPresent = m5_platform::externalPowerPresent();
+    lastExternalPowerPollAtMs = now;
     autoPowerOffController.begin(
-        static_cast<std::uint32_t>(settingsStore.idlePowerOffTimeout()),
-        now,
-        m5_platform::externalPowerPresent());
+        static_cast<std::uint32_t>(settingsStore.idlePowerOffTimeout()), now, externalPowerPresent);
     remoteInput.begin();
     SavedOssmConnection savedConnection;
     const bool hasSavedConnection = settingsStore.savedOssmConnection(savedConnection);
@@ -499,6 +528,7 @@ void begin() {
 
 void update() {
     m5_platform::update();
+    updateExternalPower();
     updateBatteryIndicator();
 
     const bool connectedScreenWasReady =
@@ -547,7 +577,7 @@ void update() {
     }
     const std::uint32_t idleDurationMs = idleTimer.idleForMs(now);
     backlightController.update(idleDurationMs);
-    autoPowerOffController.update(now, idleDurationMs, m5_platform::externalPowerPresent());
+    autoPowerOffController.update(now, idleDurationMs, externalPowerPresent);
 }
 
 void stopMotion() {
