@@ -49,6 +49,7 @@ class DiagnosticsScreen {
         kLargestBlockRow,
         kPsramRow,
         kBatteryRow,
+        kChargeCurrentRow,
         kOssmRow,
         kSignalRow,
         kRemoteAddressRow,
