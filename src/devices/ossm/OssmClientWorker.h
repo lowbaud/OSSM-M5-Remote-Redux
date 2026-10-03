@@ -32,6 +32,7 @@ class OssmClientWorker {
     void loop();
 
     bool publishRequestedState(const OssmClient::RequestedState& requested);
+    void cancelPendingConnect();
     bool latestObservedState(OssmClient::ObservedState& out) const;
     bool patternList(OssmClient::PatternList& out) const;
     void noteDisconnectedFromCallback(int reason);
