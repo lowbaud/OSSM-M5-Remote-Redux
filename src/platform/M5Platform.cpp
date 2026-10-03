@@ -52,6 +52,10 @@ bool batteryCharging() {
     return M5.Power.isCharging() == m5::Power_Class::is_charging;
 }
 
+int batteryChargeCurrentMa() {
+    return BATTERY_CHARGE_CURRENT;
+}
+
 bool externalPowerPresent() {
     switch (M5.Power.getType()) {
 #if !defined(CONFIG_IDF_TARGET_ESP32S3)

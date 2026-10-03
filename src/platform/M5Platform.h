@@ -8,6 +8,7 @@ void update();
 int batteryLevelPercent();
 int batteryVoltageMv();
 bool batteryCharging();
+int batteryChargeCurrentMa();
 bool externalPowerPresent();
 void setDisplayBrightnessPercent(int percent);
 void powerOff();

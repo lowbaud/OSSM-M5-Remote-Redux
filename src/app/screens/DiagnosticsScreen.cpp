@@ -49,6 +49,7 @@ constexpr const char* kOverviewKeys[] = {
     "Largest block",
     "PSRAM",
     "Battery",
+    "Charge current",
     "OSSM",
     "Signal",
     "Remote address",
@@ -274,6 +275,8 @@ void DiagnosticsScreen::buildOverview(lv_obj_t* panel) {
     lv_label_set_text_static(overviewValues_[kFirmwareRow], buildInfo().buildVersion);
     lv_label_set_text_static(overviewValues_[kTargetRow], BUILD_TARGET);
     lv_label_set_text_static(overviewValues_[kResetRow], system_info::resetReasonName());
+    lv_label_set_text_fmt(
+        overviewValues_[kChargeCurrentRow], "%d mA", m5_platform::batteryChargeCurrentMa());
     if (system_info::resetWasAbnormal()) {
         lv_obj_set_style_text_color(
             overviewValues_[kResetRow], lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN);
