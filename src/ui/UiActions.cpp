@@ -49,9 +49,10 @@ extern "C" void action_settings_select(lv_event_t*) {
     m5_redux::app::activateSettingsSelect();
 }
 
-// The diagnostics screen is not reachable yet; these are wired up with its implementation.
 extern "C" void action_diagnostics_back(lv_event_t*) {
-    m5_redux::app::showSettings();
+    m5_redux::app::activateDiagnosticsBack();
 }
 
-extern "C" void action_diagnostics_action(lv_event_t*) {}
+extern "C" void action_diagnostics_action(lv_event_t*) {
+    m5_redux::app::activateDiagnosticsAction();
+}

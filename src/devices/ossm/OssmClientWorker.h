@@ -26,7 +26,9 @@ class OssmClientWorker {
         std::atomic<bool>& ready,
         std::atomic<uint32_t>& speedValidityEpoch,
         std::atomic<int>& lastError,
-        std::atomic<bool>& collapsedRangeSupported);
+        std::atomic<bool>& collapsedRangeSupported,
+        std::atomic<OssmClient::FirmwareFamily>& firmwareFamily,
+        std::atomic<int>& rssi);
 
     bool begin();
     void loop();
@@ -45,12 +47,7 @@ class OssmClientWorker {
         uint8_t data[kStateNotificationCapacity] = {};
     };
 
-    // Firmware identified from the Device Information Service.
-    enum class FirmwareFamily : uint8_t {
-        Unknown,
-        Official,
-        Lite,
-    };
+    using FirmwareFamily = OssmClient::FirmwareFamily;
 
     // Motion values as written to the firmware.
     struct MotionTarget {
@@ -160,6 +157,9 @@ class OssmClientWorker {
     std::atomic<uint32_t>& speedValidityEpoch_;
     std::atomic<int>& lastError_;
     std::atomic<bool>& collapsedRangeSupported_;
+    // Published so the diagnostics screen can read them from the UI task.
+    std::atomic<FirmwareFamily>& firmwareFamily_;
+    std::atomic<int>& rssi_;
     OssmClientCallbacks callbacks_;
 
     OssmClient::RequestedState requested_{};
@@ -178,7 +178,6 @@ class OssmClientWorker {
 
     bool observedStateValid_ = false;
     bool strokeRelativeToDepth_ = false;
-    FirmwareFamily firmwareFamily_ = FirmwareFamily::Unknown;
     int goToPointPatternId_ = -1;
     MachineStateCategory observedStateCategory_ = MachineStateCategory::NoUsableState;
     ModeOperation modeOperation_{};

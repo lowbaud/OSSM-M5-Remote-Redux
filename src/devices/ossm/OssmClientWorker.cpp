@@ -110,10 +110,13 @@ OssmClientWorker::OssmClientWorker(
     std::atomic<bool>& ready,
     std::atomic<uint32_t>& speedValidityEpoch,
     std::atomic<int>& lastError,
-    std::atomic<bool>& collapsedRangeSupported)
+    std::atomic<bool>& collapsedRangeSupported,
+    std::atomic<OssmClient::FirmwareFamily>& firmwareFamily,
+    std::atomic<int>& rssi)
     : connectionState_(connectionState), modeState_(modeState), ready_(ready),
       speedValidityEpoch_(speedValidityEpoch), lastError_(lastError),
-      collapsedRangeSupported_(collapsedRangeSupported), callbacks_(*this) {}
+      collapsedRangeSupported_(collapsedRangeSupported), firmwareFamily_(firmwareFamily),
+      rssi_(rssi), callbacks_(*this) {}
 
 bool OssmClientWorker::begin() {
     if (initialized_)
@@ -183,11 +186,21 @@ bool OssmClientWorker::begin() {
 
 void OssmClientWorker::loop() {
     constexpr TickType_t kStackSampleInterval = pdMS_TO_TICKS(10000);
+    constexpr TickType_t kRssiSampleInterval = pdMS_TO_TICKS(1000);
     TickType_t lastStackSampleAt = xTaskGetTickCount() - kStackSampleInterval;
+    TickType_t lastRssiSampleAt = xTaskGetTickCount() - kRssiSampleInterval;
     uint32_t minimumFreeStackBytes = OssmClient::kWorkerStackSize + 1;
 
     for (;;) {
         const TickType_t now = xTaskGetTickCount();
+        if (now - lastRssiSampleAt >= kRssiSampleInterval) {
+            lastRssiSampleAt = now;
+            const bool connected =
+                connectionState_.load() == OssmClient::ConnectionState::Connected && client_ &&
+                client_->isConnected();
+            rssi_.store(connected ? client_->getRssi() : 0);
+        }
+
         if (now - lastStackSampleAt >= kStackSampleInterval) {
             lastStackSampleAt = now;
             // ESP32 reports lifetime minimum unused stack in bytes, including completed calls.
@@ -743,6 +756,7 @@ void OssmClientWorker::clearConnectionState() {
     firmwareFamily_ = FirmwareFamily::Unknown;
     goToPointPatternId_ = -1;
     collapsedRangeSupported_.store(false);
+    rssi_.store(0);
     nextMotionWriteAt_ = 0;
 
     if (initialized_) {

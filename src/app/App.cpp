@@ -12,6 +12,7 @@
 #include "app/IdleTimer.h"
 #include "app/screens/BootScreen.h"
 #include "app/screens/ConnectScreen.h"
+#include "app/screens/DiagnosticsScreen.h"
 #include "app/screens/OssmControlScreen.h"
 #include "app/screens/OssmPatternsScreen.h"
 #include "app/screens/ScanScreen.h"
@@ -22,6 +23,8 @@
 #include "devices/ossm/OssmControl.h"
 #include "devices/ossm/OssmDiscovery.h"
 #include "diagnostics/Log.h"
+#include "diagnostics/SerialConsole.h"
+#include "diagnostics/SystemInfo.h"
 #include "platform/LvglPort.h"
 #include "platform/M5Platform.h"
 #include "platform/RemoteInput.h"
@@ -44,6 +47,7 @@ enum class Screen : std::uint8_t {
     OssmControl,
     OssmPatterns,
     Settings,
+    Diagnostics,
 };
 
 enum class ConnectionOrigin : std::uint8_t {
@@ -67,9 +71,11 @@ ConnectScreen connectScreen;
 OssmControlScreen ossmControlScreen(ossmControl);
 OssmPatternsScreen ossmPatternsScreen(ossmControl);
 SettingsScreen settingsScreen(settingsStore);
+DiagnosticsScreen diagnosticsScreen(ossmClient);
 
 Screen currentScreen = Screen::Boot;
 Screen settingsReturnScreen = Screen::Welcome;
+bool returningFromDiagnostics = false;
 ConnectionOrigin connectionOrigin = ConnectionOrigin::Startup;
 SavedOssmConnection connectionTarget{};
 SavedOssmConnection startupConnection{};
@@ -163,6 +169,9 @@ void leaveScreen(Screen screen) {
             backlightController.setBrightnessLevel(settingsStore.brightnessLevel());
             settingsScreen.leave();
             break;
+        case Screen::Diagnostics:
+            diagnosticsScreen.leave();
+            break;
     }
 }
 
@@ -195,9 +204,16 @@ void enterScreen(Screen screen) {
             settingsScreen.setStopAvailable(
                 settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady());
             settingsScreen.setMotionActive(ossmControl.values().speed > 0);
-            settingsScreen.enter();
+            settingsScreen.enter(returningFromDiagnostics);
+            returningFromDiagnostics = false;
             break;
         }
+        case Screen::Diagnostics:
+            diagnosticsScreen.setStopAvailable(
+                settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady());
+            diagnosticsScreen.setMotionActive(ossmControl.values().speed > 0);
+            diagnosticsScreen.enter();
+            break;
     }
 }
 
@@ -349,6 +365,9 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 LOGE(kTag, "Unable to save default pattern setting");
             }
             break;
+        case SettingsScreenAction::ShowDiagnostics:
+            navigateTo(Screen::Diagnostics);
+            break;
         case SettingsScreenAction::None:
             break;
     }
@@ -384,6 +403,7 @@ void handleConnectionEvents(const OssmConnectionEvents& events) {
         if (hasConnectionTarget && !settingsStore.setSavedOssmConnection(connectionTarget)) {
             LOGE(kTag, "Unable to save OSSM connection");
         }
+        diagnosticsScreen.setOssmName(connectionTarget.name);
         hasConnectionTarget = false;
         ossmControl.stop();
         // Resolve by name for this firmware; an unavailable preference remains stored.
@@ -480,6 +500,12 @@ void dispatchInput(const RemoteInputEvents& events, bool connectedScreenWasReady
         case Screen::Settings:
             handleSettingsEvent(settingsScreen.update(events));
             break;
+        case Screen::Diagnostics:
+            if (diagnosticsScreen.update(events) == DiagnosticsScreenAction::Back) {
+                returningFromDiagnostics = true;
+                navigateTo(Screen::Settings);
+            }
+            break;
     }
 }
 
@@ -490,6 +516,8 @@ namespace app {
 void begin() {
     m5_platform::begin();
     LOGI(kTag, "%s %s (%s)", APP_DISPLAY_NAME, buildInfo().buildVersion, BUILD_TARGET);
+    LOGI(kTag, "Reset reason: %s", system_info::resetReasonName());
+    serial_console::begin();
     if (!settingsStore.begin()) {
         LOGE(kTag, "Redux settings initialization failed");
     }
@@ -519,6 +547,7 @@ void begin() {
     ossmControlScreen.begin();
     ossmPatternsScreen.begin();
     settingsScreen.begin();
+    diagnosticsScreen.begin();
     updateBatteryIndicator(true);
     ossmConnection.begin(APP_DISPLAY_NAME);
     if (!ossmDiscovery.begin()) {
@@ -532,6 +561,7 @@ void begin() {
 
 void update() {
     m5_platform::update();
+    serial_console::update();
     updateExternalPower();
     updateBatteryIndicator();
 
@@ -592,6 +622,8 @@ void stopMotion() {
         ossmPatternsScreen.refresh();
     } else if (currentScreen == Screen::Settings) {
         settingsScreen.setMotionActive(false);
+    } else if (currentScreen == Screen::Diagnostics) {
+        diagnosticsScreen.setMotionActive(false);
     }
 }
 
@@ -614,6 +646,18 @@ void activateSettingsBack() {
 void activateSettingsSelect() {
     if (currentScreen == Screen::Settings) {
         settingsScreen.requestSelect();
+    }
+}
+
+void activateDiagnosticsBack() {
+    if (currentScreen == Screen::Diagnostics) {
+        diagnosticsScreen.requestBack();
+    }
+}
+
+void activateDiagnosticsAction() {
+    if (currentScreen == Screen::Diagnostics) {
+        diagnosticsScreen.requestAction();
     }
 }
 

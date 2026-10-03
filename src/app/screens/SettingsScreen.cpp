@@ -19,6 +19,7 @@ constexpr char kAutoConnectSettingName[] = "Auto-connect";
 constexpr char kDepthControlSettingName[] = "Depth control";
 constexpr char kStrokeDirectionSettingName[] = "Stroke direction";
 constexpr char kTouchscreenSettingName[] = "Touchscreen";
+constexpr char kDiagnosticsSettingName[] = "Diagnostics";
 constexpr std::size_t kBrightnessSettingIndex = 1;
 constexpr std::size_t kIdleDimSettingIndex = 2;
 constexpr std::size_t kIdlePowerOffSettingIndex = 3;
@@ -26,6 +27,8 @@ constexpr std::size_t kAutoConnectSettingIndex = 4;
 constexpr std::size_t kDepthControlSettingIndex = 5;
 constexpr std::size_t kStrokeDirectionSettingIndex = 6;
 constexpr std::size_t kTouchscreenSettingIndex = 7;
+// Opens the diagnostics screen instead of an options panel.
+constexpr std::size_t kDiagnosticsSettingIndex = 8;
 constexpr std::int32_t kOptionsTitleHeight = 28;
 constexpr std::int32_t kOptionsPanelWidth = 263;
 constexpr std::int32_t kOptionsPanelHeight = 154;
@@ -83,12 +86,16 @@ std::size_t SettingsScreen::defaultPatternOptionIndex() const {
     return kNoSelection;
 }
 
-void SettingsScreen::enter() {
+void SettingsScreen::enter(bool keepSelection) {
     pendingEvent_ = {};
     closeOptions();
     refresh();
-    selectSetting(
-        patternCatalog_.count > 0 ? kDefaultPatternSettingIndex : kBrightnessSettingIndex);
+    if (keepSelection) {
+        selectSetting(selectedSettingIndex_);
+    } else {
+        selectSetting(
+            patternCatalog_.count > 0 ? kDefaultPatternSettingIndex : kBrightnessSettingIndex);
+    }
 
     if (lv_screen_active() != objects.settings) {
         loadScreen(SCREEN_ID_SETTINGS);
@@ -391,6 +398,19 @@ void SettingsScreen::buildSettingRows() {
     lv_label_set_text_static(touchscreenSetting.valueLabel, "");
 
     lv_obj_add_event_cb(touchscreenSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
+
+    SettingRow& diagnosticsSetting = settingRows_[kDiagnosticsSettingIndex];
+    diagnosticsSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
+    styleSelectableRow(diagnosticsSetting.button, objects.settings_list);
+
+    lv_obj_t* diagnosticsNameLabel = lv_label_create(diagnosticsSetting.button);
+    lv_label_set_text_static(diagnosticsNameLabel, kDiagnosticsSettingName);
+    lv_obj_set_flex_grow(diagnosticsNameLabel, 1);
+
+    diagnosticsSetting.valueLabel = lv_label_create(diagnosticsSetting.button);
+    lv_label_set_text_static(diagnosticsSetting.valueLabel, LV_SYMBOL_RIGHT);
+
+    lv_obj_add_event_cb(diagnosticsSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
 }
 
 void SettingsScreen::buildOptionsPanel() {
@@ -552,6 +572,11 @@ void SettingsScreen::configureOptions() {
 
 void SettingsScreen::openSelectedSetting() {
     if (selectedSettingIndex_ >= kSettingCount) {
+        return;
+    }
+
+    if (selectedSettingIndex_ == kDiagnosticsSettingIndex) {
+        pendingEvent_.action = SettingsScreenAction::ShowDiagnostics;
         return;
     }
 

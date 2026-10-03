@@ -44,6 +44,10 @@ int batteryLevelPercent() {
     return M5.Power.getBatteryLevel();
 }
 
+int batteryVoltageMv() {
+    return M5.Power.getBatteryVoltage();
+}
+
 bool batteryCharging() {
     return M5.Power.isCharging() == m5::Power_Class::is_charging;
 }

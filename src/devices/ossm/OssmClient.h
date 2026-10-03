@@ -31,6 +31,13 @@ class OssmClient : public OssmControlClient {
         Failed,
     };
 
+    // Firmware identified from the Device Information Service.
+    enum class FirmwareFamily : uint8_t {
+        Unknown,
+        Official,
+        Lite,
+    };
+
     OssmClient() = default;
     OssmClient(const OssmClient&) = delete;
     OssmClient& operator=(const OssmClient&) = delete;
@@ -47,6 +54,11 @@ class OssmClient : public OssmControlClient {
     bool isReady() const override;
     int lastError() const;
     bool supportsCollapsedRange() const override;
+    FirmwareFamily firmwareFamily() const;
+    // Signal strength of the current connection in dBm, or 0 when unknown.
+    int rssi() const;
+    // Lowest amount of unused worker stack seen so far, in bytes.
+    uint32_t workerStackMinimumFree() const;
 
     static constexpr size_t kObservedStateCapacity = 48;
     static constexpr size_t kObservedSessionIdCapacity = 37;
@@ -163,6 +175,8 @@ class OssmClient : public OssmControlClient {
     std::atomic<uint32_t> speedValidityEpoch_{0};
     std::atomic<int> lastError_{0};
     std::atomic<bool> collapsedRangeSupported_{false};
+    std::atomic<FirmwareFamily> firmwareFamily_{FirmwareFamily::Unknown};
+    std::atomic<int> rssi_{0};
 
     static void workerEntry(void* context);
     bool publishRequestedState();

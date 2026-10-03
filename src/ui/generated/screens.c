@@ -720,6 +720,7 @@ void tick_screen_by_id(enum ScreensEnum screenId) {
 ext_font_desc_t fonts[] = {
     { "chivo_mono_60", &ui_font_chivo_mono_60 },
     { "ami_ega_8x8", &ui_font_ami_ega_8x8 },
+    { "dos_v_jpn12", &ui_font_dos_v_jpn12 },
 #if LV_FONT_MONTSERRAT_8
     { "MONTSERRAT_8", &lv_font_montserrat_8 },
 #endif
