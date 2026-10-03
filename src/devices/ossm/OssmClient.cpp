@@ -93,8 +93,12 @@ bool OssmClient::disconnect() {
     requestedState_.speed = 0;
     requestedState_.speedValidityEpoch = speedValidityEpoch_.load();
     requestedState_.mode = {};
-    if (publishRequestedState())
+    if (publishRequestedState()) {
+        if (state == ConnectionState::Connecting) {
+            worker_->cancelPendingConnect();
+        }
         return true;
+    }
 
     requestedState_.mode = previousModeRequest;
     modeState_.store(previousModeState);

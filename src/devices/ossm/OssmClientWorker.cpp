@@ -233,6 +233,15 @@ bool OssmClientWorker::publishRequestedState(const OssmClient::RequestedState& r
     return xQueueOverwrite(requestedMailbox_, &requested) == pdPASS;
 }
 
+// Called from the app task: the worker is blocked in a synchronous connect, and the pending GAP
+// connection would otherwise keep scanning unavailable until the connect timeout.
+void OssmClientWorker::cancelPendingConnect() {
+    if (!initialized_ || !client_)
+        return;
+
+    client_->cancelConnect();
+}
+
 bool OssmClientWorker::latestObservedState(OssmClient::ObservedState& out) const {
     if (!initialized_ || !observedStateMailbox_)
         return false;

@@ -33,6 +33,7 @@ class ScanScreen {
   private:
     enum class State : std::uint8_t {
         Idle,
+        Starting,
         Scanning,
         ScanFailed,
     };
@@ -47,6 +48,8 @@ class ScanScreen {
     static constexpr std::size_t kNoSelection = static_cast<std::size_t>(-1);
     static constexpr std::uint32_t kRssiRefreshIntervalMs = 1000;
     static constexpr int kRssiFilterDivisor = 4;
+    static constexpr std::uint32_t kScanRetryIntervalMs = 250;
+    static constexpr std::uint32_t kScanStartGraceMs = 2000;
 
     ossm::OssmDiscovery& discovery_;
     std::vector<lv_obj_t*> deviceRows_;
@@ -56,8 +59,11 @@ class ScanScreen {
     std::size_t statusDeviceCount_ = 0;
     ScanScreenAction pendingAction_ = ScanScreenAction::None;
     State state_ = State::Idle;
+    std::uint32_t scanRequestedAtMs_ = 0;
+    std::uint32_t lastScanAttemptAtMs_ = 0;
 
     void startFreshScan();
+    void tryStartScan();
     void setState(State state);
     void updateScanResults();
     void selectDevice(std::size_t index);

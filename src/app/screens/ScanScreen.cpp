@@ -86,6 +86,11 @@ void ScanScreen::leave() {
 }
 
 ScanScreenAction ScanScreen::update(const RemoteInputEvents& events) {
+    if ((state_ == State::Starting || state_ == State::ScanFailed) &&
+        millis() - lastScanAttemptAtMs_ >= kScanRetryIntervalMs) {
+        tryStartScan();
+    }
+
     if (state_ == State::Scanning) {
         discovery_.update();
         updateScanResults();
@@ -147,9 +152,22 @@ void ScanScreen::startFreshScan() {
     pendingAction_ = ScanScreenAction::None;
     updateConnectButton();
 
+    scanRequestedAtMs_ = millis();
+    setState(State::Starting);
+    lv_label_set_text(objects.scan_status_label, "Scanning for OSSM...");
+    tryStartScan();
+}
+
+// Scanning is unavailable while a cancelled connection attempt is still winding down, so keep
+// retrying instead of failing on the first attempt.
+void ScanScreen::tryStartScan() {
+    lastScanAttemptAtMs_ = millis();
     if (!discovery_.startScan()) {
-        setState(State::ScanFailed);
-        lv_label_set_text(objects.scan_status_label, "Unable to start scan");
+        if (state_ == State::Starting &&
+            lastScanAttemptAtMs_ - scanRequestedAtMs_ >= kScanStartGraceMs) {
+            setState(State::ScanFailed);
+            lv_label_set_text(objects.scan_status_label, "Unable to start scan");
+        }
         return;
     }
 
@@ -164,7 +182,7 @@ void ScanScreen::setState(State state) {
         return;
     }
 
-    const bool busy = state == State::Scanning;
+    const bool busy = state == State::Starting || state == State::Scanning;
     if (busy) {
         lv_obj_remove_flag(activitySpinner_, LV_OBJ_FLAG_HIDDEN);
     } else {
