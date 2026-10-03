@@ -1,12 +1,16 @@
 #include "OssmClientWorker.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
+
+#include "diagnostics/Log.h"
 
 namespace ossm {
 
 namespace {
+constexpr const char* kTag = "ossm";
 const NimBLEUUID kOssmServiceUuid("522B443A-4F53-534D-0001-420BADBABE69");
 const NimBLEUUID kCommandCharacteristicUuid("522B443A-4F53-534D-1000-420BADBABE69");
 const NimBLEUUID kSpeedKnobCharacteristicUuid("522B443A-4F53-534D-1010-420BADBABE69");
@@ -54,26 +58,43 @@ bool writeTextValue(
     return payload && characteristic.writeValue(payload, std::strlen(payload), response);
 }
 
+// Dumps a payload at debug level as escaped text and hex, split into line-sized chunks.
 void logPayload(const char* label, const uint8_t* data, size_t length) {
-    Serial.printf("%s text: \"", label);
-    for (size_t index = 0; index < length; ++index) {
-        const uint8_t byte = data[index];
-        if (byte == '\\' || byte == '"') {
-            Serial.write('\\');
-            Serial.write(byte);
-        } else if (byte >= 0x20 && byte <= 0x7e) {
-            Serial.write(byte);
-        } else {
-            Serial.printf("\\x%02X", static_cast<unsigned>(byte));
-        }
-    }
-    Serial.println("\"");
+    if (REDUX_LOG_LEVEL < REDUX_LOG_LEVEL_DEBUG)
+        return;
 
-    Serial.printf("%s hex:", label);
-    for (size_t index = 0; index < length; ++index) {
-        Serial.printf(" %02X", static_cast<unsigned>(data[index]));
+    constexpr size_t kBytesPerLine = 32;
+    for (size_t offset = 0; offset < length; offset += kBytesPerLine) {
+        const size_t count = std::min(kBytesPerLine, length - offset);
+        // Worst case is four characters per byte for text and three for hex.
+        char text[kBytesPerLine * 4 + 1];
+        char hex[kBytesPerLine * 3 + 1];
+        size_t textLength = 0;
+        size_t hexLength = 0;
+
+        for (size_t index = 0; index < count; ++index) {
+            const uint8_t byte = data[offset + index];
+            if (byte == '\\' || byte == '"') {
+                text[textLength++] = '\\';
+                text[textLength++] = static_cast<char>(byte);
+            } else if (byte >= 0x20 && byte <= 0x7e) {
+                text[textLength++] = static_cast<char>(byte);
+            } else {
+                textLength += snprintf(
+                    text + textLength,
+                    sizeof(text) - textLength,
+                    "\\x%02X",
+                    static_cast<unsigned>(byte));
+            }
+            hexLength += snprintf(
+                hex + hexLength, sizeof(hex) - hexLength, " %02X", static_cast<unsigned>(byte));
+        }
+        text[textLength] = '\0';
+        hex[hexLength] = '\0';
+
+        LOGD(kTag, "%s [%u] text: \"%s\"", label, static_cast<unsigned>(offset), text);
+        LOGD(kTag, "%s [%u] hex:%s", label, static_cast<unsigned>(offset), hex);
     }
-    Serial.println();
 }
 }  // namespace
 
@@ -173,8 +194,9 @@ void OssmClientWorker::loop() {
             const uint32_t freeStackBytes = uxTaskGetStackHighWaterMark(nullptr);
             if (freeStackBytes < minimumFreeStackBytes) {
                 minimumFreeStackBytes = freeStackBytes;
-                Serial.printf(
-                    "OSSM worker minimum free stack: %u bytes\n",
+                LOGI(
+                    kTag,
+                    "Worker minimum free stack: %u bytes",
                     static_cast<unsigned>(freeStackBytes));
             }
         }
@@ -584,7 +606,7 @@ bool OssmClientWorker::connectNow(const NimBLEAddress& address) {
         recordError(client_->getLastError());
         return false;
     }
-    Serial.printf("OSSM negotiated MTU: %u\n", client_->getMTU());
+    LOGI(kTag, "Negotiated MTU: %u", client_->getMTU());
 
     NimBLERemoteService* service = client_->getService(kOssmServiceUuid);
     if (!client_->isConnected()) {
@@ -601,7 +623,7 @@ bool OssmClientWorker::connectNow(const NimBLEAddress& address) {
     NimBLERemoteCharacteristic* speedKnob =
         service->getCharacteristic(kSpeedKnobCharacteristicUuid);
     NimBLERemoteCharacteristic* state = service->getCharacteristic(kStateCharacteristicUuid);
-    Serial.println("OSSM pattern list characteristic lookup started");
+    LOGD(kTag, "Pattern list characteristic lookup started");
     NimBLERemoteCharacteristic* patternList =
         service->getCharacteristic(kPatternListCharacteristicUuid);
     if (!client_->isConnected()) {
@@ -626,17 +648,17 @@ bool OssmClientWorker::connectNow(const NimBLEAddress& address) {
     }
 
     if (!patternList) {
-        Serial.println("OSSM pattern list characteristic missing");
+        LOGE(kTag, "Pattern list characteristic missing");
         abortInitialization(OssmClient::kPatternListCharacteristicError);
         return false;
     }
 
     if (!patternList->canRead()) {
-        Serial.println("OSSM pattern list characteristic found but not readable");
+        LOGE(kTag, "Pattern list characteristic found but not readable");
         abortInitialization(OssmClient::kPatternListCharacteristicError);
         return false;
     }
-    Serial.println("OSSM pattern list characteristic accepted for read");
+    LOGD(kTag, "Pattern list characteristic accepted for read");
 
     commandCharacteristic_ = command;
     speedKnobCharacteristic_ = speedKnob;
@@ -687,10 +709,10 @@ bool OssmClientWorker::connectNow(const NimBLEAddress& address) {
     updateCollapsedRangeSupport();
 
     resetModeOperation();
-    Serial.println("OSSM connected; reading machine state");
+    LOGI(kTag, "Connected; reading machine state");
     readInitialState();
     if (!observedStateValid_) {
-        Serial.println("OSSM connected; waiting for machine state");
+        LOGI(kTag, "Connected; waiting for machine state");
     }
 
     // Give the machine more time after initialization before issuing further commands.
@@ -746,8 +768,9 @@ void OssmClientWorker::setModeState(OssmClient::ModeState state) {
 
 void OssmClientWorker::failMode(ModeFailure failure) {
     modeOperation_.failure = failure;
-    Serial.printf(
-        "OSSM mode failure: cause=%s category=%s error=%d\n",
+    LOGW(
+        kTag,
+        "Mode failure: cause=%s category=%s error=%d",
         modeFailureName(failure),
         machineStateCategoryName(observedStateCategory_),
         lastError_.load());
@@ -791,15 +814,14 @@ void OssmClientWorker::readInitialState() {
     const NimBLEAttValue value = stateCharacteristic_->readValue();
     const size_t length = value.length();
     if (length == 0) {
-        Serial.println("OSSM initial state read returned no data");
+        LOGW(kTag, "Initial state read returned no data");
         return;
     }
 
     if (length > kStateNotificationCapacity) {
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
-        Serial.printf(
-            "OSSM initial state read too large: %u bytes\n", static_cast<unsigned>(length));
+        LOGW(kTag, "Initial state read too large: %u bytes", static_cast<unsigned>(length));
         return;
     }
 
@@ -815,52 +837,52 @@ void OssmClientWorker::readDeviceInformation() {
 
     NimBLERemoteService* service = client_->getService(kDeviceInformationServiceUuid);
     if (!service) {
-        Serial.println("OSSM device information service missing");
+        LOGI(kTag, "Device information service missing");
         return;
     }
 
     if (characteristicTextEquals(*service, kModelNumberCharacteristicUuid, kLiteModelNumber)) {
         firmwareFamily_ = FirmwareFamily::Lite;
-        Serial.println("OSSM firmware identified as OSSM Lite");
+        LOGI(kTag, "Firmware identified as OSSM Lite");
     } else if (
         characteristicTextEquals(
             *service, kManufacturerNameCharacteristicUuid, kOfficialManufacturerName)) {
         firmwareFamily_ = FirmwareFamily::Official;
-        Serial.println("OSSM firmware identified as official");
+        LOGI(kTag, "Firmware identified as official");
     } else {
-        Serial.println("OSSM firmware not identified from device information");
+        LOGI(kTag, "Firmware not identified from device information");
     }
 }
 
 bool OssmClientWorker::loadPatterns() {
     if (!patternListCharacteristic_) {
-        Serial.println("OSSM pattern load failed: missing characteristic");
+        LOGE(kTag, "Pattern load failed: missing characteristic");
         return false;
     }
 
     if (!patternMailbox_) {
-        Serial.println("OSSM pattern load failed: missing mailbox");
+        LOGE(kTag, "Pattern load failed: missing mailbox");
         return false;
     }
 
     const NimBLEAttValue value = patternListCharacteristic_->readValue();
     const size_t length = value.length();
     if (length == 0) {
-        Serial.println("OSSM pattern list read returned no data");
+        LOGE(kTag, "Pattern list read returned no data");
         return false;
     }
 
     JsonDocument document;
     const DeserializationError error = deserializeJson(document, value.data(), length);
     if (error) {
-        Serial.printf("OSSM pattern list parse failed: %s\n", error.c_str());
-        logPayload("OSSM pattern list contents", value.data(), length);
+        LOGE(kTag, "Pattern list parse failed: %s", error.c_str());
+        logPayload("Pattern list contents", value.data(), length);
         return false;
     }
 
     if (!document.is<JsonArray>()) {
-        Serial.println("OSSM pattern list parse failed: root is not an array");
-        logPayload("OSSM pattern list contents", value.data(), length);
+        LOGE(kTag, "Pattern list parse failed: root is not an array");
+        logPayload("Pattern list contents", value.data(), length);
         return false;
     }
 
@@ -920,37 +942,38 @@ bool OssmClientWorker::loadPatterns() {
     }
 
     if (patterns.count == 0) {
-        Serial.printf(
-            "OSSM pattern list contained no usable entries; inspected=%u skipped=%u\n",
+        LOGE(
+            kTag,
+            "Pattern list contained no usable entries; inspected=%u skipped=%u",
             static_cast<unsigned>(inspectedEntries),
             static_cast<unsigned>(skippedEntries));
         return false;
     }
 
     xQueueOverwrite(patternMailbox_, &patterns);
-    Serial.printf("OSSM loaded %u patterns", static_cast<unsigned>(patterns.count));
-    if (skippedEntries > 0) {
-        Serial.printf(" (%u skipped)", static_cast<unsigned>(skippedEntries));
-    }
-    Serial.println();
+    LOGI(
+        kTag,
+        "Loaded %u patterns (%u skipped)",
+        static_cast<unsigned>(patterns.count),
+        static_cast<unsigned>(skippedEntries));
     return true;
 }
 
 void OssmClientWorker::parseStateNotification(const StateNotification& notification) {
     // The state characteristic also carries plain-text command responses.
     if (startsWith(notification.data, notification.length, "ok:")) {
-#ifdef SERIAL_INFO
-        Serial.printf(
-            "OSSM ignored protocol response: %.*s\n",
+        LOGD(
+            kTag,
+            "Ignored protocol response: %.*s",
             static_cast<int>(notification.length),
             reinterpret_cast<const char*>(notification.data));
-#endif
         return;
     }
 
     if (startsWith(notification.data, notification.length, "fail:")) {
-        Serial.printf(
-            "OSSM protocol failure response: %.*s\n",
+        LOGW(
+            kTag,
+            "Protocol failure response: %.*s",
             static_cast<int>(notification.length),
             reinterpret_cast<const char*>(notification.data));
         return;
@@ -966,25 +989,22 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
             firstByte = static_cast<unsigned>(notification.data[0]);
             lastByte = static_cast<unsigned>(notification.data[notification.length - 1]);
         }
-        Serial.printf(
-            "OSSM state notification parse failed: %s; length=%u first=0x%02X last=0x%02X\n",
+        LOGW(
+            kTag,
+            "State notification parse failed: %s; length=%u first=0x%02X last=0x%02X",
             error.c_str(),
             static_cast<unsigned>(notification.length),
             firstByte,
             lastByte);
-#ifdef SERIAL_INFO
-        logPayload("OSSM state payload", notification.data, notification.length);
-#endif
+        logPayload("State payload", notification.data, notification.length);
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
     }
 
     if (!document.is<JsonObject>()) {
-        Serial.println("OSSM state notification parse failed: root is not an object");
-#ifdef SERIAL_INFO
-        logPayload("OSSM state payload", notification.data, notification.length);
-#endif
+        LOGW(kTag, "State notification parse failed: root is not an object");
+        logPayload("State payload", notification.data, notification.length);
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
@@ -992,10 +1012,8 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
 
     const JsonVariantConst state = document["state"];
     if (!state.is<const char*>()) {
-        Serial.println("OSSM state notification parse failed: missing or invalid state");
-#ifdef SERIAL_INFO
-        logPayload("OSSM state payload", notification.data, notification.length);
-#endif
+        LOGW(kTag, "State notification parse failed: missing or invalid state");
+        logPayload("State payload", notification.data, notification.length);
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
@@ -1004,12 +1022,11 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     const char* stateText = state.as<const char*>();
     const size_t stateLength = std::strlen(stateText);
     if (stateLength == 0 || stateLength >= OssmClient::kObservedStateCapacity) {
-        Serial.printf(
-            "OSSM state notification parse failed: invalid state length=%u\n",
+        LOGW(
+            kTag,
+            "State notification parse failed: invalid state length=%u",
             static_cast<unsigned>(stateLength));
-#ifdef SERIAL_INFO
-        logPayload("OSSM state payload", notification.data, notification.length);
-#endif
+        logPayload("State payload", notification.data, notification.length);
         observedStateValid_ = false;
         observedStateCategory_ = MachineStateCategory::NoUsableState;
         return;
@@ -1030,9 +1047,7 @@ void OssmClientWorker::parseStateNotification(const StateNotification& notificat
     observedStateCategory_ = classifyMachineState(observed.state);
     xQueueOverwrite(observedStateMailbox_, &observed);
 
-#ifdef SERIAL_INFO
-    Serial.printf("OSSM observed state: %s\n", observed.state);
-#endif
+    LOGD(kTag, "Observed state: %s", observed.state);
 }
 
 // Collapse protocol-level state strings into the small set of states the worker can act on.
@@ -1142,17 +1157,13 @@ void OssmClientWorker::recordError(int error) {
 }
 
 void OssmClientWorker::logRemoteWrite(const char* target, const char* payload, bool success) const {
-#ifndef SERIAL_INFO
-    if (success)
-        return;
-#endif
-
-    Serial.printf(
-        "OSSM write[%lu] %s: %s -> %s\n",
-        static_cast<unsigned long>(millis()),
-        target ? target : "unknown",
-        payload ? payload : "",
-        success ? "ok" : "fail");
+    const char* targetName = target ? target : "unknown";
+    const char* payloadText = payload ? payload : "";
+    if (success) {
+        LOGD(kTag, "Write %s: %s -> ok", targetName, payloadText);
+    } else {
+        LOGW(kTag, "Write %s: %s -> fail", targetName, payloadText);
+    }
 }
 
 }  // namespace ossm
