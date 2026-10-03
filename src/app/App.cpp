@@ -8,6 +8,7 @@
 
 #include "app/AutoPowerOffController.h"
 #include "app/BacklightController.h"
+#include "app/BuildInfo.h"
 #include "app/IdleTimer.h"
 #include "app/screens/BootScreen.h"
 #include "app/screens/ConnectScreen.h"
@@ -20,6 +21,7 @@
 #include "devices/ossm/OssmConnectionController.h"
 #include "devices/ossm/OssmControl.h"
 #include "devices/ossm/OssmDiscovery.h"
+#include "diagnostics/Log.h"
 #include "platform/LvglPort.h"
 #include "platform/M5Platform.h"
 #include "platform/RemoteInput.h"
@@ -30,6 +32,7 @@ namespace m5_redux {
 
 namespace {
 
+constexpr const char* kTag = "app";
 constexpr std::uint32_t kBatteryUpdateIntervalMs = 10000;
 constexpr std::uint32_t kExternalPowerPollIntervalMs = 1000;
 
@@ -277,7 +280,7 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
             } else {
                 backlightController.setBrightnessLevel(settingsStore.brightnessLevel());
                 settingsScreen.commitFailed();
-                Serial.println("Unable to save display brightness setting");
+                LOGE(kTag, "Unable to save display brightness setting");
             }
             break;
         case SettingsScreenAction::CommitIdleDimTimeout:
@@ -288,7 +291,7 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 settingsScreen.commitSucceeded();
             } else {
                 settingsScreen.commitFailed();
-                Serial.println("Unable to save idle dim setting");
+                LOGE(kTag, "Unable to save idle dim setting");
             }
             break;
         case SettingsScreenAction::CommitIdlePowerOffTimeout:
@@ -300,7 +303,7 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 settingsScreen.commitSucceeded();
             } else {
                 settingsScreen.commitFailed();
-                Serial.println("Unable to save idle power-off setting");
+                LOGE(kTag, "Unable to save idle power-off setting");
             }
             break;
         case SettingsScreenAction::CommitAutoConnect:
@@ -308,7 +311,7 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 settingsScreen.commitSucceeded();
             } else {
                 settingsScreen.commitFailed();
-                Serial.println("Unable to save auto-connect setting");
+                LOGE(kTag, "Unable to save auto-connect setting");
             }
             break;
         case SettingsScreenAction::CommitDepthControl:
@@ -317,7 +320,7 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 settingsScreen.commitSucceeded();
             } else {
                 settingsScreen.commitFailed();
-                Serial.println("Unable to save depth control setting");
+                LOGE(kTag, "Unable to save depth control setting");
             }
             break;
         case SettingsScreenAction::CommitStrokeDirection:
@@ -326,7 +329,7 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 settingsScreen.commitSucceeded();
             } else {
                 settingsScreen.commitFailed();
-                Serial.println("Unable to save stroke direction setting");
+                LOGE(kTag, "Unable to save stroke direction setting");
             }
             break;
         case SettingsScreenAction::CommitTouchscreen:
@@ -335,7 +338,7 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 settingsScreen.commitSucceeded();
             } else {
                 settingsScreen.commitFailed();
-                Serial.println("Unable to save touchscreen setting");
+                LOGE(kTag, "Unable to save touchscreen setting");
             }
             break;
         case SettingsScreenAction::CommitDefaultPattern:
@@ -343,7 +346,7 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
                 settingsScreen.commitSucceeded();
             } else {
                 settingsScreen.commitFailed();
-                Serial.println("Unable to save default pattern setting");
+                LOGE(kTag, "Unable to save default pattern setting");
             }
             break;
         case SettingsScreenAction::None:
@@ -355,7 +358,7 @@ void handleConnectionEvents(const OssmConnectionEvents& events) {
     if (events.readinessLost) {
         ossmControl.handleReadinessLost();
         ossmPatternsScreen.invalidateCatalog();
-        Serial.println("OSSM readiness lost; returning to welcome");
+        LOGW(kTag, "OSSM readiness lost; returning to welcome");
         navigateTo(Screen::Welcome);
         return;
     }
@@ -379,7 +382,7 @@ void handleConnectionEvents(const OssmConnectionEvents& events) {
 
     if (events.becameReady) {
         if (hasConnectionTarget && !settingsStore.setSavedOssmConnection(connectionTarget)) {
-            Serial.println("Unable to save OSSM connection");
+            LOGE(kTag, "Unable to save OSSM connection");
         }
         hasConnectionTarget = false;
         ossmControl.stop();
@@ -396,7 +399,7 @@ void handleConnectionEvents(const OssmConnectionEvents& events) {
             }
         } else {
             ossmPatternsScreen.invalidateCatalog();
-            Serial.println("OSSM pattern catalog unavailable after readiness");
+            LOGW(kTag, "OSSM pattern catalog unavailable after readiness");
         }
         ossmControl.setPattern(defaultPatternId);
         refreshControlPatternLabel();
@@ -486,8 +489,9 @@ namespace app {
 
 void begin() {
     m5_platform::begin();
+    LOGI(kTag, "%s %s (%s)", APP_DISPLAY_NAME, buildInfo().buildVersion, BUILD_TARGET);
     if (!settingsStore.begin()) {
-        Serial.println("Redux settings initialization failed");
+        LOGE(kTag, "Redux settings initialization failed");
     }
     ossmControlScreen.setStrokeEncoderReversed(settingsStore.strokeEncoderReversed());
     ossmControlScreen.setDepthControlMode(settingsStore.depthControlMode());
@@ -518,7 +522,7 @@ void begin() {
     updateBatteryIndicator(true);
     ossmConnection.begin(APP_DISPLAY_NAME);
     if (!ossmDiscovery.begin()) {
-        Serial.println("OSSM discovery initialization failed");
+        LOGE(kTag, "OSSM discovery initialization failed");
     }
     connectAfterBoot = hasSavedConnection && autoConnectEnabled;
     if (connectAfterBoot) {

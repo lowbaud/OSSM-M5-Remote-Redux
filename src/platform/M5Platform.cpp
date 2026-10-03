@@ -21,7 +21,6 @@ void begin() {
     Serial.setTxTimeoutMs(0);
 #endif
 
-    Serial.println("Serial diagnostics ready");
     M5.Power.setChargeVoltage(4200);
     M5.Power.setChargeCurrent(BATTERY_CHARGE_CURRENT);
 

@@ -4,11 +4,14 @@
 #include <cstring>
 #include <string>
 
+#include "diagnostics/Log.h"
+
 namespace ossm {
 
 namespace {
+constexpr const char* kTag = "scan";
 const NimBLEUUID kOssmServiceUuid("522B443A-4F53-534D-0001-420BADBABE69");
-}
+}  // namespace
 
 OssmScanCallbacks::OssmScanCallbacks(OssmDiscovery& discovery) : discovery_(discovery) {}
 
@@ -56,7 +59,7 @@ bool OssmDiscovery::startScan(uint32_t durationMs) {
     scanStartedAtMs_ = millis();
     scanDurationMs_ = durationMs;
 
-    Serial.println("Scan started");
+    LOGI(kTag, "Scan started");
     return true;
 }
 
@@ -73,7 +76,7 @@ bool OssmDiscovery::stopScan() {
     scanStartedAtMs_ = 0;
     scanDurationMs_ = 0;
 
-    Serial.println("Scan stopped");
+    LOGI(kTag, "Scan stopped");
 
     return true;
 }
@@ -145,21 +148,16 @@ bool OssmDiscovery::isOssmDevice(const NimBLEAdvertisedDevice* device) const {
 }
 
 void OssmDiscovery::printDevices() const {
-    Serial.print("Devices found: ");
-    Serial.println(devices_.size());
+    LOGD(kTag, "Devices found: %u", static_cast<unsigned>(devices_.size()));
 
     for (const DiscoveredOssm& device : devices_) {
-        Serial.print("Address: ");
-        Serial.print(device.address.toString().c_str());
-
-        Serial.print(" | Name: ");
-        Serial.print(device.name);
-
-        Serial.print(" | RSSI: ");
-        Serial.print(device.rssi);
-
-        Serial.print(" | Last seen ms: ");
-        Serial.println(device.lastSeenMs);
+        LOGD(
+            kTag,
+            "Address: %s | Name: %s | RSSI: %d | Last seen ms: %lu",
+            device.address.toString().c_str(),
+            device.name,
+            device.rssi,
+            static_cast<unsigned long>(device.lastSeenMs));
     }
 }
 

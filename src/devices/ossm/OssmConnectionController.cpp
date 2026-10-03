@@ -3,25 +3,28 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 
+#include "diagnostics/Log.h"
+
 namespace m5_redux {
 
 namespace {
+constexpr const char* kTag = "ossm";
 constexpr uint16_t kPreferredMtu = 512;
-}
+}  // namespace
 
 OssmConnectionController::OssmConnectionController(ossm::OssmClient& client) : client_(client) {}
 
 bool OssmConnectionController::begin(const char* localDeviceName) {
     NimBLEDevice::init(localDeviceName);
     if (!NimBLEDevice::setMTU(kPreferredMtu)) {
-        Serial.printf("Failed to set preferred MTU to %u\n", kPreferredMtu);
+        LOGE(kTag, "Failed to set preferred MTU to %u", kPreferredMtu);
         return false;
     }
 
     initialized_ = client_.begin();
 
     if (!initialized_) {
-        Serial.printf("OSSM client initialization failed: error=%d\n", client_.lastError());
+        LOGE(kTag, "Client initialization failed: error=%d", client_.lastError());
         return false;
     }
 
