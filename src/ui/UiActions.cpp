@@ -21,7 +21,7 @@ extern "C" void action_connect_cancel(lv_event_t*) {
     m5_redux::app::cancelConnection();
 }
 
-extern "C" void action_ossm_control_stop(lv_event_t*) {
+extern "C" void action_stop(lv_event_t*) {
     m5_redux::app::stopMotion();
 }
 
@@ -45,10 +45,13 @@ extern "C" void action_settings_back(lv_event_t*) {
     m5_redux::app::activateSettingsBack();
 }
 
-extern "C" void action_settings_stop(lv_event_t*) {
-    m5_redux::app::stopMotion();
-}
-
 extern "C" void action_settings_select(lv_event_t*) {
     m5_redux::app::activateSettingsSelect();
 }
+
+// The diagnostics screen is not reachable yet; these are wired up with its implementation.
+extern "C" void action_diagnostics_back(lv_event_t*) {
+    m5_redux::app::showSettings();
+}
+
+extern "C" void action_diagnostics_action(lv_event_t*) {}
