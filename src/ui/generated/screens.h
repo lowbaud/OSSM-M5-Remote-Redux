@@ -18,7 +18,8 @@ enum ScreensEnum {
     SCREEN_ID_OSSM_CONTROL = 5,
     SCREEN_ID_OSSM_PATTERNS = 6,
     SCREEN_ID_SETTINGS = 7,
-    _SCREEN_ID_LAST = 7
+    SCREEN_ID_DIAGNOSTICS = 8,
+    _SCREEN_ID_LAST = 8
 };
 
 typedef struct _objects_t {
@@ -29,6 +30,7 @@ typedef struct _objects_t {
     lv_obj_t *ossm_control;
     lv_obj_t *ossm_patterns;
     lv_obj_t *settings;
+    lv_obj_t *diagnostics;
     lv_obj_t *redux_logo_img;
     lv_obj_t *boot_message_lbl;
     lv_obj_t *boot_version_lbl;
@@ -64,6 +66,10 @@ typedef struct _objects_t {
     lv_obj_t *settings_select_btn;
     lv_obj_t *settings_stop_btn;
     lv_obj_t *settings_options;
+    lv_obj_t *diagnostics_panel;
+    lv_obj_t *diagnostics_back_btn;
+    lv_obj_t *diagnostics_action_btn;
+    lv_obj_t *diagnostics_stop_btn;
 } objects_t;
 
 extern objects_t objects;
@@ -88,6 +94,9 @@ void tick_screen_ossm_patterns();
 
 void create_screen_settings();
 void tick_screen_settings();
+
+void create_screen_diagnostics();
+void tick_screen_diagnostics();
 
 void tick_screen_by_id(enum ScreensEnum screenId);
 void tick_screen(int screen_index);

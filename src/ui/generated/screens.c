@@ -354,7 +354,7 @@ void create_screen_ossm_control() {
             objects.oss_control_stop_btn = obj;
             lv_obj_set_pos(obj, 111, 207);
             lv_obj_set_size(obj, 98, 25);
-            lv_obj_add_event_cb(obj, action_ossm_control_stop, LV_EVENT_PRESSED, (void *)0);
+            lv_obj_add_event_cb(obj, action_stop, LV_EVENT_PRESSED, (void *)0);
             lv_obj_set_style_bg_opa(obj, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0xf44336), LV_PART_MAIN | LV_STATE_CHECKED);
             {
@@ -505,7 +505,7 @@ void create_screen_ossm_patterns() {
             objects.oss_patterns_stop_btn = obj;
             lv_obj_set_pos(obj, 111, 207);
             lv_obj_set_size(obj, 98, 25);
-            lv_obj_add_event_cb(obj, action_ossm_control_stop, LV_EVENT_PRESSED, (void *)0);
+            lv_obj_add_event_cb(obj, action_stop, LV_EVENT_PRESSED, (void *)0);
             lv_obj_set_style_bg_opa(obj, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0xf44336), LV_PART_MAIN | LV_STATE_CHECKED);
             {
@@ -585,7 +585,7 @@ void create_screen_settings() {
             objects.settings_stop_btn = obj;
             lv_obj_set_pos(obj, 111, 207);
             lv_obj_set_size(obj, 98, 25);
-            lv_obj_add_event_cb(obj, action_settings_stop, LV_EVENT_PRESSED, (void *)0);
+            lv_obj_add_event_cb(obj, action_stop, LV_EVENT_PRESSED, (void *)0);
             lv_obj_set_style_bg_opa(obj, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0xf44336), LV_PART_MAIN | LV_STATE_CHECKED);
             {
@@ -615,6 +615,84 @@ void create_screen_settings() {
 void tick_screen_settings() {
 }
 
+void create_screen_diagnostics() {
+    lv_obj_t *obj = lv_obj_create(0);
+    objects.diagnostics = obj;
+    lv_obj_set_pos(obj, 0, 0);
+    lv_obj_set_size(obj, 320, 240);
+    {
+        lv_obj_t *parent_obj = obj;
+        {
+            // diagnostics_panel
+            lv_obj_t *obj = lv_obj_create(parent_obj);
+            objects.diagnostics_panel = obj;
+            lv_obj_set_pos(obj, 10, 10);
+            lv_obj_set_size(obj, 300, 188);
+        }
+        {
+            // diagnostics_back_btn
+            lv_obj_t *obj = lv_button_create(parent_obj);
+            objects.diagnostics_back_btn = obj;
+            lv_obj_set_pos(obj, 10, 207);
+            lv_obj_set_size(obj, 98, 25);
+            lv_obj_add_event_cb(obj, action_diagnostics_back, LV_EVENT_CLICKED, (void *)0);
+            {
+                lv_obj_t *parent_obj = obj;
+                {
+                    lv_obj_t *obj = lv_label_create(parent_obj);
+                    lv_obj_set_pos(obj, 0, 0);
+                    lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                    lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_label_set_text_static(obj, "Back");
+                }
+            }
+        }
+        {
+            // diagnostics_action_btn
+            lv_obj_t *obj = lv_button_create(parent_obj);
+            objects.diagnostics_action_btn = obj;
+            lv_obj_set_pos(obj, 212, 207);
+            lv_obj_set_size(obj, 98, 25);
+            lv_obj_add_event_cb(obj, action_diagnostics_action, LV_EVENT_CLICKED, (void *)0);
+            {
+                lv_obj_t *parent_obj = obj;
+                {
+                    lv_obj_t *obj = lv_label_create(parent_obj);
+                    lv_obj_set_pos(obj, 0, 0);
+                    lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                    lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_label_set_text_static(obj, "Log");
+                }
+            }
+        }
+        {
+            // diagnostics_stop_btn
+            lv_obj_t *obj = lv_button_create(parent_obj);
+            objects.diagnostics_stop_btn = obj;
+            lv_obj_set_pos(obj, 111, 207);
+            lv_obj_set_size(obj, 98, 25);
+            lv_obj_add_event_cb(obj, action_stop, LV_EVENT_PRESSED, (void *)0);
+            lv_obj_set_style_bg_opa(obj, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_color(obj, lv_color_hex(0xf44336), LV_PART_MAIN | LV_STATE_CHECKED);
+            {
+                lv_obj_t *parent_obj = obj;
+                {
+                    lv_obj_t *obj = lv_label_create(parent_obj);
+                    lv_obj_set_pos(obj, 0, 0);
+                    lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                    lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_label_set_text_static(obj, "Stop");
+                }
+            }
+        }
+    }
+    
+    tick_screen_diagnostics();
+}
+
+void tick_screen_diagnostics() {
+}
+
 typedef void (*tick_screen_func_t)();
 tick_screen_func_t tick_screen_funcs[] = {
     tick_screen_boot,
@@ -624,9 +702,10 @@ tick_screen_func_t tick_screen_funcs[] = {
     tick_screen_ossm_control,
     tick_screen_ossm_patterns,
     tick_screen_settings,
+    tick_screen_diagnostics,
 };
 void tick_screen(int screen_index) {
-    if (screen_index >= 0 && screen_index < 7) {
+    if (screen_index >= 0 && screen_index < 8) {
         tick_screen_funcs[screen_index]();
     }
 }
@@ -732,4 +811,5 @@ void create_screens() {
     create_screen_ossm_control();
     create_screen_ossm_patterns();
     create_screen_settings();
+    create_screen_diagnostics();
 }
