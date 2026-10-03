@@ -9,6 +9,8 @@ void stopMotion();
 void showSettings();
 void activateSettingsBack();
 void activateSettingsSelect();
+void activateDiagnosticsBack();
+void activateDiagnosticsAction();
 void showScan();
 void cancelScan();
 void connectSelectedScanDevice();

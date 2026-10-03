@@ -26,6 +26,7 @@ enum class SettingsScreenAction : std::uint8_t {
     CommitTouchscreen,
     CommitDepthControl,
     CommitStrokeDirection,
+    ShowDiagnostics,
 };
 
 struct SettingsScreenEvent {
@@ -45,7 +46,8 @@ class SettingsScreen {
     explicit SettingsScreen(SettingsStore& settings);
 
     void begin();
-    void enter();
+    // Keeping the selection returns to the row that was selected when the screen was left.
+    void enter(bool keepSelection = false);
     void setPatternCatalog(const ossm::OssmClient::PatternList& catalog);
     void leave();
     SettingsScreenEvent update(const RemoteInputEvents& events);
@@ -70,7 +72,7 @@ class SettingsScreen {
         lv_obj_t* textLabel = nullptr;
     };
 
-    static constexpr std::size_t kSettingCount = 8;
+    static constexpr std::size_t kSettingCount = 9;
     static constexpr std::size_t kMaxOptionRows = ossm::OssmClient::kMaxPatternCount + 1;
     static constexpr std::size_t kNoSelection = static_cast<std::size_t>(-1);
     static_assert(

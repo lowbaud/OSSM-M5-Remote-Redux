@@ -25,7 +25,9 @@ bool OssmClient::begin() {
             ready_,
             speedValidityEpoch_,
             lastError_,
-            collapsedRangeSupported_);
+            collapsedRangeSupported_,
+            firmwareFamily_,
+            rssi_);
         if (!worker_) {
             lastError_.store(kWorkerStartError);
             return false;
@@ -153,6 +155,19 @@ int OssmClient::lastError() const {
 
 bool OssmClient::supportsCollapsedRange() const {
     return collapsedRangeSupported_.load();
+}
+
+OssmClient::FirmwareFamily OssmClient::firmwareFamily() const {
+    return firmwareFamily_.load();
+}
+
+int OssmClient::rssi() const {
+    return rssi_.load();
+}
+
+uint32_t OssmClient::workerStackMinimumFree() const {
+    // ESP32 reports the high-water mark in bytes, not words.
+    return workerTask_ ? static_cast<uint32_t>(uxTaskGetStackHighWaterMark(workerTask_)) : 0;
 }
 
 bool OssmClient::latestObservedState(ObservedState& out) const {

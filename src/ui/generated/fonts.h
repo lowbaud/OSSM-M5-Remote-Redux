@@ -9,6 +9,7 @@ extern "C" {
 
 extern const lv_font_t ui_font_chivo_mono_60;
 extern const lv_font_t ui_font_ami_ega_8x8;
+extern const lv_font_t ui_font_dos_v_jpn12;
 
 #ifndef EXT_FONT_DESC_T
 #define EXT_FONT_DESC_T

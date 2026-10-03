@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 // Application logging, independent of CORE_DEBUG_LEVEL so framework verbosity can be tuned
@@ -24,9 +25,15 @@ enum class Level : std::uint8_t {
     Debug = REDUX_LOG_LEVEL_DEBUG,
 };
 
-// Formats one complete line and writes it atomically. Calls from an ISR are dropped.
+// Formats one complete line and writes it atomically. Info and above are also kept in the
+// diagnostic log buffer. Calls from an ISR are dropped.
 void write(Level level, const char* tag, const char* format, ...)
     __attribute__((format(printf, 3, 4)));
+
+// Writes preformatted text to the log output without interleaving with log lines.
+void writeOutput(const char* text, std::size_t length);
+
+char levelLetter(Level level);
 
 }  // namespace logging
 }  // namespace m5_redux

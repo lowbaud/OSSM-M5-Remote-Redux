@@ -5,6 +5,8 @@
 #include <cstring>
 #include <mutex>
 
+#include "diagnostics/LogBuffer.h"
+
 #ifdef ARDUINO
 #include <Arduino.h>
 #else
@@ -20,21 +22,6 @@ constexpr char kTruncationMarker[] = "...";
 
 // Constant-initialized, so it is safe to use from any task before setup() runs.
 std::mutex outputMutex;
-
-char levelLetter(Level level) {
-    switch (level) {
-        case Level::Error:
-            return 'E';
-        case Level::Warn:
-            return 'W';
-        case Level::Info:
-            return 'I';
-        case Level::Debug:
-            return 'D';
-    }
-
-    return '?';
-}
 
 unsigned long uptimeMs() {
 #ifdef ARDUINO
@@ -56,6 +43,21 @@ void writeLine(const char* line, size_t length) {
 }
 }  // namespace
 
+char levelLetter(Level level) {
+    switch (level) {
+        case Level::Error:
+            return 'E';
+        case Level::Warn:
+            return 'W';
+        case Level::Info:
+            return 'I';
+        case Level::Debug:
+            return 'D';
+    }
+
+    return '?';
+}
+
 void write(Level level, const char* tag, const char* format, ...) {
 #ifdef ARDUINO
     if (xPortInIsrContext())
@@ -66,13 +68,15 @@ void write(Level level, const char* tag, const char* format, ...) {
     // Reserve room for the trailing newline and NUL.
     constexpr size_t kTextCapacity = kLineCapacity - 2;
 
+    const unsigned long timeMs = uptimeMs();
     int prefixLength = std::snprintf(
-        line, kTextCapacity, "%c (%lu) %s: ", levelLetter(level), uptimeMs(), tag ? tag : "-");
+        line, kTextCapacity, "%c (%lu) %s: ", levelLetter(level), timeMs, tag ? tag : "-");
     if (prefixLength < 0)
         return;
     size_t length = static_cast<size_t>(prefixLength);
     if (length >= kTextCapacity)
         length = kTextCapacity - 1;
+    const size_t messageStart = length;
 
     va_list args;
     va_start(args, format);
@@ -89,11 +93,26 @@ void write(Level level, const char* tag, const char* format, ...) {
         length += static_cast<size_t>(messageLength);
     }
 
+    line[length] = '\0';
+    if (level <= Level::Info) {
+        appendRecord(level, static_cast<std::uint32_t>(timeMs), tag, line + messageStart);
+    }
+
     line[length++] = '\n';
     line[length] = '\0';
 
     std::lock_guard<std::mutex> lock(outputMutex);
     writeLine(line, length);
+}
+
+void writeOutput(const char* text, size_t length) {
+#ifdef ARDUINO
+    if (xPortInIsrContext())
+        return;
+#endif
+
+    std::lock_guard<std::mutex> lock(outputMutex);
+    writeLine(text, length);
 }
 
 }  // namespace logging
