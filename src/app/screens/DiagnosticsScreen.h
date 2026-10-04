@@ -76,6 +76,8 @@ class DiagnosticsScreen {
     lv_obj_t* logView_ = nullptr;
     lv_obj_t* logLabel_ = nullptr;
     lv_obj_t* logStatusLabel_ = nullptr;
+    lv_obj_t* logScrollbar_ = nullptr;
+    std::int32_t logTrackHeight_ = 0;
     std::size_t logColumns_ = 0;
     std::size_t logRows_ = 0;
     // Display lines scrolled back from the newest line.
@@ -92,6 +94,8 @@ class DiagnosticsScreen {
     void renderLog();
     void scrollLog(std::int32_t linesBack);
     void updateLogStatus(bool newEntriesBelow);
+    // Sizes and places the drawn scroll indicator for the current log window.
+    void updateLogScrollbar();
 };
 
 }  // namespace m5_redux

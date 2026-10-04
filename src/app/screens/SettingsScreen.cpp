@@ -2,6 +2,11 @@
 
 #include <Arduino.h>
 
+#include <algorithm>
+#include <cctype>
+
+#include "ui/ListRowStyle.h"
+#include "ui/ThemeColors.h"
 #include "ui/generated/screens.h"
 #include "ui/generated/ui.h"
 
@@ -12,12 +17,12 @@ namespace {
 constexpr std::size_t kDefaultPatternSettingIndex = 0;
 constexpr char kDefaultPatternSettingName[] = "Default pattern";
 constexpr char kAutoPatternOptionName[] = "Auto";
-constexpr char kBrightnessSettingName[] = "Display brightness";
-constexpr char kIdleDimSettingName[] = "Dim after";
-constexpr char kIdlePowerOffSettingName[] = "Power off after";
+constexpr char kBrightnessSettingName[] = "Brightness";
+constexpr char kIdleDimSettingName[] = "Dim";
+constexpr char kIdlePowerOffSettingName[] = "Power off";
 constexpr char kAutoConnectSettingName[] = "Auto-connect";
-constexpr char kDepthControlSettingName[] = "Depth control";
-constexpr char kStrokeDirectionSettingName[] = "Stroke direction";
+constexpr char kDepthControlSettingName[] = "Depth mode";
+constexpr char kStrokeDirectionSettingName[] = "Stroke dir.";
 constexpr char kTouchscreenSettingName[] = "Touchscreen";
 constexpr char kDiagnosticsSettingName[] = "Diagnostics";
 constexpr std::size_t kBrightnessSettingIndex = 1;
@@ -30,21 +35,10 @@ constexpr std::size_t kTouchscreenSettingIndex = 7;
 // Opens the diagnostics screen instead of an options panel.
 constexpr std::size_t kDiagnosticsSettingIndex = 8;
 constexpr std::int32_t kOptionsTitleHeight = 28;
-constexpr std::int32_t kOptionsPanelWidth = 263;
-constexpr std::int32_t kOptionsPanelHeight = 154;
-constexpr std::int32_t kOptionsScrollbarWidth = 5;
+constexpr std::int32_t kOptionsTitlePadX = 12;
+// The panel grows with the option count up to this many rows, then scrolls.
+constexpr std::size_t kMaxVisibleOptions = 4;
 constexpr std::uint32_t kSaveFailureDurationMs = 2000;
-
-void styleSelectableRow(lv_obj_t* row, lv_obj_t* list) {
-    const lv_style_selector_t normal = 0;
-    const lv_style_selector_t selected = LV_STATE_CHECKED;
-
-    lv_obj_set_style_bg_color(row, lv_obj_get_style_bg_color(list, LV_PART_MAIN), normal);
-    lv_obj_set_style_bg_opa(row, lv_obj_get_style_bg_opa(list, LV_PART_MAIN), normal);
-    lv_obj_set_style_bg_color(row, lv_theme_get_color_primary(row), selected);
-    lv_obj_set_style_bg_opa(row, LV_OPA_COVER, selected);
-    lv_obj_set_style_text_color(row, lv_color_white(), selected);
-}
 
 std::int64_t clampIndex(std::int64_t index, std::size_t count) {
     if (index < 0) {
@@ -297,120 +291,27 @@ void SettingsScreen::commitFailed() {
 }
 
 void SettingsScreen::buildSettingRows() {
-    SettingRow& pattern = settingRows_[kDefaultPatternSettingIndex];
-    pattern.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
-    styleSelectableRow(pattern.button, objects.settings_list);
-    lv_obj_t* patternName = lv_label_create(pattern.button);
-    lv_label_set_text_static(patternName, kDefaultPatternSettingName);
-    lv_obj_set_flex_grow(patternName, 1);
-    pattern.valueLabel = lv_label_create(pattern.button);
-    lv_label_set_text_static(pattern.valueLabel, "");
-    lv_obj_add_event_cb(pattern.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
+    styleList(objects.settings_list);
 
-    SettingRow& brightnessSetting = settingRows_[kBrightnessSettingIndex];
-    brightnessSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
-    styleSelectableRow(brightnessSetting.button, objects.settings_list);
+    addSettingRow(kDefaultPatternSettingIndex, kDefaultPatternSettingName, "");
+    addSettingRow(kBrightnessSettingIndex, kBrightnessSettingName, "");
+    addSettingRow(kIdleDimSettingIndex, kIdleDimSettingName, "");
+    addSettingRow(kIdlePowerOffSettingIndex, kIdlePowerOffSettingName, "");
+    addSettingRow(kAutoConnectSettingIndex, kAutoConnectSettingName, "");
+    addSettingRow(kDepthControlSettingIndex, kDepthControlSettingName, "");
+    addSettingRow(kStrokeDirectionSettingIndex, kStrokeDirectionSettingName, "");
+    addSettingRow(kTouchscreenSettingIndex, kTouchscreenSettingName, "");
+    addSettingRow(kDiagnosticsSettingIndex, kDiagnosticsSettingName, LV_SYMBOL_RIGHT);
+}
 
-    lv_obj_t* brightnessNameLabel = lv_label_create(brightnessSetting.button);
-    lv_label_set_text_static(brightnessNameLabel, kBrightnessSettingName);
-    lv_obj_set_flex_grow(brightnessNameLabel, 1);
-
-    brightnessSetting.valueLabel = lv_label_create(brightnessSetting.button);
-    lv_label_set_text_static(brightnessSetting.valueLabel, "");
-
-    lv_obj_add_event_cb(brightnessSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
-
-    SettingRow& idleDimSetting = settingRows_[kIdleDimSettingIndex];
-    idleDimSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
-    styleSelectableRow(idleDimSetting.button, objects.settings_list);
-
-    lv_obj_t* idleDimNameLabel = lv_label_create(idleDimSetting.button);
-    lv_label_set_text_static(idleDimNameLabel, kIdleDimSettingName);
-    lv_obj_set_flex_grow(idleDimNameLabel, 1);
-
-    idleDimSetting.valueLabel = lv_label_create(idleDimSetting.button);
-    lv_label_set_text_static(idleDimSetting.valueLabel, "");
-
-    lv_obj_add_event_cb(idleDimSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
-
-    SettingRow& idlePowerOffSetting = settingRows_[kIdlePowerOffSettingIndex];
-    idlePowerOffSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
-    styleSelectableRow(idlePowerOffSetting.button, objects.settings_list);
-
-    lv_obj_t* idlePowerOffNameLabel = lv_label_create(idlePowerOffSetting.button);
-    lv_label_set_text_static(idlePowerOffNameLabel, kIdlePowerOffSettingName);
-    lv_obj_set_flex_grow(idlePowerOffNameLabel, 1);
-
-    idlePowerOffSetting.valueLabel = lv_label_create(idlePowerOffSetting.button);
-    lv_label_set_text_static(idlePowerOffSetting.valueLabel, "");
-
-    lv_obj_add_event_cb(idlePowerOffSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
-
-    SettingRow& autoConnectSetting = settingRows_[kAutoConnectSettingIndex];
-    autoConnectSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
-    styleSelectableRow(autoConnectSetting.button, objects.settings_list);
-
-    lv_obj_t* autoConnectNameLabel = lv_label_create(autoConnectSetting.button);
-    lv_label_set_text_static(autoConnectNameLabel, kAutoConnectSettingName);
-    lv_obj_set_flex_grow(autoConnectNameLabel, 1);
-
-    autoConnectSetting.valueLabel = lv_label_create(autoConnectSetting.button);
-    lv_label_set_text_static(autoConnectSetting.valueLabel, "");
-
-    lv_obj_add_event_cb(autoConnectSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
-
-    SettingRow& depthControlSetting = settingRows_[kDepthControlSettingIndex];
-    depthControlSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
-    styleSelectableRow(depthControlSetting.button, objects.settings_list);
-
-    lv_obj_t* depthControlNameLabel = lv_label_create(depthControlSetting.button);
-    lv_label_set_text_static(depthControlNameLabel, kDepthControlSettingName);
-    lv_obj_set_flex_grow(depthControlNameLabel, 1);
-
-    depthControlSetting.valueLabel = lv_label_create(depthControlSetting.button);
-    lv_label_set_text_static(depthControlSetting.valueLabel, "");
-
-    lv_obj_add_event_cb(depthControlSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
-
-    SettingRow& strokeDirectionSetting = settingRows_[kStrokeDirectionSettingIndex];
-    strokeDirectionSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
-    styleSelectableRow(strokeDirectionSetting.button, objects.settings_list);
-
-    lv_obj_t* strokeDirectionNameLabel = lv_label_create(strokeDirectionSetting.button);
-    lv_label_set_text_static(strokeDirectionNameLabel, kStrokeDirectionSettingName);
-    lv_obj_set_flex_grow(strokeDirectionNameLabel, 1);
-
-    strokeDirectionSetting.valueLabel = lv_label_create(strokeDirectionSetting.button);
-    lv_label_set_text_static(strokeDirectionSetting.valueLabel, "");
-
-    lv_obj_add_event_cb(
-        strokeDirectionSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
-
-    SettingRow& touchscreenSetting = settingRows_[kTouchscreenSettingIndex];
-    touchscreenSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
-    styleSelectableRow(touchscreenSetting.button, objects.settings_list);
-
-    lv_obj_t* touchscreenNameLabel = lv_label_create(touchscreenSetting.button);
-    lv_label_set_text_static(touchscreenNameLabel, kTouchscreenSettingName);
-    lv_obj_set_flex_grow(touchscreenNameLabel, 1);
-
-    touchscreenSetting.valueLabel = lv_label_create(touchscreenSetting.button);
-    lv_label_set_text_static(touchscreenSetting.valueLabel, "");
-
-    lv_obj_add_event_cb(touchscreenSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
-
-    SettingRow& diagnosticsSetting = settingRows_[kDiagnosticsSettingIndex];
-    diagnosticsSetting.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
-    styleSelectableRow(diagnosticsSetting.button, objects.settings_list);
-
-    lv_obj_t* diagnosticsNameLabel = lv_label_create(diagnosticsSetting.button);
-    lv_label_set_text_static(diagnosticsNameLabel, kDiagnosticsSettingName);
-    lv_obj_set_flex_grow(diagnosticsNameLabel, 1);
-
-    diagnosticsSetting.valueLabel = lv_label_create(diagnosticsSetting.button);
-    lv_label_set_text_static(diagnosticsSetting.valueLabel, LV_SYMBOL_RIGHT);
-
-    lv_obj_add_event_cb(diagnosticsSetting.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
+void SettingsScreen::addSettingRow(std::size_t index, const char* name, const char* value) {
+    SettingRow& row = settingRows_[index];
+    row.button = lv_list_add_button(objects.settings_list, nullptr, nullptr);
+    styleListRow(row.button);
+    addListRowName(row.button, name);
+    row.valueLabel = addListRowValue(row.button, value);
+    lv_obj_set_style_text_color(row.valueLabel, themeColor(COLOR_ID_ACCENT), LV_STATE_CHECKED);
+    lv_obj_add_event_cb(row.button, handleSettingRowEvent, LV_EVENT_CLICKED, this);
 }
 
 void SettingsScreen::buildOptionsPanel() {
@@ -421,56 +322,42 @@ void SettingsScreen::buildOptionsPanel() {
 
     optionsTitle_ = lv_label_create(objects.settings_options);
     lv_obj_set_pos(optionsTitle_, 0, 0);
-    lv_obj_set_size(optionsTitle_, kOptionsPanelWidth, kOptionsTitleHeight);
-    lv_obj_set_style_text_align(optionsTitle_, LV_TEXT_ALIGN_CENTER, mainStyle);
+    lv_obj_set_size(optionsTitle_, lv_pct(100), kOptionsTitleHeight);
+    // Uppercase label in the same style as the value captions on the control screen.
+    lv_obj_set_style_text_font(optionsTitle_, &lv_font_montserrat_14, mainStyle);
+    lv_obj_set_style_text_color(optionsTitle_, themeColor(COLOR_ID_TEXT_SECONDARY), mainStyle);
+    lv_obj_set_style_pad_left(optionsTitle_, kOptionsTitlePadX, mainStyle);
+    lv_obj_set_style_pad_right(optionsTitle_, kOptionsTitlePadX, mainStyle);
     const lv_font_t* titleFont = lv_obj_get_style_text_font(optionsTitle_, LV_PART_MAIN);
     const std::int32_t titleTopPadding =
-        (kOptionsTitleHeight - 2 - lv_font_get_line_height(titleFont)) / 2;
+        (kOptionsTitleHeight - 1 - lv_font_get_line_height(titleFont)) / 2;
     lv_obj_set_style_pad_top(optionsTitle_, titleTopPadding, mainStyle);
-    lv_obj_set_style_border_color(
-        optionsTitle_,
-        lv_obj_get_style_border_color(objects.settings_options, LV_PART_MAIN),
-        mainStyle);
-    lv_obj_set_style_border_opa(optionsTitle_, LV_OPA_50, mainStyle);
-    lv_obj_set_style_border_width(optionsTitle_, 2, mainStyle);
+    lv_obj_set_style_border_color(optionsTitle_, themeColor(COLOR_ID_BORDER), mainStyle);
+    lv_obj_set_style_border_opa(optionsTitle_, LV_OPA_COVER, mainStyle);
+    lv_obj_set_style_border_width(optionsTitle_, 1, mainStyle);
     lv_obj_set_style_border_side(optionsTitle_, LV_BORDER_SIDE_BOTTOM, mainStyle);
     lv_label_set_text_static(optionsTitle_, "");
 
     optionsList_ = lv_list_create(objects.settings_options);
     lv_obj_set_pos(optionsList_, 0, kOptionsTitleHeight);
-    lv_obj_set_size(optionsList_, kOptionsPanelWidth, kOptionsPanelHeight - kOptionsTitleHeight);
+    lv_obj_set_width(optionsList_, lv_pct(100));
     lv_obj_set_style_bg_opa(optionsList_, LV_OPA_TRANSP, mainStyle);
     lv_obj_set_style_border_width(optionsList_, 0, mainStyle);
     lv_obj_set_style_outline_width(optionsList_, 0, mainStyle);
     lv_obj_set_style_pad_all(optionsList_, 0, mainStyle);
-    lv_obj_set_style_pad_right(optionsList_, kOptionsScrollbarWidth + 1, mainStyle);
-    lv_obj_set_style_pad_row(optionsList_, 0, mainStyle);
-    lv_obj_set_scrollbar_mode(optionsList_, LV_SCROLLBAR_MODE_AUTO);
-    lv_obj_set_style_width(optionsList_, kOptionsScrollbarWidth, LV_PART_SCROLLBAR);
-    lv_obj_set_style_bg_color(
-        optionsList_, lv_theme_get_color_primary(optionsList_), LV_PART_SCROLLBAR);
-    lv_obj_set_style_bg_opa(optionsList_, LV_OPA_COVER, LV_PART_SCROLLBAR);
-    lv_obj_set_style_radius(optionsList_, LV_RADIUS_CIRCLE, LV_PART_SCROLLBAR);
-    lv_obj_set_style_pad_right(optionsList_, 0, LV_PART_SCROLLBAR);
+    // The panel clips its own rounded corners; rounding the list too would cut the rows.
+    lv_obj_set_style_radius(optionsList_, 0, mainStyle);
+    styleList(optionsList_);
 
     for (std::size_t index = 0; index < optionRows_.size(); ++index) {
         OptionRow& option = optionRows_[index];
         option.button = lv_list_add_button(optionsList_, nullptr, nullptr);
-        styleSelectableRow(option.button, optionsList_);
-        lv_obj_set_style_pad_left(option.button, 10, mainStyle);
-        lv_obj_set_style_pad_right(option.button, 10, mainStyle);
-        lv_obj_set_style_pad_top(option.button, 4, mainStyle);
-        lv_obj_set_style_pad_bottom(option.button, 4, mainStyle);
-        lv_obj_set_style_pad_column(option.button, 4, mainStyle);
-
-        option.checkLabel = lv_label_create(option.button);
-        lv_obj_set_width(option.checkLabel, 18);
-        lv_label_set_text_static(option.checkLabel, LV_SYMBOL_OK);
-        lv_obj_set_style_text_opa(option.checkLabel, LV_OPA_TRANSP, LV_PART_MAIN);
-
-        option.textLabel = lv_label_create(option.button);
-        lv_label_set_text_static(option.textLabel, "");
-        lv_obj_set_flex_grow(option.textLabel, 1);
+        styleListRow(option.button);
+        option.textLabel = addListRowName(option.button, "");
+        // Marks the stored value; the selected row shows where the cursor is.
+        option.checkLabel = addListRowValue(option.button, LV_SYMBOL_OK);
+        lv_obj_set_style_text_color(option.checkLabel, themeColor(COLOR_ID_ACCENT), 0);
+        lv_obj_add_flag(option.checkLabel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(option.button, LV_OBJ_FLAG_HIDDEN);
 
         lv_obj_add_event_cb(option.button, handleOptionRowEvent, LV_EVENT_CLICKED, this);
@@ -479,7 +366,7 @@ void SettingsScreen::buildOptionsPanel() {
     // Overlay the choices without intercepting touch input or changing their layout.
     saveFailureLabel_ = lv_label_create(objects.settings_options);
     lv_label_set_text_static(saveFailureLabel_, "Couldn't save. Try again.");
-    lv_obj_set_width(saveFailureLabel_, kOptionsPanelWidth - 24);
+    lv_obj_set_width(saveFailureLabel_, lv_pct(90));
     lv_obj_set_style_text_align(saveFailureLabel_, LV_TEXT_ALIGN_CENTER, mainStyle);
     lv_obj_set_style_bg_color(
         saveFailureLabel_,
@@ -497,35 +384,36 @@ void SettingsScreen::buildOptionsPanel() {
 }
 
 void SettingsScreen::configureOptions() {
+    const char* title = "";
     switch (selectedSettingIndex_) {
         case kDefaultPatternSettingIndex:
-            lv_label_set_text_static(optionsTitle_, kDefaultPatternSettingName);
+            title = kDefaultPatternSettingName;
             break;
         case kBrightnessSettingIndex:
-            lv_label_set_text_static(optionsTitle_, kBrightnessSettingName);
+            title = kBrightnessSettingName;
             break;
         case kIdleDimSettingIndex:
-            lv_label_set_text_static(optionsTitle_, kIdleDimSettingName);
+            title = kIdleDimSettingName;
             break;
         case kIdlePowerOffSettingIndex:
-            lv_label_set_text_static(optionsTitle_, kIdlePowerOffSettingName);
+            title = kIdlePowerOffSettingName;
             break;
         case kAutoConnectSettingIndex:
-            lv_label_set_text_static(optionsTitle_, kAutoConnectSettingName);
+            title = kAutoConnectSettingName;
             break;
         case kTouchscreenSettingIndex:
-            lv_label_set_text_static(optionsTitle_, kTouchscreenSettingName);
+            title = kTouchscreenSettingName;
             break;
         case kDepthControlSettingIndex:
-            lv_label_set_text_static(optionsTitle_, kDepthControlSettingName);
+            title = kDepthControlSettingName;
             break;
         case kStrokeDirectionSettingIndex:
-            lv_label_set_text_static(optionsTitle_, kStrokeDirectionSettingName);
+            title = kStrokeDirectionSettingName;
             break;
         default:
-            lv_label_set_text_static(optionsTitle_, "");
             break;
     }
+    setOptionsTitle(title);
 
     const std::size_t optionCount = currentOptionCount();
 
@@ -570,6 +458,17 @@ void SettingsScreen::configureOptions() {
     }
 }
 
+void SettingsScreen::setOptionsTitle(const char* title) {
+    char upperTitle[32];
+    std::size_t length = 0;
+    for (; title[length] != '\0' && length < sizeof(upperTitle) - 1; ++length) {
+        upperTitle[length] =
+            static_cast<char>(std::toupper(static_cast<unsigned char>(title[length])));
+    }
+    upperTitle[length] = '\0';
+    lv_label_set_text(optionsTitle_, upperTitle);
+}
+
 void SettingsScreen::openSelectedSetting() {
     if (selectedSettingIndex_ >= kSettingCount) {
         return;
@@ -582,15 +481,25 @@ void SettingsScreen::openSelectedSetting() {
 
     optionsOpen_ = true;
     configureOptions();
-    lv_obj_remove_flag(objects.settings_options, LV_OBJ_FLAG_HIDDEN);
+    resizeOptionsPanel();
+    lv_obj_remove_flag(objects.settings_options_scrim, LV_OBJ_FLAG_HIDDEN);
     selectOption(currentStoredOptionIndex(), false);
+}
+
+void SettingsScreen::resizeOptionsPanel() {
+    const std::size_t visibleRows = std::min(currentOptionCount(), kMaxVisibleOptions);
+    const std::int32_t listHeight = static_cast<std::int32_t>(visibleRows) * listRowHeight();
+    const std::int32_t borderWidth =
+        lv_obj_get_style_border_width(objects.settings_options, LV_PART_MAIN);
+    lv_obj_set_height(optionsList_, listHeight);
+    lv_obj_set_height(objects.settings_options, kOptionsTitleHeight + listHeight + 2 * borderWidth);
 }
 
 void SettingsScreen::closeOptions() {
     clearSaveFailure();
     optionsOpen_ = false;
     selectedOptionIndex_ = kNoSelection;
-    lv_obj_add_flag(objects.settings_options, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(objects.settings_options_scrim, LV_OBJ_FLAG_HIDDEN);
 }
 
 void SettingsScreen::clearSaveFailure() {
@@ -649,9 +558,14 @@ void SettingsScreen::selectOption(std::size_t index, bool preview) {
     if (index != selectedOptionIndex_) {
         clearSaveFailure();
     }
+    const std::size_t storedIndex = currentStoredOptionIndex();
     for (std::size_t rowIndex = 0; rowIndex < optionRows_.size(); ++rowIndex) {
-        lv_obj_remove_state(optionRows_[rowIndex].button, LV_STATE_CHECKED);
-        lv_obj_set_style_text_opa(optionRows_[rowIndex].checkLabel, LV_OPA_TRANSP, LV_PART_MAIN);
+        setListRowSelected(optionRows_[rowIndex].button, false);
+        if (rowIndex == storedIndex) {
+            lv_obj_remove_flag(optionRows_[rowIndex].checkLabel, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(optionRows_[rowIndex].checkLabel, LV_OBJ_FLAG_HIDDEN);
+        }
     }
 
     selectedOptionIndex_ = kNoSelection;
@@ -659,8 +573,7 @@ void SettingsScreen::selectOption(std::size_t index, bool preview) {
         return;
     }
     selectedOptionIndex_ = index;
-    lv_obj_add_state(optionRows_[index].button, LV_STATE_CHECKED);
-    lv_obj_set_style_text_opa(optionRows_[index].checkLabel, LV_OPA_COVER, LV_PART_MAIN);
+    setListRowSelected(optionRows_[index].button, true);
     lv_obj_scroll_to_view(optionRows_[index].button, LV_ANIM_OFF);
 
     if (preview && selectedSettingIndex_ == kBrightnessSettingIndex) {
@@ -678,11 +591,11 @@ void SettingsScreen::selectSetting(std::size_t index) {
     }
 
     if (selectedSettingIndex_ < settingRows_.size()) {
-        lv_obj_remove_state(settingRows_[selectedSettingIndex_].button, LV_STATE_CHECKED);
+        setListRowSelected(settingRows_[selectedSettingIndex_].button, false);
     }
 
     selectedSettingIndex_ = index;
-    lv_obj_add_state(settingRows_[selectedSettingIndex_].button, LV_STATE_CHECKED);
+    setListRowSelected(settingRows_[selectedSettingIndex_].button, true);
     lv_obj_scroll_to_view(settingRows_[selectedSettingIndex_].button, LV_ANIM_OFF);
     lv_obj_remove_state(objects.settings_select_btn, LV_STATE_DISABLED);
 }

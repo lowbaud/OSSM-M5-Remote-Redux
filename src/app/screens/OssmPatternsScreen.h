@@ -37,16 +37,23 @@ class OssmPatternsScreen {
     const char* patternName(int patternId) const;
 
   private:
+    struct Row {
+        lv_obj_t* button = nullptr;
+        lv_obj_t* currentMark = nullptr;
+    };
+
     static constexpr std::size_t kNoSelection = static_cast<std::size_t>(-1);
 
     OssmControl& control_;
     ossm::OssmClient::PatternList catalog_{};
-    std::vector<lv_obj_t*> rows_;
+    std::vector<Row> rows_;
     std::size_t selectedIndex_ = kNoSelection;
     OssmPatternsScreenAction pendingAction_ = OssmPatternsScreenAction::None;
     StopButtonFeedback stopButtonFeedback_;
 
     void rebuildRows();
+    // Shows the check mark on the pattern the OSSM is currently running.
+    void markCurrentPattern();
     void selectCurrentPattern();
     void selectRow(std::size_t index);
     void updateSelectButton();

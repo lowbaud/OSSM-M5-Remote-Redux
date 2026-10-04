@@ -113,9 +113,14 @@ class SettingsScreen {
     bool optionsOpen_ = false;
 
     void buildSettingRows();
+    void addSettingRow(std::size_t index, const char* name, const char* value);
     void buildOptionsPanel();
     void configureOptions();
+    // Shows the setting name in uppercase as the options panel heading.
+    void setOptionsTitle(const char* title);
     void openSelectedSetting();
+    // Fits the panel to the current option count so short lists leave no empty space.
+    void resizeOptionsPanel();
     void closeOptions();
     void clearSaveFailure();
     std::size_t currentOptionCount() const;

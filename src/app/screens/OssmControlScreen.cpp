@@ -53,7 +53,7 @@ OssmControlScreen::OssmControlScreen(OssmControl& control) : control_(control) {
 
 void OssmControlScreen::begin() {
     batteryIndicator_.begin(objects.ossm_control_battery_lbl);
-    stopButtonFeedback_.begin(objects.oss_control_stop_btn);
+    stopButtonFeedback_.begin(objects.ossm_control_stop_btn);
 
     lv_slider_set_range(objects.ossm_control_motion_range_slider, 0, 100);
     lv_obj_remove_flag(objects.ossm_control_motion_range_slider, LV_OBJ_FLAG_CLICKABLE);

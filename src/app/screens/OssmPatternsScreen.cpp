@@ -3,32 +3,19 @@
 #include <algorithm>
 #include <cstring>
 
+#include "ui/ListRowStyle.h"
+#include "ui/ThemeColors.h"
 #include "ui/generated/screens.h"
 #include "ui/generated/ui.h"
 
 namespace m5_redux {
 
-namespace {
-
-void stylePatternRow(lv_obj_t* row, lv_obj_t* list) {
-    const lv_style_selector_t normal = 0;
-    const lv_style_selector_t selected = LV_STATE_CHECKED;
-
-    lv_obj_set_style_bg_color(row, lv_obj_get_style_bg_color(list, LV_PART_MAIN), normal);
-    lv_obj_set_style_bg_opa(row, lv_obj_get_style_bg_opa(list, LV_PART_MAIN), normal);
-    lv_obj_set_style_text_font(row, &lv_font_montserrat_16, normal);
-    lv_obj_set_style_bg_color(row, lv_theme_get_color_primary(row), selected);
-    lv_obj_set_style_bg_opa(row, LV_OPA_COVER, selected);
-    lv_obj_set_style_text_color(row, lv_color_white(), selected);
-}
-
-}  // namespace
-
 OssmPatternsScreen::OssmPatternsScreen(OssmControl& control) : control_(control) {}
 
 void OssmPatternsScreen::begin() {
     rows_.reserve(ossm::OssmClient::kMaxPatternCount);
-    stopButtonFeedback_.begin(objects.oss_patterns_stop_btn);
+    styleList(objects.ossm_patterns_list);
+    stopButtonFeedback_.begin(objects.ossm_patterns_stop_btn);
     updateSelectButton();
     refresh();
 }
@@ -54,6 +41,7 @@ void OssmPatternsScreen::invalidateCatalog() {
 }
 
 void OssmPatternsScreen::enter() {
+    markCurrentPattern();
     selectCurrentPattern();
     refresh();
 
@@ -131,14 +119,31 @@ void OssmPatternsScreen::rebuildRows() {
     selectedIndex_ = kNoSelection;
 
     for (std::size_t index = 0; index < catalog_.count; ++index) {
-        lv_obj_t* row =
-            lv_list_add_button(objects.ossm_patterns_list, nullptr, catalog_.patterns[index].name);
-        stylePatternRow(row, objects.ossm_patterns_list);
-        lv_obj_add_event_cb(row, handleRowEvent, LV_EVENT_CLICKED, this);
+        Row row;
+        row.button = lv_list_add_button(objects.ossm_patterns_list, nullptr, nullptr);
+        styleListRow(row.button);
+        addListRowName(row.button, catalog_.patterns[index].name);
+        row.currentMark = addListRowValue(row.button, LV_SYMBOL_OK);
+        lv_obj_set_style_text_color(row.currentMark, themeColor(COLOR_ID_ACCENT), 0);
+        lv_obj_add_flag(row.currentMark, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_event_cb(row.button, handleRowEvent, LV_EVENT_CLICKED, this);
         rows_.push_back(row);
     }
 
+    markCurrentPattern();
+
     updateSelectButton();
+}
+
+void OssmPatternsScreen::markCurrentPattern() {
+    const int currentPattern = control_.values().pattern;
+    for (std::size_t index = 0; index < rows_.size(); ++index) {
+        if (catalog_.patterns[index].id == currentPattern) {
+            lv_obj_remove_flag(rows_[index].currentMark, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(rows_[index].currentMark, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
 }
 
 void OssmPatternsScreen::selectCurrentPattern() {
@@ -165,12 +170,12 @@ void OssmPatternsScreen::selectRow(std::size_t index) {
     }
 
     if (selectedIndex_ != kNoSelection && selectedIndex_ < rows_.size()) {
-        lv_obj_remove_state(rows_[selectedIndex_], LV_STATE_CHECKED);
+        setListRowSelected(rows_[selectedIndex_].button, false);
     }
 
     selectedIndex_ = index;
-    lv_obj_add_state(rows_[selectedIndex_], LV_STATE_CHECKED);
-    lv_obj_scroll_to_view(rows_[selectedIndex_], LV_ANIM_ON);
+    setListRowSelected(rows_[selectedIndex_].button, true);
+    lv_obj_scroll_to_view(rows_[selectedIndex_].button, LV_ANIM_ON);
     updateSelectButton();
 }
 
@@ -184,7 +189,7 @@ void OssmPatternsScreen::updateSelectButton() {
 
 void OssmPatternsScreen::handleRowClicked(lv_obj_t* row) {
     for (std::size_t index = 0; index < rows_.size(); ++index) {
-        if (rows_[index] == row) {
+        if (rows_[index].button == row) {
             selectRow(index);
             return;
         }

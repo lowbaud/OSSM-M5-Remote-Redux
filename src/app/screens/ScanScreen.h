@@ -38,6 +38,12 @@ class ScanScreen {
         ScanFailed,
     };
 
+    struct DeviceRow {
+        lv_obj_t* button = nullptr;
+        lv_obj_t* nameLabel = nullptr;
+        lv_obj_t* signalLabel = nullptr;
+    };
+
     struct DisplayedDevice {
         ossm::DiscoveredOssm latest{};
         float filteredRssi = 0.0f;
@@ -52,9 +58,8 @@ class ScanScreen {
     static constexpr std::uint32_t kScanStartGraceMs = 2000;
 
     ossm::OssmDiscovery& discovery_;
-    std::vector<lv_obj_t*> deviceRows_;
+    std::vector<DeviceRow> deviceRows_;
     std::vector<DisplayedDevice> displayedDevices_;
-    lv_obj_t* activitySpinner_ = nullptr;
     std::size_t selectedIndex_ = kNoSelection;
     std::size_t statusDeviceCount_ = 0;
     ScanScreenAction pendingAction_ = ScanScreenAction::None;

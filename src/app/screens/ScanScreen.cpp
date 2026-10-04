@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "ui/ListRowStyle.h"
 #include "ui/generated/screens.h"
 #include "ui/generated/ui.h"
 
@@ -13,30 +14,12 @@ namespace m5_redux {
 
 namespace {
 
-constexpr std::int32_t kSpinnerSize = 14;
-constexpr std::int32_t kSpinnerLabelGap = 6;
-constexpr std::int32_t kSpinnerArcWidth = 2;
-constexpr std::uint32_t kSpinnerDurationMs = 1000;
-constexpr std::uint32_t kSpinnerArcSweepDegrees = 200;
-
 const char* deviceName(const ossm::DiscoveredOssm& device) {
     return device.name[0] == '\0' ? "Unnamed OSSM" : device.name;
 }
 
-void formatDeviceText(
-    const ossm::DiscoveredOssm& device, int rssi, char* text, std::size_t textSize) {
-    std::snprintf(text, textSize, "%s  %d dBm", deviceName(device), rssi);
-}
-
-void styleDeviceRow(lv_obj_t* row, lv_obj_t* list) {
-    const lv_style_selector_t normal = 0;
-    const lv_style_selector_t selected = LV_STATE_CHECKED;
-
-    lv_obj_set_style_bg_color(row, lv_obj_get_style_bg_color(list, LV_PART_MAIN), normal);
-    lv_obj_set_style_bg_opa(row, lv_obj_get_style_bg_opa(list, LV_PART_MAIN), normal);
-    lv_obj_set_style_bg_color(row, lv_theme_get_color_primary(row), selected);
-    lv_obj_set_style_bg_opa(row, LV_OPA_COVER, selected);
-    lv_obj_set_style_text_color(row, lv_color_white(), selected);
+void formatSignalText(int rssi, char* text, std::size_t textSize) {
+    std::snprintf(text, textSize, "%d dBm", rssi);
 }
 
 }  // namespace
@@ -44,27 +27,7 @@ void styleDeviceRow(lv_obj_t* row, lv_obj_t* list) {
 ScanScreen::ScanScreen(ossm::OssmDiscovery& discovery) : discovery_(discovery) {}
 
 void ScanScreen::begin() {
-    activitySpinner_ = lv_spinner_create(objects.scan);
-    lv_obj_set_size(activitySpinner_, kSpinnerSize, kSpinnerSize);
-    lv_spinner_set_anim_params(activitySpinner_, kSpinnerDurationMs, kSpinnerArcSweepDegrees);
-
-    const lv_color_t primaryColor = lv_theme_get_color_primary(activitySpinner_);
-    lv_obj_set_style_arc_color(activitySpinner_, primaryColor, LV_PART_MAIN);
-    lv_obj_set_style_arc_opa(activitySpinner_, LV_OPA_30, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(activitySpinner_, kSpinnerArcWidth, LV_PART_MAIN);
-    lv_obj_set_style_arc_rounded(activitySpinner_, true, LV_PART_MAIN);
-    lv_obj_set_style_arc_color(activitySpinner_, primaryColor, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_opa(activitySpinner_, LV_OPA_COVER, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_width(activitySpinner_, kSpinnerArcWidth, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_rounded(activitySpinner_, true, LV_PART_INDICATOR);
-
-    lv_obj_set_pos(objects.scan_status_label, 30, 183);
-    lv_obj_set_width(objects.scan_status_label, 280);
-    lv_label_set_long_mode(objects.scan_status_label, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_update_layout(objects.scan);
-    lv_obj_align_to(
-        activitySpinner_, objects.scan_status_label, LV_ALIGN_OUT_LEFT_MID, -kSpinnerLabelGap, 0);
-
+    styleList(objects.scan_device_list);
     setState(State::Idle);
 }
 
@@ -178,15 +141,11 @@ void ScanScreen::tryStartScan() {
 
 void ScanScreen::setState(State state) {
     state_ = state;
-    if (!activitySpinner_) {
-        return;
-    }
-
     const bool busy = state == State::Starting || state == State::Scanning;
     if (busy) {
-        lv_obj_remove_flag(activitySpinner_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(objects.scan_spinner, LV_OBJ_FLAG_HIDDEN);
     } else {
-        lv_obj_add_flag(activitySpinner_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(objects.scan_spinner, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -200,12 +159,15 @@ void ScanScreen::updateScanResults() {
         }
 
         if (index >= deviceRows_.size()) {
-            char text[64];
-            formatDeviceText(device, device.rssi, text, sizeof(text));
+            char signalText[16];
+            formatSignalText(device.rssi, signalText, sizeof(signalText));
 
-            lv_obj_t* row = lv_list_add_button(objects.scan_device_list, nullptr, text);
-            styleDeviceRow(row, objects.scan_device_list);
-            lv_obj_add_event_cb(row, handleDeviceRowEvent, LV_EVENT_CLICKED, this);
+            DeviceRow row;
+            row.button = lv_list_add_button(objects.scan_device_list, nullptr, nullptr);
+            styleListRow(row.button);
+            row.nameLabel = addListRowName(row.button, deviceName(device));
+            row.signalLabel = addListRowValue(row.button, signalText);
+            lv_obj_add_event_cb(row.button, handleDeviceRowEvent, LV_EVENT_CLICKED, this);
             deviceRows_.push_back(row);
 
             DisplayedDevice displayed;
@@ -233,10 +195,13 @@ void ScanScreen::updateScanResults() {
         const int roundedRssi = static_cast<int>(std::lround(displayed.filteredRssi));
         const bool rssiRefreshDue = roundedRssi != displayed.renderedRssi &&
                                     now - displayed.renderedAtMs >= kRssiRefreshIntervalMs;
-        if (nameChanged || rssiRefreshDue) {
-            char text[64];
-            formatDeviceText(device, roundedRssi, text, sizeof(text));
-            lv_list_set_button_text(objects.scan_device_list, deviceRows_[index], text);
+        if (nameChanged) {
+            lv_label_set_text(deviceRows_[index].nameLabel, deviceName(device));
+        }
+        if (rssiRefreshDue) {
+            char signalText[16];
+            formatSignalText(roundedRssi, signalText, sizeof(signalText));
+            lv_label_set_text(deviceRows_[index].signalLabel, signalText);
             displayed.renderedRssi = roundedRssi;
             displayed.renderedAtMs = now;
         }
@@ -251,12 +216,12 @@ void ScanScreen::selectDevice(std::size_t index) {
     }
 
     if (selectedIndex_ != kNoSelection && selectedIndex_ < deviceRows_.size()) {
-        lv_obj_remove_state(deviceRows_[selectedIndex_], LV_STATE_CHECKED);
+        setListRowSelected(deviceRows_[selectedIndex_].button, false);
     }
 
     selectedIndex_ = index;
-    lv_obj_add_state(deviceRows_[selectedIndex_], LV_STATE_CHECKED);
-    lv_obj_scroll_to_view(deviceRows_[selectedIndex_], LV_ANIM_ON);
+    setListRowSelected(deviceRows_[selectedIndex_].button, true);
+    lv_obj_scroll_to_view(deviceRows_[selectedIndex_].button, LV_ANIM_ON);
     updateConnectButton();
 }
 
@@ -291,7 +256,7 @@ void ScanScreen::handleDeviceClicked(lv_obj_t* row) {
     }
 
     for (std::size_t index = 0; index < deviceRows_.size(); ++index) {
-        if (deviceRows_[index] == row) {
+        if (deviceRows_[index].button == row) {
             selectDevice(index);
             requestConnect();
             return;
