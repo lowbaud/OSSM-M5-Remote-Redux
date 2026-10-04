@@ -13,6 +13,8 @@
 #include "diagnostics/LogBuffer.h"
 #include "diagnostics/SystemInfo.h"
 #include "platform/M5Platform.h"
+#include "ui/ListRowStyle.h"
+#include "ui/ThemeColors.h"
 #include "ui/generated/fonts.h"
 #include "ui/generated/screens.h"
 #include "ui/generated/ui.h"
@@ -21,15 +23,21 @@ namespace m5_redux {
 
 namespace {
 
+// Matches the list padding on the settings screen.
 constexpr std::int32_t kOverviewPadHorizontal = 10;
-constexpr std::int32_t kOverviewPadVertical = 6;
-constexpr std::int32_t kOverviewRowPad = 3;
-constexpr std::int32_t kOverviewKeyWidth = 112;
-// About two rows per detent. Scrolling jumps instead of animating, because each animation
-// frame redraws the whole panel and the redraw is visible.
-constexpr std::int32_t kOverviewScrollStep = 44;
+constexpr std::int32_t kOverviewPadTop = 6;
+constexpr std::int32_t kOverviewColumnGap = 8;
+// Single-line rows per detent. Scrolling jumps instead of animating, because each animation frame
+// redraws the whole panel and the redraw is visible.
+constexpr std::int32_t kOverviewScrollRows = 2;
 constexpr std::uint32_t kOverviewRefreshIntervalMs = 1000;
-constexpr std::int32_t kLogPad = 6;
+// Same inset as the list edges; the log keeps more columns than aligning with the row text.
+constexpr std::int32_t kLogPadLeft = 10;
+constexpr std::int32_t kLogPadRight = 10;
+constexpr std::int32_t kLogPadVertical = 6;
+constexpr std::int32_t kLogScrollbarWidth = 3;
+constexpr std::int32_t kLogScrollbarEdgeGap = 2;
+constexpr std::int32_t kLogScrollbarMinHeight = 12;
 // Some glyphs fill the whole line height, so keep a pixel between lines.
 constexpr std::int32_t kLogLineSpace = 1;
 constexpr std::int32_t kLogStatusGap = 2;
@@ -46,13 +54,13 @@ constexpr const char* kOverviewKeys[] = {
     "Uptime",
     "Last reset",
     "Memory",
-    "Largest block",
+    "Max block",
     "PSRAM",
     "Battery",
     "Charge current",
     "OSSM",
     "Signal",
-    "Remote address",
+    "Address",
     "Worker stack",
     "Log",
 };
@@ -173,7 +181,8 @@ DiagnosticsScreenAction DiagnosticsScreen::update(const RemoteInputEvents& event
     const std::int32_t steps = events.encoderSteps[3];
     if (view_ == View::Overview) {
         if (steps != 0) {
-            lv_obj_scroll_by_bounded(overview_, 0, -steps * kOverviewScrollStep, LV_ANIM_OFF);
+            lv_obj_scroll_by_bounded(
+                overview_, 0, -steps * kOverviewScrollRows * listRowHeight(), LV_ANIM_OFF);
         }
         if (millis() - lastOverviewRefreshAtMs_ >= kOverviewRefreshIntervalMs) {
             refreshOverview();
@@ -246,30 +255,44 @@ void DiagnosticsScreen::buildOverview(lv_obj_t* panel) {
     lv_obj_remove_style_all(overview_);
     lv_obj_set_size(overview_, lv_pct(100), lv_pct(100));
     lv_obj_set_style_pad_hor(overview_, kOverviewPadHorizontal, LV_PART_MAIN);
-    lv_obj_set_style_pad_ver(overview_, kOverviewPadVertical, LV_PART_MAIN);
+    lv_obj_set_style_pad_top(overview_, kOverviewPadTop, LV_PART_MAIN);
     lv_obj_set_flex_flow(overview_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_scroll_dir(overview_, LV_DIR_VER);
-    lv_obj_set_scrollbar_mode(overview_, LV_SCROLLBAR_MODE_AUTO);
+    styleList(overview_);
 
+    std::array<lv_obj_t*, kOverviewRowCount> keys{};
     for (std::size_t index = 0; index < kOverviewRowCount; ++index) {
         lv_obj_t* row = lv_obj_create(overview_);
         lv_obj_remove_style_all(row);
+        styleListRow(row);
         lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
-        lv_obj_set_style_pad_ver(row, kOverviewRowPad, LV_PART_MAIN);
+        lv_obj_set_style_pad_column(row, kOverviewColumnGap, LV_PART_MAIN);
         lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+        // Keep the key on the first line when a long value wraps.
+        lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
         // Let drags on a row scroll the overview.
         lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(row, LV_OBJ_FLAG_CLICKABLE);
 
-        lv_obj_t* key = lv_label_create(row);
-        lv_obj_set_width(key, kOverviewKeyWidth);
-        lv_obj_set_style_text_opa(key, LV_OPA_70, LV_PART_MAIN);
-        lv_label_set_text_static(key, kOverviewKeys[index]);
+        keys[index] = addListRowName(row, kOverviewKeys[index]);
+        lv_obj_set_flex_grow(keys[index], 0);
 
-        lv_obj_t* value = lv_label_create(row);
+        lv_obj_t* value = addListRowValue(row, "");
         lv_obj_set_flex_grow(value, 1);
-        lv_label_set_long_mode(value, LV_LABEL_LONG_MODE_DOTS);
-        lv_label_set_text_static(value, "");
+        lv_label_set_long_mode(value, LV_LABEL_LONG_MODE_WRAP);
         overviewValues_[index] = value;
+    }
+
+    // Give every key the width of the longest one, so the values form a column.
+    const lv_font_t* keyFont = lv_obj_get_style_text_font(keys[0], LV_PART_MAIN);
+    std::int32_t keyWidth = 0;
+    for (const char* key : kOverviewKeys) {
+        lv_point_t size;
+        lv_text_get_size(&size, key, keyFont, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+        keyWidth = std::max(keyWidth, size.x);
+    }
+    for (lv_obj_t* key : keys) {
+        lv_obj_set_width(key, keyWidth);
     }
 
     lv_label_set_text_static(overviewValues_[kFirmwareRow], buildInfo().buildVersion);
@@ -279,7 +302,7 @@ void DiagnosticsScreen::buildOverview(lv_obj_t* panel) {
         overviewValues_[kChargeCurrentRow], "%d mA", m5_platform::batteryChargeCurrentMa());
     if (system_info::resetWasAbnormal()) {
         lv_obj_set_style_text_color(
-            overviewValues_[kResetRow], lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN);
+            overviewValues_[kResetRow], themeColor(COLOR_ID_DANGER), LV_PART_MAIN);
     }
 }
 
@@ -287,7 +310,9 @@ void DiagnosticsScreen::buildLogView(lv_obj_t* panel) {
     logView_ = lv_obj_create(panel);
     lv_obj_remove_style_all(logView_);
     lv_obj_set_size(logView_, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_pad_all(logView_, kLogPad, LV_PART_MAIN);
+    lv_obj_set_style_pad_left(logView_, kLogPadLeft, LV_PART_MAIN);
+    lv_obj_set_style_pad_right(logView_, kLogPadRight, LV_PART_MAIN);
+    lv_obj_set_style_pad_ver(logView_, kLogPadVertical, LV_PART_MAIN);
     lv_obj_remove_flag(logView_, LV_OBJ_FLAG_SCROLLABLE);
 
     // Monospaced, so the text grid below maps exactly onto the label.
@@ -295,6 +320,7 @@ void DiagnosticsScreen::buildLogView(lv_obj_t* panel) {
 
     logLabel_ = lv_label_create(logView_);
     lv_obj_set_style_text_font(logLabel_, logFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(logLabel_, themeColor(COLOR_ID_TEXT_PRIMARY), LV_PART_MAIN);
     lv_obj_set_style_text_line_space(logLabel_, kLogLineSpace, LV_PART_MAIN);
     lv_label_set_long_mode(logLabel_, LV_LABEL_LONG_MODE_CLIP);
     lv_label_set_text_static(logLabel_, "");
@@ -302,7 +328,7 @@ void DiagnosticsScreen::buildLogView(lv_obj_t* panel) {
     const lv_font_t* statusFont = &lv_font_montserrat_12;
     logStatusLabel_ = lv_label_create(logView_);
     lv_obj_set_style_text_font(logStatusLabel_, statusFont, LV_PART_MAIN);
-    lv_obj_set_style_text_opa(logStatusLabel_, LV_OPA_70, LV_PART_MAIN);
+    lv_obj_set_style_text_color(logStatusLabel_, themeColor(COLOR_ID_TEXT_SECONDARY), LV_PART_MAIN);
     lv_obj_align(logStatusLabel_, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     lv_label_set_text_static(logStatusLabel_, "");
 
@@ -313,6 +339,18 @@ void DiagnosticsScreen::buildLogView(lv_obj_t* panel) {
         contentHeight - lv_font_get_line_height(statusFont) - kLogStatusGap;
     lv_obj_set_pos(logLabel_, 0, 0);
     lv_obj_set_size(logLabel_, contentWidth, logHeight);
+    logTrackHeight_ = logHeight;
+
+    // The log draws its own text window rather than scrolling, so it gets a drawn indicator
+    // that looks like the list scrollbars.
+    logScrollbar_ = lv_obj_create(logView_);
+    lv_obj_remove_style_all(logScrollbar_);
+    lv_obj_remove_flag(logScrollbar_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_bg_color(logScrollbar_, themeColor(COLOR_ID_SCROLLBAR), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(logScrollbar_, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(logScrollbar_, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_width(logScrollbar_, kLogScrollbarWidth);
+    lv_obj_add_flag(logScrollbar_, LV_OBJ_FLAG_HIDDEN);
 
     const std::int32_t glyphWidth =
         std::max<std::int32_t>(1, lv_font_get_glyph_width(logFont, 'M', 0));
@@ -517,7 +555,31 @@ void DiagnosticsScreen::renderLog() {
     // The buffer is reused, so make sure the label redraws even if its pointer is unchanged.
     lv_obj_invalidate(logLabel_);
 
+    updateLogScrollbar();
     updateLogStatus(false);
+}
+
+void DiagnosticsScreen::updateLogScrollbar() {
+    if (logTotalLines_ <= logRows_) {
+        lv_obj_add_flag(logScrollbar_, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    const std::int64_t track = logTrackHeight_;
+    const std::int64_t thumb = std::max<std::int64_t>(
+        kLogScrollbarMinHeight,
+        track * static_cast<std::int64_t>(logRows_) / static_cast<std::int64_t>(logTotalLines_));
+    const std::int64_t maxScroll = static_cast<std::int64_t>(logTotalLines_ - logRows_);
+    // Scrolling back from the newest line moves the thumb up from the bottom.
+    const std::int64_t offset =
+        (track - thumb) * (maxScroll - static_cast<std::int64_t>(logScrollLines_)) / maxScroll;
+
+    // Positions are relative to the content area, so reach into the right padding.
+    const std::int32_t x = lv_obj_get_content_width(logView_) + kLogPadRight -
+                           kLogScrollbarEdgeGap - kLogScrollbarWidth;
+    lv_obj_set_pos(logScrollbar_, x, static_cast<std::int32_t>(offset));
+    lv_obj_set_height(logScrollbar_, static_cast<std::int32_t>(thumb));
+    lv_obj_remove_flag(logScrollbar_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void DiagnosticsScreen::scrollLog(std::int32_t linesBack) {

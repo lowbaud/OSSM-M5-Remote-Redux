@@ -3,10 +3,20 @@
 #include <Arduino.h>
 #include <lvgl.h>
 
+#include "ui/ThemeColors.h"
 #include "ui/generated/screens.h"
 #include "ui/generated/ui.h"
 
 namespace m5_redux {
+
+namespace {
+
+void setStatus(const char* text, Colors color) {
+    lv_label_set_text(objects.connect_status_lbl, text);
+    lv_obj_set_style_text_color(objects.connect_status_lbl, themeColor(color), LV_PART_MAIN);
+}
+
+}  // namespace
 
 void ConnectScreen::begin() {
     lv_label_set_long_mode(objects.connect_device_name_lbl, LV_LABEL_LONG_MODE_DOTS);
@@ -57,18 +67,19 @@ void ConnectScreen::requestCancel() {
 
 void ConnectScreen::connectionStarted() {
     retryPending_ = false;
-    lv_label_set_text(objects.connect_status_lbl, "Connecting...");
+    setStatus("Connecting...", COLOR_ID_TEXT_PRIMARY);
 }
 
 void ConnectScreen::connectionEstablished() {
     retryPending_ = false;
-    lv_label_set_text(objects.connect_status_lbl, "Preparing OSSM...");
+    setStatus("Preparing OSSM...", COLOR_ID_TEXT_PRIMARY);
 }
 
 void ConnectScreen::connectionFailed() {
     retryPending_ = true;
     retryAtMs_ = millis() + kRetryDelayMs;
-    lv_label_set_text(objects.connect_status_lbl, "Connection failed. Retrying...");
+    // Stands out from normal progress until the next attempt resets it.
+    setStatus("Connection failed. Retrying...", COLOR_ID_DANGER);
 }
 
 }  // namespace m5_redux
