@@ -7,7 +7,9 @@
 #include "platform/RemoteInput.h"
 #include "settings/SettingsStore.h"
 #include "ui/BatteryIndicator.h"
+#include "ui/RangeValueReadout.h"
 #include "ui/StopButtonFeedback.h"
+#include "ui/ValueHighlight.h"
 
 namespace m5_redux {
 
@@ -64,6 +66,9 @@ class OssmControlScreen {
     BoundaryPushState boundaryPushState_{};
     BatteryIndicator batteryIndicator_;
     StopButtonFeedback stopButtonFeedback_;
+    RangeValueReadout rangeValueReadout_;
+    ValueHighlight speedHighlight_;
+    ValueHighlight sensationHighlight_;
     DepthControlMode depthControlMode_ = SettingsStore::kDefaultDepthControlMode;
     bool strokeEncoderReversed_ = false;
     bool holdFeedbackActive_ = false;

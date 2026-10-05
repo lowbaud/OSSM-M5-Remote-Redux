@@ -56,6 +56,10 @@ void OssmControlScreen::begin() {
     stopButtonFeedback_.begin(objects.ossm_control_stop_btn);
 
     lv_slider_set_range(objects.ossm_control_motion_range_slider, 0, 100);
+    rangeValueReadout_.begin(objects.ossm_control_motion_range_slider);
+    speedHighlight_.begin(objects.ossm_control_speed_value_lbl, objects.ossm_control_speed_lbl);
+    sensationHighlight_.begin(
+        objects.ossm_control_sensation_value_lbl, objects.ossm_control_sensation_lbl);
     lv_obj_remove_flag(objects.ossm_control_motion_range_slider, LV_OBJ_FLAG_CLICKABLE);
     setPatternLabel(control_.values().pattern, nullptr);
     refresh();
@@ -72,6 +76,9 @@ void OssmControlScreen::enter() {
 void OssmControlScreen::leave() {
     resetAcceleration();
     stopButtonFeedback_.reset();
+    rangeValueReadout_.hide();
+    speedHighlight_.reset();
+    sensationHighlight_.reset();
     setHoldFeedback(false);
 }
 
@@ -149,9 +156,21 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
     adjustments.sensation = accelerate(
         events.encoderSteps[3], accelerationStates_[3], AccelerationPolicy::BothDirections, now);
 
+    const OssmControlValues previous = control_.values();
     if (control_.apply(adjustments)) {
         refresh();
+
+        const OssmControlValues& values = control_.values();
+        if (values.speed != previous.speed) {
+            speedHighlight_.highlight();
+        }
+        if (values.sensation != previous.sensation) {
+            sensationHighlight_.highlight();
+        }
     }
+
+    // Label the turned knob, also when it pushes the other one or sits at a limit.
+    rangeValueReadout_.show(events.encoderSteps[1] != 0, events.encoderSteps[2] != 0);
 
     return OssmControlScreenAction::None;
 }
