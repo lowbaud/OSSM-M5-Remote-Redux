@@ -178,7 +178,7 @@ void DiagnosticsScreen::leave() {
 }
 
 DiagnosticsScreenAction DiagnosticsScreen::update(const RemoteInputEvents& events) {
-    const std::int32_t steps = events.encoderSteps[3];
+    const std::int32_t steps = events.menuSteps();
     if (view_ == View::Overview) {
         if (steps != 0) {
             lv_obj_scroll_by_bounded(

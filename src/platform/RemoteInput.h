@@ -16,6 +16,11 @@ struct RemoteInputEvents {
     bool mxPress = false;
     bool leftClick = false;
     bool rightClick = false;
+
+    // Menus scroll with either outer encoder: speed or sensation.
+    std::int32_t menuSteps() const {
+        return encoderSteps[0] + encoderSteps[3];
+    }
 };
 
 class RemoteInput {

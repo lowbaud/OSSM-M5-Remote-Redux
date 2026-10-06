@@ -89,6 +89,8 @@ void SettingsScreen::enter(bool keepSelection) {
     if (keepSelection && settingVisible(selectedSettingIndex_)) {
         selectSetting(selectedSettingIndex_);
     } else {
+        // Rows shown above an earlier scroll position would stay out of view otherwise.
+        lv_obj_scroll_to_y(objects.settings_list, 0, LV_ANIM_OFF);
         selectSetting(defaultSettingIndex());
     }
 
@@ -109,17 +111,17 @@ SettingsScreenEvent SettingsScreen::update(const RemoteInputEvents& events) {
         clearSaveFailure();
     }
 
-    if (events.encoderSteps[3] != 0) {
+    const std::int32_t steps = events.menuSteps();
+    if (steps != 0) {
         if (optionsOpen_) {
             const std::int64_t current =
                 selectedOptionIndex_ == kNoSelection ? 0 : selectedOptionIndex_;
-            const std::int64_t next =
-                clampIndex(current + events.encoderSteps[3], currentOptionCount());
+            const std::int64_t next = clampIndex(current + steps, currentOptionCount());
             if (static_cast<std::size_t>(next) != selectedOptionIndex_) {
                 selectOption(static_cast<std::size_t>(next), true);
             }
         } else {
-            const std::size_t next = stepSetting(events.encoderSteps[3]);
+            const std::size_t next = stepSetting(steps);
             if (next != selectedSettingIndex_) {
                 selectSetting(next);
             }

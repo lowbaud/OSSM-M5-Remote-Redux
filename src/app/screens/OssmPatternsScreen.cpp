@@ -56,10 +56,11 @@ void OssmPatternsScreen::leave() {
 }
 
 OssmPatternsScreenAction OssmPatternsScreen::update(const RemoteInputEvents& events) {
-    if (!rows_.empty() && events.encoderSteps[3] != 0) {
+    const std::int32_t steps = events.menuSteps();
+    if (!rows_.empty() && steps != 0) {
         const std::int64_t current = selectedIndex_ == kNoSelection ? 0 : selectedIndex_;
         const std::int64_t last = static_cast<std::int64_t>(rows_.size() - 1);
-        std::int64_t next = current + events.encoderSteps[3];
+        std::int64_t next = current + steps;
         if (next < 0) {
             next = 0;
         } else if (next > last) {

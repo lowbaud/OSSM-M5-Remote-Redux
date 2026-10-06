@@ -58,10 +58,11 @@ ScanScreenAction ScanScreen::update(const RemoteInputEvents& events) {
         discovery_.update();
         updateScanResults();
 
-        if (!deviceRows_.empty() && events.encoderSteps[3] != 0) {
+        const std::int32_t steps = events.menuSteps();
+        if (!deviceRows_.empty() && steps != 0) {
             const std::int64_t current = selectedIndex_ == kNoSelection ? 0 : selectedIndex_;
             const std::int64_t last = static_cast<std::int64_t>(deviceRows_.size() - 1);
-            std::int64_t next = current + events.encoderSteps[3];
+            std::int64_t next = current + steps;
             if (next < 0) {
                 next = 0;
             } else if (next > last) {
