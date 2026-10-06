@@ -14,7 +14,10 @@ namespace m5_redux {
 
 namespace {
 
-constexpr std::size_t kDefaultPatternSettingIndex = 0;
+// Disconnects from the OSSM instead of opening an options panel.
+constexpr std::size_t kDisconnectSettingIndex = 0;
+constexpr std::size_t kDefaultPatternSettingIndex = 1;
+constexpr char kDisconnectSettingName[] = "Disconnect";
 constexpr char kDefaultPatternSettingName[] = "Default pattern";
 constexpr char kAutoPatternOptionName[] = "Auto";
 constexpr char kBrightnessSettingName[] = "Brightness";
@@ -25,15 +28,15 @@ constexpr char kDepthControlSettingName[] = "Depth mode";
 constexpr char kStrokeDirectionSettingName[] = "Stroke dir.";
 constexpr char kTouchscreenSettingName[] = "Touchscreen";
 constexpr char kDiagnosticsSettingName[] = "Diagnostics";
-constexpr std::size_t kBrightnessSettingIndex = 1;
-constexpr std::size_t kIdleDimSettingIndex = 2;
-constexpr std::size_t kIdlePowerOffSettingIndex = 3;
-constexpr std::size_t kAutoConnectSettingIndex = 4;
-constexpr std::size_t kDepthControlSettingIndex = 5;
-constexpr std::size_t kStrokeDirectionSettingIndex = 6;
-constexpr std::size_t kTouchscreenSettingIndex = 7;
+constexpr std::size_t kBrightnessSettingIndex = 2;
+constexpr std::size_t kIdleDimSettingIndex = 3;
+constexpr std::size_t kIdlePowerOffSettingIndex = 4;
+constexpr std::size_t kAutoConnectSettingIndex = 5;
+constexpr std::size_t kDepthControlSettingIndex = 6;
+constexpr std::size_t kStrokeDirectionSettingIndex = 7;
+constexpr std::size_t kTouchscreenSettingIndex = 8;
 // Opens the diagnostics screen instead of an options panel.
-constexpr std::size_t kDiagnosticsSettingIndex = 8;
+constexpr std::size_t kDiagnosticsSettingIndex = 9;
 constexpr std::int32_t kOptionsTitleHeight = 28;
 constexpr std::int32_t kOptionsTitlePadX = 12;
 // The panel grows with the option count up to this many rows, then scrolls.
@@ -58,8 +61,7 @@ void SettingsScreen::begin() {
     setStopAvailable(false);
     buildSettingRows();
     buildOptionsPanel();
-    selectSetting(
-        patternCatalog_.count > 0 ? kDefaultPatternSettingIndex : kBrightnessSettingIndex);
+    selectSetting(defaultSettingIndex());
     closeOptions();
     refresh();
 }
@@ -84,11 +86,10 @@ void SettingsScreen::enter(bool keepSelection) {
     pendingEvent_ = {};
     closeOptions();
     refresh();
-    if (keepSelection) {
+    if (keepSelection && settingVisible(selectedSettingIndex_)) {
         selectSetting(selectedSettingIndex_);
     } else {
-        selectSetting(
-            patternCatalog_.count > 0 ? kDefaultPatternSettingIndex : kBrightnessSettingIndex);
+        selectSetting(defaultSettingIndex());
     }
 
     if (lv_screen_active() != objects.settings) {
@@ -118,11 +119,9 @@ SettingsScreenEvent SettingsScreen::update(const RemoteInputEvents& events) {
                 selectOption(static_cast<std::size_t>(next), true);
             }
         } else {
-            const std::int64_t next = clampIndex(
-                static_cast<std::int64_t>(selectedSettingIndex_) + events.encoderSteps[3],
-                kSettingCount);
-            if (static_cast<std::size_t>(next) != selectedSettingIndex_) {
-                selectSetting(static_cast<std::size_t>(next));
+            const std::size_t next = stepSetting(events.encoderSteps[3]);
+            if (next != selectedSettingIndex_) {
+                selectSetting(next);
             }
         }
     }
@@ -140,6 +139,12 @@ SettingsScreenEvent SettingsScreen::update(const RemoteInputEvents& events) {
 }
 
 void SettingsScreen::refresh() {
+    if (disconnectAvailable_) {
+        lv_obj_remove_flag(settingRows_[kDisconnectSettingIndex].button, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(settingRows_[kDisconnectSettingIndex].button, LV_OBJ_FLAG_HIDDEN);
+    }
+
     SettingRow& pattern = settingRows_[kDefaultPatternSettingIndex];
     if (patternCatalog_.count > 0) {
         lv_obj_remove_flag(pattern.button, LV_OBJ_FLAG_HIDDEN);
@@ -201,6 +206,10 @@ void SettingsScreen::setStopAvailable(bool available) {
         stopButtonFeedback_.reset();
         lv_obj_add_flag(objects.settings_stop_btn, LV_OBJ_FLAG_HIDDEN);
     }
+}
+
+void SettingsScreen::setDisconnectAvailable(bool available) {
+    disconnectAvailable_ = available;
 }
 
 void SettingsScreen::setMotionActive(bool active) {
@@ -293,6 +302,7 @@ void SettingsScreen::commitFailed() {
 void SettingsScreen::buildSettingRows() {
     styleList(objects.settings_list);
 
+    addSettingRow(kDisconnectSettingIndex, kDisconnectSettingName, "");
     addSettingRow(kDefaultPatternSettingIndex, kDefaultPatternSettingName, "");
     addSettingRow(kBrightnessSettingIndex, kBrightnessSettingName, "");
     addSettingRow(kIdleDimSettingIndex, kIdleDimSettingName, "");
@@ -478,6 +488,10 @@ void SettingsScreen::openSelectedSetting() {
         pendingEvent_.action = SettingsScreenAction::ShowDiagnostics;
         return;
     }
+    if (selectedSettingIndex_ == kDisconnectSettingIndex) {
+        pendingEvent_.action = SettingsScreenAction::Disconnect;
+        return;
+    }
 
     optionsOpen_ = true;
     configureOptions();
@@ -583,9 +597,6 @@ void SettingsScreen::selectOption(std::size_t index, bool preview) {
 }
 
 void SettingsScreen::selectSetting(std::size_t index) {
-    if (index == kDefaultPatternSettingIndex && patternCatalog_.count == 0) {
-        index = kBrightnessSettingIndex;
-    }
     if (index >= settingRows_.size()) {
         return;
     }
@@ -598,6 +609,40 @@ void SettingsScreen::selectSetting(std::size_t index) {
     setListRowSelected(settingRows_[selectedSettingIndex_].button, true);
     lv_obj_scroll_to_view(settingRows_[selectedSettingIndex_].button, LV_ANIM_OFF);
     lv_obj_remove_state(objects.settings_select_btn, LV_STATE_DISABLED);
+}
+
+bool SettingsScreen::settingVisible(std::size_t index) const {
+    switch (index) {
+        case kDisconnectSettingIndex:
+            return disconnectAvailable_;
+        case kDefaultPatternSettingIndex:
+            return patternCatalog_.count > 0;
+        default:
+            return index < kSettingCount;
+    }
+}
+
+// Starts on the first setting so a quick select cannot disconnect by accident.
+std::size_t SettingsScreen::defaultSettingIndex() const {
+    return settingVisible(kDefaultPatternSettingIndex) ? kDefaultPatternSettingIndex
+                                                       : kBrightnessSettingIndex;
+}
+
+std::size_t SettingsScreen::stepSetting(std::int64_t steps) const {
+    const std::int64_t direction = steps > 0 ? 1 : -1;
+    std::int64_t index = static_cast<std::int64_t>(selectedSettingIndex_);
+    for (std::int64_t remaining = steps; remaining != 0; remaining -= direction) {
+        std::int64_t next = index + direction;
+        while (next >= 0 && next < static_cast<std::int64_t>(kSettingCount) &&
+               !settingVisible(static_cast<std::size_t>(next))) {
+            next += direction;
+        }
+        if (next < 0 || next >= static_cast<std::int64_t>(kSettingCount)) {
+            break;
+        }
+        index = next;
+    }
+    return static_cast<std::size_t>(index);
 }
 
 void SettingsScreen::handleSettingClicked(lv_obj_t* row) {
