@@ -27,6 +27,7 @@ enum class SettingsScreenAction : std::uint8_t {
     CommitDepthControl,
     CommitStrokeDirection,
     ShowDiagnostics,
+    Disconnect,
 };
 
 struct SettingsScreenEvent {
@@ -53,6 +54,7 @@ class SettingsScreen {
     SettingsScreenEvent update(const RemoteInputEvents& events);
     void refresh();
     void setStopAvailable(bool available);
+    void setDisconnectAvailable(bool available);
     void setMotionActive(bool active);
 
     void requestBack();
@@ -72,7 +74,7 @@ class SettingsScreen {
         lv_obj_t* textLabel = nullptr;
     };
 
-    static constexpr std::size_t kSettingCount = 9;
+    static constexpr std::size_t kSettingCount = 10;
     static constexpr std::size_t kMaxOptionRows = ossm::OssmClient::kMaxPatternCount + 1;
     static constexpr std::size_t kNoSelection = static_cast<std::size_t>(-1);
     static_assert(
@@ -110,6 +112,7 @@ class SettingsScreen {
     SettingsScreenEvent pendingEvent_{};
     StopButtonFeedback stopButtonFeedback_;
     bool stopAvailable_ = false;
+    bool disconnectAvailable_ = false;
     bool optionsOpen_ = false;
 
     void buildSettingRows();
@@ -127,6 +130,10 @@ class SettingsScreen {
     std::size_t currentStoredOptionIndex() const;
     void selectOption(std::size_t index, bool preview);
     void selectSetting(std::size_t index);
+    bool settingVisible(std::size_t index) const;
+    std::size_t defaultSettingIndex() const;
+    // Moves the selection by visible rows, stopping at the first and last one.
+    std::size_t stepSetting(std::int64_t steps) const;
     void handleSettingClicked(lv_obj_t* row);
     void handleOptionClicked(lv_obj_t* row);
 

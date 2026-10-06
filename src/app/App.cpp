@@ -196,13 +196,15 @@ void enterScreen(Screen screen) {
             ossmPatternsScreen.enter();
             break;
         case Screen::Settings: {
+            const bool connected =
+                settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady();
             ossm::OssmClient::PatternList catalog{};
-            if (settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady()) {
+            if (connected) {
                 ossmClient.patternList(catalog);
             }
             settingsScreen.setPatternCatalog(catalog);
-            settingsScreen.setStopAvailable(
-                settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady());
+            settingsScreen.setStopAvailable(connected);
+            settingsScreen.setDisconnectAvailable(connected);
             settingsScreen.setMotionActive(ossmControl.values().speed > 0);
             settingsScreen.enter(returningFromDiagnostics);
             returningFromDiagnostics = false;
@@ -367,6 +369,15 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
             break;
         case SettingsScreenAction::ShowDiagnostics:
             navigateTo(Screen::Diagnostics);
+            break;
+        case SettingsScreenAction::Disconnect:
+            // The client stops motion before it drops the link. A requested disconnect raises
+            // no readiness-lost event, so reset the control state here.
+            ossmConnection.disconnect();
+            ossmControl.handleReadinessLost();
+            ossmPatternsScreen.invalidateCatalog();
+            LOGI(kTag, "Disconnected from OSSM");
+            navigateTo(Screen::Welcome);
             break;
         case SettingsScreenAction::None:
             break;
