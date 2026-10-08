@@ -88,11 +88,19 @@ class MenuItem {
     // Stable key for the saved row order, namespaced by source, e.g. "ossm.depthmode".
     const char* id() const;
     virtual const char* name() const;
+    // Shorter name for tiles, e.g. "Depth" for "Depth mode"; the name unless set.
+    const char* shortName() const;
+    void setShortName(const char* shortName);
     virtual MenuItemKind kind() const = 0;
     // Shown on the right side of the row; empty when the row has no value.
     virtual const char* valueText() const;
     // Marks rows that open another page or screen.
     virtual bool showsChevron() const;
+    // Symbol drawn on tiles, e.g. LV_SYMBOL_SETTINGS; empty for none.
+    const char* icon() const;
+    void setIcon(const char* icon);
+    // Tiles normally take half the page width; wide ones, like sliders, take a whole line.
+    virtual bool wideTile() const;
     // Label of the select button while the row is highlighted.
     virtual const char* selectLabel() const;
     // A page never starts on a destructive row, so a quick select cannot trigger it by accident.
@@ -107,6 +115,8 @@ class MenuItem {
   private:
     const char* id_;
     const char* name_;
+    const char* shortName_ = nullptr;
+    const char* icon_ = "";
 };
 
 }  // namespace m5_redux

@@ -11,8 +11,8 @@
 #include "app/BuildInfo.h"
 #include "app/IdleTimer.h"
 #include "app/menu/AppMenuCommands.h"
-#include "app/menu/OssmSettingsSource.h"
-#include "app/menu/RemoteSettingsSource.h"
+#include "app/menu/OssmMenuSources.h"
+#include "app/menu/RemoteMenuSources.h"
 #include "app/screens/BootScreen.h"
 #include "app/screens/ConnectScreen.h"
 #include "app/screens/DiagnosticsScreen.h"
@@ -83,6 +83,9 @@ OssmSettingsSource ossmSettings(settingsStore, ossmControlScreen);
 RemoteSettingsSource
     remoteSettings(settingsStore, backlightController, autoPowerOffController, idleTimer);
 MenuPage settingsPage("Settings");
+OssmQuickActionsSource ossmQuickActions(settingsStore, ossmControlScreen);
+RemoteQuickActionsSource remoteQuickActions(settingsStore, backlightController, settingsPage);
+MenuPage quickActionsPage("Quick actions", MenuPage::Layout::Tiles);
 
 Screen currentScreen = Screen::Boot;
 // The screen under the menu panel, and where closing the menu returns to.
@@ -234,7 +237,8 @@ void enterScreen(Screen screen) {
                 }
                 menuPanel.show();
             } else {
-                menuPanel.open(settingsPage);
+                // The quick actions belong to the control screen; Welcome has only settings.
+                menuPanel.open(connected ? quickActionsPage : settingsPage);
             }
             break;
         }
@@ -519,6 +523,8 @@ void begin() {
     diagnosticsScreen.begin();
     settingsPage.addSource(ossmSettings);
     settingsPage.addSource(remoteSettings);
+    quickActionsPage.addSource(ossmQuickActions);
+    quickActionsPage.addSource(remoteQuickActions);
     menuPanel.begin();
     updateBatteryIndicator(true);
     ossmConnection.begin(APP_DISPLAY_NAME);

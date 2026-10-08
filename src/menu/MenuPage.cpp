@@ -4,10 +4,14 @@
 
 namespace m5_redux {
 
-MenuPage::MenuPage(const char* title) : title_(title) {}
+MenuPage::MenuPage(const char* title, Layout layout) : title_(title), layout_(layout) {}
 
 const char* MenuPage::title() const {
     return title_;
+}
+
+MenuPage::Layout MenuPage::layout() const {
+    return layout_;
 }
 
 bool MenuPage::addSource(MenuSource& source) {

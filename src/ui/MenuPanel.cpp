@@ -18,8 +18,15 @@ namespace {
 
 constexpr const char* kTag = "menu";
 constexpr std::int32_t kPanelWidth = 250;
-// Space between the bottom of the panel and the button bar.
-constexpr std::int32_t kButtonBarGap = 4;
+// Space between the panel and the screen edge, and between the panel and the button bar.
+constexpr std::int32_t kPanelMargin = 4;
+constexpr std::int32_t kPanelRadius = 10;
+// The control screen shows through the panel, darkened.
+constexpr lv_opa_t kPanelOpacity = LV_OPA_80;
+// The full-screen list matches the old settings screen.
+constexpr std::int32_t kScreenListBarGap = 7;
+constexpr std::int32_t kScreenListPadX = 10;
+constexpr std::int32_t kScreenListPadTop = 6;
 constexpr std::int32_t kTitleHeight = 28;
 constexpr std::int32_t kTitlePadX = 12;
 constexpr std::int32_t kPopupWidth = 263;
@@ -27,8 +34,8 @@ constexpr std::int32_t kPopupOffsetY = -20;
 constexpr std::int32_t kPopupBorderWidth = 1;
 // The popup grows with its rows up to this many, then scrolls.
 constexpr std::size_t kMaxVisiblePopupRows = 4;
+constexpr lv_opa_t kPopupScrimOpacity = LV_OPA_50;
 constexpr std::int32_t kSaveFailureWidth = 236;
-constexpr lv_opa_t kScrimOpacity = LV_OPA_50;
 constexpr std::uint32_t kSlideDurationMs = 180;
 constexpr std::uint32_t kSaveFailureDurationMs = 2000;
 
@@ -37,6 +44,21 @@ lv_obj_t* createPlainObject(lv_obj_t* parent) {
     lv_obj_remove_style_all(object);
     lv_obj_remove_flag(object, LV_OBJ_FLAG_SCROLLABLE);
     return object;
+}
+
+lv_obj_t* createScrollArea(lv_obj_t* parent) {
+    lv_obj_t* area = createPlainObject(parent);
+    lv_obj_add_flag(area, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(area, LV_DIR_VER);
+    return area;
+}
+
+void setHidden(lv_obj_t* object, bool hidden) {
+    if (hidden) {
+        lv_obj_add_flag(object, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_remove_flag(object, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 // Places the button where the screens put theirs, so the bar does not move when the menu opens.
@@ -87,16 +109,15 @@ void MenuPanel::begin() {
     lv_obj_remove_flag(root_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(root_, LV_OBJ_FLAG_HIDDEN);
 
-    // Dims the screen and closes the menu when tapped outside the panel.
-    scrim_ = createPlainObject(root_);
-    lv_obj_set_size(scrim_, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_bg_color(scrim_, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(scrim_, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_add_event_cb(scrim_, handleScrimEvent, LV_EVENT_CLICKED, this);
+    // Taps beside the panel close the menu; the screen behind stays as it is.
+    lv_obj_t* closeArea = createPlainObject(root_);
+    lv_obj_set_size(closeArea, lv_pct(100), lv_pct(100));
+    lv_obj_add_event_cb(closeArea, handleCloseEvent, LV_EVENT_CLICKED, this);
 
     const std::int32_t buttonBarTop =
         lv_obj_get_style_y(objects.ossm_control_settings_btn, LV_PART_MAIN);
-    buildPanel(buttonBarTop - kButtonBarGap);
+    buildPanel(buttonBarTop);
+    buildScreen(buttonBarTop);
     buildPopup();
     buildButtonBar();
     buildSaveFailureLabel();
@@ -107,8 +128,8 @@ void MenuPanel::open(MenuPage& root) {
     controller_.open(root);
     clearTaps();
     hideSaveFailure();
-    // Shown before rendering so scrolling to the highlighted row sees the final layout.
-    slideIn();
+    visible_ = true;
+    lv_obj_remove_flag(root_, LV_OBJ_FLAG_HIDDEN);
     renderAll();
 }
 
@@ -118,20 +139,24 @@ void MenuPanel::close() {
     clearTaps();
     hideSaveFailure();
     lv_obj_add_flag(popupScrim_, LV_OBJ_FLAG_HIDDEN);
-    if (visible_) {
+    if (!visible_) {
+        return;
+    }
+
+    visible_ = false;
+    // Only the panel slides; the full-screen page goes at once, like a screen change.
+    if (panelIn_ && lv_obj_has_flag(screen_, LV_OBJ_FLAG_HIDDEN)) {
         slideOut();
+    } else {
+        hideNow();
     }
 }
 
 void MenuPanel::hide() {
-    lv_anim_delete(panel_, setPanelX);
-    lv_anim_delete(scrim_, setScrimOpacity);
+    visible_ = false;
     clearTaps();
     hideSaveFailure();
-    visible_ = false;
-    lv_obj_add_flag(root_, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_x(panel_, -panelWidth_);
-    lv_obj_set_style_bg_opa(scrim_, LV_OPA_TRANSP, LV_PART_MAIN);
+    hideNow();
 }
 
 void MenuPanel::show() {
@@ -141,7 +166,8 @@ void MenuPanel::show() {
 
     controller_.refresh();
     clearTaps();
-    slideIn();
+    visible_ = true;
+    lv_obj_remove_flag(root_, LV_OBJ_FLAG_HIDDEN);
     renderAll();
 }
 
@@ -202,43 +228,93 @@ void MenuPanel::setMotionActive(bool active) {
     stopButtonFeedback_.setMotionActive(active);
 }
 
-void MenuPanel::buildPanel(std::int32_t height) {
-    panelWidth_ = kPanelWidth;
+void MenuPanel::buildPanel(std::int32_t buttonBarTop) {
+    const std::int32_t screenHeight = lv_display_get_vertical_resolution(nullptr);
+    const std::int32_t maxHeight = buttonBarTop - 2 * kPanelMargin;
+    const lv_style_selector_t mainStyle = LV_PART_MAIN;
+
+    // Fits its tiles and grows upwards from just above the button bar; starts off screen.
     panel_ = createPlainObject(root_);
-    lv_obj_set_pos(panel_, -panelWidth_, 0);
-    lv_obj_set_size(panel_, panelWidth_, height);
-    lv_obj_set_style_bg_color(panel_, themeColor(COLOR_ID_BACKGROUND), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(panel_, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_color(panel_, themeColor(COLOR_ID_BORDER), LV_PART_MAIN);
-    lv_obj_set_style_border_opa(panel_, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(panel_, 1, LV_PART_MAIN);
-    lv_obj_set_style_border_side(
-        panel_,
-        static_cast<lv_border_side_t>(LV_BORDER_SIDE_RIGHT | LV_BORDER_SIDE_BOTTOM),
-        LV_PART_MAIN);
-    // The bottom border takes one pixel from the list.
-    buildPageView(panelPage_, panel_, height - kTitleHeight - 1);
+    lv_obj_set_size(panel_, kPanelWidth, LV_SIZE_CONTENT);
+    lv_obj_set_style_max_height(panel_, maxHeight, mainStyle);
+    lv_obj_align(
+        panel_, LV_ALIGN_BOTTOM_LEFT, -kPanelWidth, -(screenHeight - buttonBarTop + kPanelMargin));
+    lv_obj_set_style_bg_color(panel_, themeColor(COLOR_ID_BACKGROUND), mainStyle);
+    lv_obj_set_style_bg_opa(panel_, kPanelOpacity, mainStyle);
+    lv_obj_set_style_border_color(panel_, themeColor(COLOR_ID_BORDER), mainStyle);
+    lv_obj_set_style_border_opa(panel_, LV_OPA_COVER, mainStyle);
+    lv_obj_set_style_border_width(panel_, 1, mainStyle);
+    lv_obj_set_style_radius(panel_, kPanelRadius, mainStyle);
+
+    panelPage_.tiles = true;
+    panelPage_.container = createScrollArea(panel_);
+    lv_obj_set_size(panelPage_.container, lv_pct(100), LV_SIZE_CONTENT);
+    // Inside the panel border.
+    lv_obj_set_style_max_height(panelPage_.container, maxHeight - 2, mainStyle);
+    styleMenuTileGrid(panelPage_.container);
+}
+
+void MenuPanel::buildScreen(std::int32_t buttonBarTop) {
+    const lv_style_selector_t mainStyle = LV_PART_MAIN;
+
+    screen_ = createPlainObject(root_);
+    lv_obj_set_size(screen_, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_bg_color(screen_, themeColor(COLOR_ID_BACKGROUND), mainStyle);
+    lv_obj_set_style_bg_opa(screen_, LV_OPA_COVER, mainStyle);
+    lv_obj_add_flag(screen_, LV_OBJ_FLAG_HIDDEN);
+
+    screenPage_.container = createScrollArea(screen_);
+    lv_obj_set_pos(screenPage_.container, 0, 0);
+    lv_obj_set_size(screenPage_.container, lv_pct(100), buttonBarTop - kScreenListBarGap);
+    addSharedListStyles(screenPage_.container);
+    lv_obj_set_style_pad_left(screenPage_.container, kScreenListPadX, mainStyle);
+    lv_obj_set_style_pad_right(screenPage_.container, kScreenListPadX, mainStyle);
+    lv_obj_set_style_pad_top(screenPage_.container, kScreenListPadTop, mainStyle);
 }
 
 void MenuPanel::buildPopup() {
+    const lv_style_selector_t mainStyle = LV_PART_MAIN;
+    const lv_font_t* titleFont = &lv_font_montserrat_14;
+
     popupScrim_ = createPlainObject(root_);
     lv_obj_set_size(popupScrim_, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_bg_color(popupScrim_, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(popupScrim_, kScrimOpacity, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(popupScrim_, lv_color_black(), mainStyle);
+    lv_obj_set_style_bg_opa(popupScrim_, kPopupScrimOpacity, mainStyle);
     lv_obj_add_event_cb(popupScrim_, handleBackEvent, LV_EVENT_CLICKED, this);
     lv_obj_add_flag(popupScrim_, LV_OBJ_FLAG_HIDDEN);
 
     popup_ = createPlainObject(popupScrim_);
     lv_obj_set_width(popup_, kPopupWidth);
     lv_obj_align(popup_, LV_ALIGN_CENTER, 0, kPopupOffsetY);
-    lv_obj_set_style_bg_color(popup_, themeColor(COLOR_ID_SURFACE), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(popup_, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_color(popup_, themeColor(COLOR_ID_BORDER), LV_PART_MAIN);
-    lv_obj_set_style_border_opa(popup_, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(popup_, kPopupBorderWidth, LV_PART_MAIN);
-    lv_obj_set_style_radius(popup_, 8, LV_PART_MAIN);
-    lv_obj_set_style_clip_corner(popup_, true, LV_PART_MAIN);
-    buildPageView(popupPage_, popup_, 0);
+    lv_obj_set_style_bg_color(popup_, themeColor(COLOR_ID_SURFACE), mainStyle);
+    lv_obj_set_style_bg_opa(popup_, LV_OPA_COVER, mainStyle);
+    lv_obj_set_style_border_color(popup_, themeColor(COLOR_ID_BORDER), mainStyle);
+    lv_obj_set_style_border_opa(popup_, LV_OPA_COVER, mainStyle);
+    lv_obj_set_style_border_width(popup_, kPopupBorderWidth, mainStyle);
+    lv_obj_set_style_radius(popup_, 8, mainStyle);
+    lv_obj_set_style_clip_corner(popup_, true, mainStyle);
+
+    // Uppercase label in the style of the value captions on the control screen.
+    lv_obj_t* title = lv_label_create(popup_);
+    popupPage_.title = title;
+    lv_obj_set_pos(title, 0, 0);
+    lv_obj_set_size(title, lv_pct(100), kTitleHeight);
+    lv_obj_set_style_text_font(title, titleFont, mainStyle);
+    lv_obj_set_style_text_color(title, themeColor(COLOR_ID_TEXT_SECONDARY), mainStyle);
+    lv_obj_set_style_pad_left(title, kTitlePadX, mainStyle);
+    lv_obj_set_style_pad_right(title, kTitlePadX, mainStyle);
+    lv_obj_set_style_pad_top(
+        title, (kTitleHeight - 1 - lv_font_get_line_height(titleFont)) / 2, mainStyle);
+    lv_obj_set_style_border_color(title, themeColor(COLOR_ID_BORDER), mainStyle);
+    lv_obj_set_style_border_opa(title, LV_OPA_COVER, mainStyle);
+    lv_obj_set_style_border_width(title, 1, mainStyle);
+    lv_obj_set_style_border_side(title, LV_BORDER_SIDE_BOTTOM, mainStyle);
+    lv_label_set_text_static(title, popupPage_.titleText);
+
+    popupPage_.container = createScrollArea(popup_);
+    lv_obj_set_pos(popupPage_.container, 0, kTitleHeight);
+    lv_obj_set_width(popupPage_.container, lv_pct(100));
+    addSharedListStyles(popupPage_.container);
 }
 
 void MenuPanel::buildButtonBar() {
@@ -280,34 +356,6 @@ void MenuPanel::buildSaveFailureLabel() {
     lv_obj_add_flag(saveFailureLabel_, LV_OBJ_FLAG_HIDDEN);
 }
 
-void MenuPanel::buildPageView(PageView& view, lv_obj_t* parent, std::int32_t listHeight) {
-    const lv_style_selector_t mainStyle = LV_PART_MAIN;
-    const lv_font_t* titleFont = &lv_font_montserrat_14;
-
-    // Uppercase label in the style of the value captions on the control screen.
-    view.title = lv_label_create(parent);
-    lv_obj_set_pos(view.title, 0, 0);
-    lv_obj_set_size(view.title, lv_pct(100), kTitleHeight);
-    lv_obj_set_style_text_font(view.title, titleFont, mainStyle);
-    lv_obj_set_style_text_color(view.title, themeColor(COLOR_ID_TEXT_SECONDARY), mainStyle);
-    lv_obj_set_style_pad_left(view.title, kTitlePadX, mainStyle);
-    lv_obj_set_style_pad_right(view.title, kTitlePadX, mainStyle);
-    lv_obj_set_style_pad_top(
-        view.title, (kTitleHeight - 1 - lv_font_get_line_height(titleFont)) / 2, mainStyle);
-    lv_obj_set_style_border_color(view.title, themeColor(COLOR_ID_BORDER), mainStyle);
-    lv_obj_set_style_border_opa(view.title, LV_OPA_COVER, mainStyle);
-    lv_obj_set_style_border_width(view.title, 1, mainStyle);
-    lv_obj_set_style_border_side(view.title, LV_BORDER_SIDE_BOTTOM, mainStyle);
-    lv_label_set_text_static(view.title, view.titleText);
-
-    view.list = createPlainObject(parent);
-    lv_obj_add_flag(view.list, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scroll_dir(view.list, LV_DIR_VER);
-    lv_obj_set_pos(view.list, 0, kTitleHeight);
-    lv_obj_set_size(view.list, lv_pct(100), listHeight);
-    addSharedListStyles(view.list);
-}
-
 void MenuPanel::clearTaps() {
     tappedRow_ = MenuPage::kNoItem;
     backTapped_ = false;
@@ -317,25 +365,35 @@ void MenuPanel::clearTaps() {
 
 void MenuPanel::slideIn() {
     lv_anim_delete(panel_, setPanelX);
-    lv_anim_delete(scrim_, setScrimOpacity);
-    visible_ = true;
-    lv_obj_remove_flag(root_, LV_OBJ_FLAG_HIDDEN);
-    animate(panel_, setPanelX, lv_obj_get_style_x(panel_, LV_PART_MAIN), 0);
-    animate(scrim_, setScrimOpacity, lv_obj_get_style_bg_opa(scrim_, LV_PART_MAIN), kScrimOpacity);
+    panelIn_ = true;
+    animate(panel_, setPanelX, lv_obj_get_style_x(panel_, LV_PART_MAIN), kPanelMargin);
 }
 
 void MenuPanel::slideOut() {
     lv_anim_delete(panel_, setPanelX);
-    lv_anim_delete(scrim_, setScrimOpacity);
-    visible_ = false;
+    panelIn_ = false;
     animate(
         panel_,
         setPanelX,
         lv_obj_get_style_x(panel_, LV_PART_MAIN),
-        -panelWidth_,
+        -kPanelWidth,
         handleSlideOutCompleted,
         this);
-    animate(scrim_, setScrimOpacity, lv_obj_get_style_bg_opa(scrim_, LV_PART_MAIN), LV_OPA_TRANSP);
+}
+
+void MenuPanel::movePanelIn() {
+    lv_anim_delete(panel_, setPanelX);
+    panelIn_ = true;
+    lv_obj_set_x(panel_, kPanelMargin);
+}
+
+void MenuPanel::hideNow() {
+    lv_anim_delete(panel_, setPanelX);
+    panelIn_ = false;
+    lv_obj_set_x(panel_, -kPanelWidth);
+    lv_obj_add_flag(screen_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(popupScrim_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(root_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void MenuPanel::renderAll() {
@@ -350,9 +408,32 @@ void MenuPanel::render(const MenuChanges& changes) {
     }
 
     const std::size_t top = controller_.depth() - 1;
-    const std::size_t base = panelLevel();
+    const std::size_t base = baseLevel();
     if (changes.pages) {
-        showPage(panelPage_, base);
+        // The quick actions stay in the panel while a full-screen page covers them.
+        const bool screenShown = !drawsTiles(base);
+        const std::size_t panelLevel = screenShown ? 0 : base;
+        const bool panelShown = drawsTiles(panelLevel);
+        if (panelShown) {
+            showPage(panelPage_, panelLevel);
+        }
+        if (screenShown) {
+            showPage(screenPage_, base);
+        }
+        setHidden(screen_, !screenShown);
+
+        if (panelShown && !panelIn_) {
+            if (screenShown) {
+                movePanelIn();
+            } else {
+                slideIn();
+            }
+        } else if (!panelShown && panelIn_) {
+            lv_anim_delete(panel_, setPanelX);
+            panelIn_ = false;
+            lv_obj_set_x(panel_, -kPanelWidth);
+        }
+
         // A popup opened from a popup replaces it rather than stacking.
         if (top != base) {
             showPage(popupPage_, top);
@@ -363,12 +444,12 @@ void MenuPanel::render(const MenuChanges& changes) {
         }
     } else {
         if (changes.highlight) {
-            updateHighlight(top == base ? panelPage_ : popupPage_, top);
+            updateHighlight(top);
         }
         if (changes.values) {
-            updateValues(base);
+            updateValues(top);
             if (top != base) {
-                updateValues(top);
+                updateValues(base);
             }
         }
     }
@@ -379,7 +460,7 @@ void MenuPanel::render(const MenuChanges& changes) {
     }
 }
 
-std::size_t MenuPanel::panelLevel() const {
+std::size_t MenuPanel::baseLevel() const {
     std::size_t level = controller_.depth() - 1;
     while (level > 0 && controller_.isPopup(level)) {
         --level;
@@ -387,58 +468,74 @@ std::size_t MenuPanel::panelLevel() const {
     return level;
 }
 
+bool MenuPanel::drawsTiles(std::size_t level) const {
+    return !controller_.isPopup(level) &&
+           controller_.page(level).layout() == MenuPage::Layout::Tiles;
+}
+
+MenuPanel::PageView& MenuPanel::pageView(std::size_t level) {
+    if (level > baseLevel()) {
+        return popupPage_;
+    }
+    return drawsTiles(level) ? panelPage_ : screenPage_;
+}
+
 void MenuPanel::showPage(PageView& view, std::size_t level) {
     MenuPage& page = controller_.page(level);
-    setTitle(view, page.title());
+    if (view.title != nullptr) {
+        setTitle(view, page.title());
+    }
 
-    for (std::size_t index = 0; index < rowCount_; ++index) {
-        if (rows_[index].list == view.list) {
-            lv_obj_add_flag(rows_[index].row, LV_OBJ_FLAG_HIDDEN);
+    for (std::size_t index = 0; index < viewCount_; ++index) {
+        if (views_[index].container == view.container) {
+            lv_obj_add_flag(views_[index].root, LV_OBJ_FLAG_HIDDEN);
         }
     }
 
     for (std::size_t index = 0; index < page.count(); ++index) {
-        RowView* row = rowFor(page.item(index), view.list);
-        if (row == nullptr) {
+        MenuItemView* itemView = viewFor(page.item(index), view.container, view.tiles);
+        if (itemView == nullptr) {
             break;
         }
-        lv_obj_move_to_index(row->row, static_cast<std::int32_t>(index));
-        lv_obj_remove_flag(row->row, LV_OBJ_FLAG_HIDDEN);
-        refreshRow(*row);
+        lv_obj_move_to_index(itemView->root, static_cast<std::int32_t>(index));
+        lv_obj_remove_flag(itemView->root, LV_OBJ_FLAG_HIDDEN);
+        refreshMenuItemView(*itemView);
     }
 
-    updateHighlight(view, level);
+    updateHighlight(level);
 }
 
-void MenuPanel::updateHighlight(PageView& view, std::size_t level) {
+void MenuPanel::updateHighlight(std::size_t level) {
+    const PageView& view = pageView(level);
     const MenuPage& page = controller_.page(level);
     const std::size_t highlight = controller_.highlight(level);
     lv_obj_t* highlighted = nullptr;
     for (std::size_t index = 0; index < page.count(); ++index) {
-        RowView* row = findRow(page.item(index));
-        if (row == nullptr) {
+        const MenuItemView* itemView = findView(page.item(index), view.tiles);
+        if (itemView == nullptr) {
             continue;
         }
         const bool selected = index == highlight;
-        setListRowSelected(row->row, selected);
+        setMenuItemViewSelected(*itemView, selected);
         if (selected) {
-            highlighted = row->row;
+            highlighted = itemView->root;
         }
     }
 
     if (highlighted != nullptr) {
         lv_obj_scroll_to_view(highlighted, LV_ANIM_OFF);
     } else {
-        lv_obj_scroll_to_y(view.list, 0, LV_ANIM_OFF);
+        lv_obj_scroll_to_y(view.container, 0, LV_ANIM_OFF);
     }
 }
 
 void MenuPanel::updateValues(std::size_t level) {
+    const PageView& view = pageView(level);
     const MenuPage& page = controller_.page(level);
     for (std::size_t index = 0; index < page.count(); ++index) {
-        const RowView* row = findRow(page.item(index));
-        if (row != nullptr) {
-            refreshRow(*row);
+        const MenuItemView* itemView = findView(page.item(index), view.tiles);
+        if (itemView != nullptr) {
+            refreshMenuItemView(*itemView);
         }
     }
 }
@@ -458,7 +555,7 @@ void MenuPanel::updateButtonBar() {
 void MenuPanel::resizePopup(std::size_t rowCount) {
     const std::size_t visibleRows = std::min(rowCount, kMaxVisiblePopupRows);
     const std::int32_t listHeight = static_cast<std::int32_t>(visibleRows) * listRowHeight();
-    lv_obj_set_height(popupPage_.list, listHeight);
+    lv_obj_set_height(popupPage_.container, listHeight);
     lv_obj_set_height(popup_, kTitleHeight + listHeight + 2 * kPopupBorderWidth);
 }
 
@@ -481,111 +578,59 @@ void MenuPanel::setTitle(PageView& view, const char* title) {
     lv_label_set_text_static(view.title, view.titleText);
 }
 
-MenuPanel::RowView* MenuPanel::rowFor(MenuItem& item, lv_obj_t* list) {
-    RowView* existing = findRow(item);
+MenuItemView* MenuPanel::viewFor(MenuItem& item, lv_obj_t* container, bool tile) {
+    MenuItemView* existing = findView(item, tile);
     if (existing != nullptr) {
-        if (existing->list != list) {
-            lv_obj_set_parent(existing->row, list);
-            existing->list = list;
+        // List rows move between the full-screen page and the popup.
+        if (existing->container != container) {
+            lv_obj_set_parent(existing->root, container);
+            existing->container = container;
         }
         return existing;
     }
 
-    if (rowCount_ >= rows_.size()) {
-        LOGW(kTag, "No room for menu row %s", item.name());
+    if (viewCount_ >= views_.size()) {
+        LOGW(kTag, "No room for menu item %s", item.name());
         return nullptr;
     }
 
-    RowView& row = rows_[rowCount_++];
-    row.item = &item;
-    row.list = list;
-    createRow(row);
-    return &row;
+    MenuItemView& view = views_[viewCount_++];
+    view.item = &item;
+    if (tile) {
+        // The grid fills the panel inside its border.
+        createMenuTile(view, container, menuTileWidth(kPanelWidth - 2));
+    } else {
+        createMenuRow(view, container);
+    }
+    lv_obj_add_event_cb(view.root, handleViewEvent, LV_EVENT_CLICKED, this);
+    return &view;
 }
 
-MenuPanel::RowView* MenuPanel::findRow(const MenuItem& item) {
-    for (std::size_t index = 0; index < rowCount_; ++index) {
-        if (rows_[index].item == &item) {
-            return &rows_[index];
+MenuItemView* MenuPanel::findView(const MenuItem& item, bool tile) {
+    for (std::size_t index = 0; index < viewCount_; ++index) {
+        if (views_[index].item == &item && views_[index].tile == tile) {
+            return &views_[index];
         }
     }
     return nullptr;
 }
 
-void MenuPanel::createRow(RowView& view) {
-    view.row = createPlainObject(view.list);
-    addSharedListRowStyles(view.row);
-    lv_obj_add_event_cb(view.row, handleRowEvent, LV_EVENT_CLICKED, this);
-
-    view.name = lv_label_create(view.row);
-    addSharedListRowNameStyles(view.name);
-    lv_label_set_long_mode(view.name, LV_LABEL_LONG_MODE_DOTS);
-
-    const MenuItem& item = *view.item;
-    if (item.kind() == MenuItemKind::Choice &&
-        static_cast<const MenuChoiceItem&>(item).showsLevel()) {
-        view.level = lv_bar_create(view.row);
-        lv_obj_remove_style_all(view.level);
-        addSharedListRowLevelStyles(view.level);
-        // Taps on the bar select the row.
-        lv_obj_remove_flag(view.level, LV_OBJ_FLAG_CLICKABLE);
-        return;
-    }
-
-    view.value = lv_label_create(view.row);
-    addSharedListRowValueStyles(view.value, item.kind() == MenuItemKind::Option);
-}
-
-void MenuPanel::handleRowClicked(lv_obj_t* row) {
+void MenuPanel::handleViewClicked(lv_obj_t* root) {
     if (!controller_.isOpen()) {
         return;
     }
 
     const MenuPage& page = controller_.page(controller_.depth() - 1);
-    for (std::size_t index = 0; index < rowCount_; ++index) {
-        if (rows_[index].row == row) {
-            tappedRow_ = page.indexOf(*rows_[index].item);
+    for (std::size_t index = 0; index < viewCount_; ++index) {
+        if (views_[index].root == root) {
+            tappedRow_ = page.indexOf(*views_[index].item);
             return;
         }
     }
 }
 
-void MenuPanel::refreshRow(const RowView& view) {
-    const MenuItem& item = *view.item;
-    lv_label_set_text_static(view.name, item.name());
-
-    if (view.level != nullptr) {
-        const auto& choice = static_cast<const MenuChoiceItem&>(item);
-        const std::size_t count = choice.optionCount();
-        const std::size_t option = choice.displayedOption();
-        // The lowest option still shows one step, like the first bar of a signal meter.
-        lv_bar_set_range(view.level, 0, static_cast<std::int32_t>(count));
-        lv_bar_set_value(
-            view.level, option < count ? static_cast<std::int32_t>(option) + 1 : 0, LV_ANIM_OFF);
-        return;
-    }
-
-    if (item.kind() == MenuItemKind::Option) {
-        // Marks the stored option; the highlight shows where the cursor is.
-        lv_label_set_text_static(view.value, LV_SYMBOL_OK);
-        if (static_cast<const MenuOptionItem&>(item).stored()) {
-            lv_obj_remove_flag(view.value, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(view.value, LV_OBJ_FLAG_HIDDEN);
-        }
-        return;
-    }
-
-    lv_label_set_text_static(view.value, item.showsChevron() ? LV_SYMBOL_RIGHT : item.valueText());
-}
-
 void MenuPanel::setPanelX(void* panel, std::int32_t x) {
     lv_obj_set_x(static_cast<lv_obj_t*>(panel), x);
-}
-
-void MenuPanel::setScrimOpacity(void* scrim, std::int32_t opacity) {
-    lv_obj_set_style_bg_opa(
-        static_cast<lv_obj_t*>(scrim), static_cast<lv_opa_t>(opacity), LV_PART_MAIN);
 }
 
 void MenuPanel::handleSlideOutCompleted(lv_anim_t* animation) {
@@ -593,9 +638,9 @@ void MenuPanel::handleSlideOutCompleted(lv_anim_t* animation) {
     lv_obj_add_flag(panel->root_, LV_OBJ_FLAG_HIDDEN);
 }
 
-void MenuPanel::handleRowEvent(lv_event_t* event) {
+void MenuPanel::handleViewEvent(lv_event_t* event) {
     auto* panel = static_cast<MenuPanel*>(lv_event_get_user_data(event));
-    panel->handleRowClicked(static_cast<lv_obj_t*>(lv_event_get_current_target(event)));
+    panel->handleViewClicked(static_cast<lv_obj_t*>(lv_event_get_current_target(event)));
 }
 
 void MenuPanel::handleBackEvent(lv_event_t* event) {
@@ -606,7 +651,7 @@ void MenuPanel::handleSelectEvent(lv_event_t* event) {
     static_cast<MenuPanel*>(lv_event_get_user_data(event))->selectTapped_ = true;
 }
 
-void MenuPanel::handleScrimEvent(lv_event_t* event) {
+void MenuPanel::handleCloseEvent(lv_event_t* event) {
     static_cast<MenuPanel*>(lv_event_get_user_data(event))->closeTapped_ = true;
 }
 

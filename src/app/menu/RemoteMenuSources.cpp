@@ -1,6 +1,7 @@
-#include "RemoteSettingsSource.h"
+#include "RemoteMenuSources.h"
 
 #include <Arduino.h>
+#include <lvgl.h>
 
 #include <cstdint>
 
@@ -81,51 +82,63 @@ void RemoteSettingsSource::addItems(MenuPage& page) {
     page.add(diagnostics_);
 }
 
-RemoteSettingsSource::BrightnessItem::BrightnessItem(
-    SettingsStore& settings, BacklightController& backlight)
-    : SettingChoiceItem("remote.brightness", "Brightness", settings, kBrightnessSetting),
-      backlight_(backlight) {}
+RemoteQuickActionsSource::RemoteQuickActionsSource(
+    SettingsStore& settings, BacklightController& backlight, MenuPage& settingsPage)
+    : brightness_(settings, backlight), settings_("remote.settings", "Settings", settingsPage) {
+    settings_.setIcon(LV_SYMBOL_SETTINGS);
+}
 
-void RemoteSettingsSource::BrightnessItem::previewOption(std::size_t index) {
+void RemoteQuickActionsSource::addItems(MenuPage& page) {
+    page.add(brightness_);
+    page.add(settings_);
+}
+
+BrightnessItem::BrightnessItem(SettingsStore& settings, BacklightController& backlight)
+    : SettingChoiceItem("remote.brightness", "Brightness", settings, kBrightnessSetting),
+      backlight_(backlight) {
+    setIcon(LV_SYMBOL_EYE_OPEN);
+}
+
+void BrightnessItem::previewOption(std::size_t index) {
     backlight_.setBrightnessLevel(optionValue(index));
 }
 
-void RemoteSettingsSource::BrightnessItem::cancelPreview() {
+void BrightnessItem::cancelPreview() {
     backlight_.setBrightnessLevel(storedValue());
 }
 
-bool RemoteSettingsSource::BrightnessItem::showsLevel() const {
+bool BrightnessItem::showsLevel() const {
     return true;
 }
 
-void RemoteSettingsSource::BrightnessItem::applied(BrightnessLevel level) {
+void BrightnessItem::applied(BrightnessLevel level) {
     backlight_.setBrightnessLevel(level);
 }
 
-RemoteSettingsSource::IdleDimItem::IdleDimItem(
+IdleDimItem::IdleDimItem(
     SettingsStore& settings, BacklightController& backlight, IdleTimer& idleTimer)
     : SettingChoiceItem("remote.dim", "Dim", settings, kIdleDimSetting), backlight_(backlight),
       idleTimer_(idleTimer) {}
 
-void RemoteSettingsSource::IdleDimItem::applied(IdleDimTimeout timeout) {
+void IdleDimItem::applied(IdleDimTimeout timeout) {
     backlight_.setIdleDimTimeoutSeconds(static_cast<std::uint32_t>(timeout));
     idleTimer_.reset(millis());
 }
 
-RemoteSettingsSource::IdlePowerOffItem::IdlePowerOffItem(
+IdlePowerOffItem::IdlePowerOffItem(
     SettingsStore& settings, AutoPowerOffController& autoPowerOff, IdleTimer& idleTimer)
     : SettingChoiceItem("remote.poweroff", "Power off", settings, kIdlePowerOffSetting),
       autoPowerOff_(autoPowerOff), idleTimer_(idleTimer) {}
 
-void RemoteSettingsSource::IdlePowerOffItem::applied(IdlePowerOffTimeout timeout) {
+void IdlePowerOffItem::applied(IdlePowerOffTimeout timeout) {
     autoPowerOff_.setTimeoutSeconds(static_cast<std::uint32_t>(timeout));
     idleTimer_.reset(millis());
 }
 
-RemoteSettingsSource::TouchscreenItem::TouchscreenItem(SettingsStore& settings)
+TouchscreenItem::TouchscreenItem(SettingsStore& settings)
     : SettingChoiceItem("remote.touchscreen", "Touchscreen", settings, kTouchscreenSetting) {}
 
-void RemoteSettingsSource::TouchscreenItem::applied(bool enabled) {
+void TouchscreenItem::applied(bool enabled) {
     lvgl_port::setTouchscreenEnabled(enabled);
 }
 

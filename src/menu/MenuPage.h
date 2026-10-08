@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 
 #include "MenuItem.h"
 #include "MenuItems.h"
@@ -25,12 +26,20 @@ class MenuPage {
     static constexpr std::size_t kMaxSources = 4;
     static constexpr std::size_t kNoItem = static_cast<std::size_t>(-1);
 
-    explicit MenuPage(const char* title);
+    enum class Layout : std::uint8_t {
+        // Rows with the value on the right, for settings.
+        List,
+        // A grid of tiles that stand out at a glance, for quick actions.
+        Tiles,
+    };
+
+    explicit MenuPage(const char* title, Layout layout = Layout::List);
     MenuPage(const MenuPage&) = delete;
     MenuPage& operator=(const MenuPage&) = delete;
     virtual ~MenuPage() = default;
 
     virtual const char* title() const;
+    Layout layout() const;
     // Sources are registered once at startup and add their rows in registration order.
     bool addSource(MenuSource& source);
     // Rebuilds the rows from the sources.
@@ -52,6 +61,7 @@ class MenuPage {
 
   private:
     const char* title_;
+    Layout layout_;
     std::array<MenuItem*, kMaxItems> items_{};
     std::size_t count_ = 0;
     std::array<MenuSource*, kMaxSources> sources_{};

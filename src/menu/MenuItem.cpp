@@ -30,11 +30,31 @@ const char* MenuItem::name() const {
     return name_;
 }
 
+const char* MenuItem::shortName() const {
+    return shortName_ != nullptr ? shortName_ : name();
+}
+
+void MenuItem::setShortName(const char* shortName) {
+    shortName_ = shortName;
+}
+
 const char* MenuItem::valueText() const {
     return "";
 }
 
 bool MenuItem::showsChevron() const {
+    return false;
+}
+
+const char* MenuItem::icon() const {
+    return icon_;
+}
+
+void MenuItem::setIcon(const char* icon) {
+    icon_ = icon;
+}
+
+bool MenuItem::wideTile() const {
     return false;
 }
 

@@ -36,6 +36,10 @@ bool MenuLinkItem::showsChevron() const {
     return true;
 }
 
+bool MenuLinkItem::wideTile() const {
+    return true;
+}
+
 const char* MenuLinkItem::selectLabel() const {
     return "Open";
 }
@@ -59,8 +63,16 @@ std::size_t MenuChoiceItem::displayedOption() const {
     return pendingOption_ != kNoOption ? pendingOption_ : storedOption();
 }
 
+bool MenuChoiceItem::toggledOn() const {
+    return optionCount() == 2 && displayedOption() == 1;
+}
+
 MenuItemKind MenuChoiceItem::kind() const {
     return MenuItemKind::Choice;
+}
+
+bool MenuChoiceItem::wideTile() const {
+    return showsLevel();
 }
 
 const char* MenuChoiceItem::valueText() const {

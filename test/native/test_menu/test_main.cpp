@@ -582,6 +582,44 @@ void test_step_index_starts_at_either_end_without_a_current_index() {
     TEST_ASSERT_TRUE(stepMenuIndex(none, 0, 1) == none);
 }
 
+void test_tile_hints_follow_the_kind_of_row() {
+    class LevelChoice : public FakeChoice {
+      public:
+        using FakeChoice::FakeChoice;
+
+        bool showsLevel() const override {
+            return true;
+        }
+    };
+
+    MenuPage quickActions("Quick actions", MenuPage::Layout::Tiles);
+    MenuPage settings("Settings");
+    TEST_ASSERT_TRUE(quickActions.layout() == MenuPage::Layout::Tiles);
+    TEST_ASSERT_TRUE(settings.layout() == MenuPage::Layout::List);
+
+    MenuLinkItem settingsLink("settings", "Settings", settings);
+    MenuCommandItem pause("pause", "Pause", 1);
+    FakeChoice depthMode("Depth mode", {"Stroke / Depth", "Min / Max"}, 0);
+    LevelChoice brightness("Brightness", fourOptions(), 1);
+    TEST_ASSERT_TRUE(settingsLink.wideTile());
+    TEST_ASSERT_FALSE(pause.wideTile());
+    TEST_ASSERT_FALSE(depthMode.wideTile());
+    TEST_ASSERT_TRUE(brightness.wideTile());
+
+    TEST_ASSERT_EQUAL_STRING("Pause", pause.shortName());
+    depthMode.setShortName("Depth");
+    TEST_ASSERT_EQUAL_STRING("Depth", depthMode.shortName());
+    TEST_ASSERT_EQUAL_STRING("Depth mode", depthMode.name());
+    TEST_ASSERT_EQUAL_STRING("", pause.icon());
+    pause.setIcon("P");
+    TEST_ASSERT_EQUAL_STRING("P", pause.icon());
+
+    TEST_ASSERT_FALSE(depthMode.toggledOn());
+    depthMode.adjust(0, 1);
+    TEST_ASSERT_TRUE(depthMode.toggledOn());
+    TEST_ASSERT_FALSE(brightness.toggledOn());
+}
+
 }  // namespace
 
 void setUp() {}
@@ -611,5 +649,6 @@ int main() {
     RUN_TEST(test_refresh_closes_pages_opened_from_a_row_that_went_away);
     RUN_TEST(test_sources_add_rows_in_registration_order_up_to_the_capacity);
     RUN_TEST(test_step_index_starts_at_either_end_without_a_current_index);
+    RUN_TEST(test_tile_hints_follow_the_kind_of_row);
     return UNITY_END();
 }

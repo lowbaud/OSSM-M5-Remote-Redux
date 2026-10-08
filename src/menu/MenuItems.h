@@ -39,6 +39,7 @@ class MenuLinkItem : public MenuItem {
 
     MenuItemKind kind() const override;
     bool showsChevron() const override;
+    bool wideTile() const override;
     const char* selectLabel() const override;
     MenuResult activate() override;
 
@@ -76,8 +77,12 @@ class MenuChoiceItem : public MenuItem {
 
     // The inline adjustment while one is pending, otherwise the stored option.
     std::size_t displayedOption() const;
+    // Two-option choices count as switched on while their second option shows, e.g. Min / Max.
+    bool toggledOn() const;
 
     MenuItemKind kind() const override;
+    // Level bars take a whole line.
+    bool wideTile() const override;
     const char* valueText() const override;
     const char* selectLabel() const override;
     bool adjust(std::size_t knob, std::int32_t steps) override;
