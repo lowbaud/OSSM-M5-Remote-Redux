@@ -91,6 +91,8 @@ class MenuItem {
     virtual MenuItemKind kind() const = 0;
     // Shown on the right side of the row; empty when the row has no value.
     virtual const char* valueText() const;
+    // Marks rows that open another page or screen.
+    virtual bool showsChevron() const;
     // Label of the select button while the row is highlighted.
     virtual const char* selectLabel() const;
     // A page never starts on a destructive row, so a quick select cannot trigger it by accident.

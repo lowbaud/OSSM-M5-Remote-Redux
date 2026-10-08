@@ -85,7 +85,16 @@ MenuEvent MenuController::update(const MenuInput& input) {
         }
     }
 
-    if (input.select) {
+    bool select = input.select;
+    const Frame& top = frames_[depth_ - 1];
+    if (input.tappedRow < top.page->count()) {
+        if (input.tappedRow != top.highlight) {
+            setHighlight(input.tappedRow);
+        }
+        select = true;
+    }
+
+    if (select) {
         MenuItem* item = highlightedItem();
         if (item != nullptr) {
             const MenuEvent event = apply(item->activate());

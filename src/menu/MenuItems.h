@@ -10,22 +10,26 @@ namespace m5_redux {
 // Hands a command to the host, e.g. to open the diagnostics screen or disconnect.
 class MenuCommandItem : public MenuItem {
   public:
+    enum class Style : std::uint8_t {
+        Plain,
+        // Shows a chevron and selects with "Open".
+        OpensScreen,
+        // Acts at once, e.g. Disconnect, so a page never starts on it.
+        Destructive,
+    };
+
     MenuCommandItem(
-        const char* id,
-        const char* name,
-        MenuCommand command,
-        const char* selectLabel = "Select",
-        bool destructive = false);
+        const char* id, const char* name, MenuCommand command, Style style = Style::Plain);
 
     MenuItemKind kind() const override;
+    bool showsChevron() const override;
     const char* selectLabel() const override;
     bool destructive() const override;
     MenuResult activate() override;
 
   private:
     MenuCommand command_;
-    const char* selectLabel_;
-    bool destructive_;
+    Style style_;
 };
 
 // Opens another page, e.g. Settings from the quick actions.
@@ -34,6 +38,7 @@ class MenuLinkItem : public MenuItem {
     MenuLinkItem(const char* id, const char* name, MenuPage& page);
 
     MenuItemKind kind() const override;
+    bool showsChevron() const override;
     const char* selectLabel() const override;
     MenuResult activate() override;
 
@@ -66,6 +71,8 @@ class MenuChoiceItem : public MenuItem {
     virtual void previewOption(std::size_t index);
     // Undoes previewOption() by applying the stored option again.
     virtual void cancelPreview();
+    // Draws the options as a level bar instead of the option name, e.g. for brightness.
+    virtual bool showsLevel() const;
 
     // The inline adjustment while one is pending, otherwise the stored option.
     std::size_t displayedOption() const;

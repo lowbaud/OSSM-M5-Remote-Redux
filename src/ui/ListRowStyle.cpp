@@ -13,7 +13,102 @@ constexpr std::int32_t kRowPadY = 6;
 constexpr std::int32_t kAccentWidth = 4;
 constexpr std::int32_t kScrollbarWidth = 3;
 constexpr std::int32_t kScrollbarEdgeGap = 2;
+constexpr std::int32_t kRowColumnGap = 8;
+constexpr std::int32_t kLevelWidth = 72;
+constexpr std::int32_t kLevelHeight = 8;
 const lv_font_t* const kRowFont = &lv_font_montserrat_16;
+
+struct SharedStyles {
+    lv_style_t list;
+    lv_style_t scrollbar;
+    lv_style_t row;
+    lv_style_t rowSelected;
+    lv_style_t name;
+    lv_style_t value;
+    lv_style_t valueSelected;
+    lv_style_t accentValue;
+    lv_style_t level;
+    lv_style_t levelIndicator;
+};
+
+void initSharedStyles(SharedStyles& styles) {
+    lv_style_init(&styles.list);
+    lv_style_set_pad_all(&styles.list, 0);
+    lv_style_set_pad_row(&styles.list, 0);
+    lv_style_set_layout(&styles.list, LV_LAYOUT_FLEX);
+    lv_style_set_flex_flow(&styles.list, LV_FLEX_FLOW_COLUMN);
+
+    lv_style_init(&styles.scrollbar);
+    lv_style_set_width(&styles.scrollbar, kScrollbarWidth);
+    lv_style_set_pad_right(&styles.scrollbar, kScrollbarEdgeGap);
+    lv_style_set_bg_color(&styles.scrollbar, themeColor(COLOR_ID_SCROLLBAR));
+    lv_style_set_bg_opa(&styles.scrollbar, LV_OPA_COVER);
+    lv_style_set_radius(&styles.scrollbar, LV_RADIUS_CIRCLE);
+
+    lv_style_init(&styles.row);
+    lv_style_set_width(&styles.row, lv_pct(100));
+    lv_style_set_height(&styles.row, LV_SIZE_CONTENT);
+    lv_style_set_layout(&styles.row, LV_LAYOUT_FLEX);
+    lv_style_set_flex_flow(&styles.row, LV_FLEX_FLOW_ROW);
+    lv_style_set_flex_cross_place(&styles.row, LV_FLEX_ALIGN_CENTER);
+    lv_style_set_pad_column(&styles.row, kRowColumnGap);
+    lv_style_set_bg_opa(&styles.row, LV_OPA_TRANSP);
+    lv_style_set_text_font(&styles.row, kRowFont);
+    lv_style_set_text_color(&styles.row, themeColor(COLOR_ID_TEXT_PRIMARY));
+    lv_style_set_pad_left(&styles.row, kRowPadX);
+    lv_style_set_pad_right(&styles.row, kRowPadX);
+    lv_style_set_pad_top(&styles.row, kRowPadY);
+    lv_style_set_pad_bottom(&styles.row, kRowPadY);
+    lv_style_set_border_side(&styles.row, LV_BORDER_SIDE_BOTTOM);
+    lv_style_set_border_width(&styles.row, 1);
+    lv_style_set_border_color(&styles.row, themeColor(COLOR_ID_DIVIDER));
+    lv_style_set_border_opa(&styles.row, LV_OPA_COVER);
+
+    // Same accent bar and padding compensation as styleListRow().
+    lv_style_init(&styles.rowSelected);
+    lv_style_set_bg_color(&styles.rowSelected, themeColor(COLOR_ID_ROW_SELECTED));
+    lv_style_set_bg_opa(&styles.rowSelected, LV_OPA_COVER);
+    lv_style_set_text_color(&styles.rowSelected, lv_color_white());
+    lv_style_set_border_side(&styles.rowSelected, LV_BORDER_SIDE_LEFT);
+    lv_style_set_border_width(&styles.rowSelected, kAccentWidth);
+    lv_style_set_border_color(&styles.rowSelected, themeColor(COLOR_ID_ACCENT));
+    lv_style_set_pad_left(&styles.rowSelected, kRowPadX - kAccentWidth);
+    lv_style_set_pad_bottom(&styles.rowSelected, kRowPadY + 1);
+
+    lv_style_init(&styles.name);
+    lv_style_set_flex_grow(&styles.name, 1);
+
+    lv_style_init(&styles.value);
+    lv_style_set_text_color(&styles.value, themeColor(COLOR_ID_TEXT_SECONDARY));
+
+    lv_style_init(&styles.valueSelected);
+    lv_style_set_text_color(&styles.valueSelected, themeColor(COLOR_ID_ACCENT));
+
+    lv_style_init(&styles.accentValue);
+    lv_style_set_text_color(&styles.accentValue, themeColor(COLOR_ID_ACCENT));
+
+    lv_style_init(&styles.level);
+    lv_style_set_width(&styles.level, kLevelWidth);
+    lv_style_set_height(&styles.level, kLevelHeight);
+    lv_style_set_radius(&styles.level, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_color(&styles.level, themeColor(COLOR_ID_DIVIDER));
+    lv_style_set_bg_opa(&styles.level, LV_OPA_COVER);
+
+    lv_style_init(&styles.levelIndicator);
+    lv_style_set_radius(&styles.levelIndicator, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_color(&styles.levelIndicator, themeColor(COLOR_ID_ACCENT));
+    lv_style_set_bg_opa(&styles.levelIndicator, LV_OPA_COVER);
+}
+
+SharedStyles& sharedStyles() {
+    static SharedStyles styles;
+    static bool initialized = false;
+    if (!initialized) {
+        initSharedStyles(styles);
+        initialized = true;
+    }
+    return styles;
+}
 
 }  // namespace
 
@@ -90,6 +185,39 @@ void setListRowSelected(lv_obj_t* row, bool selected) {
             lv_obj_remove_state(lv_obj_get_child(row, index), LV_STATE_CHECKED);
         }
     }
+}
+
+void addSharedListStyles(lv_obj_t* list) {
+    SharedStyles& styles = sharedStyles();
+    lv_obj_add_style(list, &styles.list, LV_PART_MAIN);
+    lv_obj_add_style(list, &styles.scrollbar, LV_PART_SCROLLBAR);
+    lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_AUTO);
+}
+
+void addSharedListRowStyles(lv_obj_t* row) {
+    SharedStyles& styles = sharedStyles();
+    lv_obj_add_style(row, &styles.row, LV_PART_MAIN);
+    lv_obj_add_style(row, &styles.rowSelected, LV_STATE_CHECKED);
+}
+
+void addSharedListRowNameStyles(lv_obj_t* label) {
+    lv_obj_add_style(label, &sharedStyles().name, LV_PART_MAIN);
+}
+
+void addSharedListRowValueStyles(lv_obj_t* label, bool accent) {
+    SharedStyles& styles = sharedStyles();
+    if (accent) {
+        lv_obj_add_style(label, &styles.accentValue, LV_PART_MAIN);
+        return;
+    }
+    lv_obj_add_style(label, &styles.value, LV_PART_MAIN);
+    lv_obj_add_style(label, &styles.valueSelected, LV_STATE_CHECKED);
+}
+
+void addSharedListRowLevelStyles(lv_obj_t* bar) {
+    SharedStyles& styles = sharedStyles();
+    lv_obj_add_style(bar, &styles.level, LV_PART_MAIN);
+    lv_obj_add_style(bar, &styles.levelIndicator, LV_PART_INDICATOR);
 }
 
 }  // namespace m5_redux

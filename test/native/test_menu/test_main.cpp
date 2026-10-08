@@ -105,7 +105,8 @@ std::vector<const char*> fourOptions() {
 }
 
 void test_open_starts_on_the_first_row_that_is_not_destructive() {
-    MenuCommandItem disconnect("disconnect", "Disconnect", kDisconnectCommand, "Select", true);
+    MenuCommandItem disconnect(
+        "disconnect", "Disconnect", kDisconnectCommand, MenuCommandItem::Style::Destructive);
     MenuCommandItem diagnostics("diagnostics", "Diagnostics", kDiagnosticsCommand);
     FakeSource source;
     source.items = {&disconnect, &diagnostics};
@@ -163,7 +164,8 @@ void test_back_on_the_root_page_closes_the_menu() {
 }
 
 void test_command_rows_hand_their_command_to_the_host() {
-    MenuCommandItem diagnostics("diagnostics", "Diagnostics", kDiagnosticsCommand, "Open");
+    MenuCommandItem diagnostics(
+        "diagnostics", "Diagnostics", kDiagnosticsCommand, MenuCommandItem::Style::OpensScreen);
     FakeSource source;
     source.items = {&diagnostics};
     MenuPage page("Settings");
@@ -176,7 +178,37 @@ void test_command_rows_hand_their_command_to_the_host() {
     TEST_ASSERT_EQUAL_INT(static_cast<int>(MenuEvent::Type::Command), static_cast<int>(event.type));
     TEST_ASSERT_EQUAL_UINT(kDiagnosticsCommand, event.command);
     TEST_ASSERT_EQUAL_STRING("Open", diagnostics.selectLabel());
+    TEST_ASSERT_TRUE(diagnostics.showsChevron());
+    TEST_ASSERT_FALSE(diagnostics.destructive());
     TEST_ASSERT_TRUE(menu.isOpen());
+}
+
+void test_tapping_a_row_highlights_and_selects_it() {
+    MenuCommandItem disconnect(
+        "disconnect", "Disconnect", kDisconnectCommand, MenuCommandItem::Style::Destructive);
+    MenuCommandItem diagnostics(
+        "diagnostics", "Diagnostics", kDiagnosticsCommand, MenuCommandItem::Style::OpensScreen);
+    FakeSource source;
+    source.items = {&disconnect, &diagnostics};
+    MenuPage page("Settings");
+    page.addSource(source);
+    MenuController menu;
+    menu.open(page);
+    TEST_ASSERT_EQUAL_STRING("Select", disconnect.selectLabel());
+    TEST_ASSERT_FALSE(disconnect.showsChevron());
+
+    MenuInput input;
+    input.tappedRow = 0;
+    const MenuEvent event = menu.update(input);
+
+    TEST_ASSERT_EQUAL_UINT(0, menu.highlight(0));
+    TEST_ASSERT_EQUAL_INT(static_cast<int>(MenuEvent::Type::Command), static_cast<int>(event.type));
+    TEST_ASSERT_EQUAL_UINT(kDisconnectCommand, event.command);
+
+    input.tappedRow = 2;
+    TEST_ASSERT_EQUAL_INT(
+        static_cast<int>(MenuEvent::Type::None), static_cast<int>(menu.update(input).type));
+    TEST_ASSERT_EQUAL_UINT(0, menu.highlight(0));
 }
 
 void test_link_opens_a_page_and_back_returns_to_the_same_row() {
@@ -198,6 +230,8 @@ void test_link_opens_a_page_and_back_returns_to_the_same_row() {
     menu.open(quickActions);
     menu.update(stepInput(1));
     menu.takeChanges();
+    TEST_ASSERT_TRUE(settingsLink.showsChevron());
+    TEST_ASSERT_EQUAL_STRING("Open", settingsLink.selectLabel());
 
     menu.update(selectInput());
     TEST_ASSERT_EQUAL_UINT(2, menu.depth());
@@ -469,7 +503,8 @@ void test_next_option_choice_toggles_on_select() {
 }
 
 void test_refresh_keeps_the_highlight_on_the_same_row() {
-    MenuCommandItem disconnect("disconnect", "Disconnect", kDisconnectCommand, "Select", true);
+    MenuCommandItem disconnect(
+        "disconnect", "Disconnect", kDisconnectCommand, MenuCommandItem::Style::Destructive);
     MenuCommandItem pattern("pattern", "Default pattern", 1);
     MenuCommandItem diagnostics("diagnostics", "Diagnostics", kDiagnosticsCommand);
     FakeSource source;
@@ -489,7 +524,8 @@ void test_refresh_keeps_the_highlight_on_the_same_row() {
 }
 
 void test_refresh_closes_pages_opened_from_a_row_that_went_away() {
-    MenuCommandItem disconnect("disconnect", "Disconnect", kDisconnectCommand, "Select", true);
+    MenuCommandItem disconnect(
+        "disconnect", "Disconnect", kDisconnectCommand, MenuCommandItem::Style::Destructive);
     FakeChoice pattern("Default pattern", {"Auto", "Simple"}, 0);
     MenuCommandItem diagnostics("diagnostics", "Diagnostics", kDiagnosticsCommand);
     FakeSource source;
@@ -557,6 +593,7 @@ int main() {
     RUN_TEST(test_highlight_stops_at_the_first_and_last_row);
     RUN_TEST(test_back_on_the_root_page_closes_the_menu);
     RUN_TEST(test_command_rows_hand_their_command_to_the_host);
+    RUN_TEST(test_tapping_a_row_highlights_and_selects_it);
     RUN_TEST(test_link_opens_a_page_and_back_returns_to_the_same_row);
     RUN_TEST(test_pages_open_no_deeper_than_the_maximum_depth);
     RUN_TEST(test_choice_popup_previews_options_and_back_cancels_the_preview);

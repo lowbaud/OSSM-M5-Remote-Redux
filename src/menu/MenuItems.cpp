@@ -2,24 +2,23 @@
 
 namespace m5_redux {
 
-MenuCommandItem::MenuCommandItem(
-    const char* id,
-    const char* name,
-    MenuCommand command,
-    const char* selectLabel,
-    bool destructive)
-    : MenuItem(id, name), command_(command), selectLabel_(selectLabel), destructive_(destructive) {}
+MenuCommandItem::MenuCommandItem(const char* id, const char* name, MenuCommand command, Style style)
+    : MenuItem(id, name), command_(command), style_(style) {}
 
 MenuItemKind MenuCommandItem::kind() const {
     return MenuItemKind::Action;
 }
 
+bool MenuCommandItem::showsChevron() const {
+    return style_ == Style::OpensScreen;
+}
+
 const char* MenuCommandItem::selectLabel() const {
-    return selectLabel_;
+    return style_ == Style::OpensScreen ? "Open" : "Select";
 }
 
 bool MenuCommandItem::destructive() const {
-    return destructive_;
+    return style_ == Style::Destructive;
 }
 
 MenuResult MenuCommandItem::activate() {
@@ -31,6 +30,10 @@ MenuLinkItem::MenuLinkItem(const char* id, const char* name, MenuPage& page)
 
 MenuItemKind MenuLinkItem::kind() const {
     return MenuItemKind::Link;
+}
+
+bool MenuLinkItem::showsChevron() const {
+    return true;
 }
 
 const char* MenuLinkItem::selectLabel() const {
@@ -47,6 +50,10 @@ MenuChoiceItem::MenuChoiceItem(const char* id, const char* name, SelectAction se
 void MenuChoiceItem::previewOption(std::size_t) {}
 
 void MenuChoiceItem::cancelPreview() {}
+
+bool MenuChoiceItem::showsLevel() const {
+    return false;
+}
 
 std::size_t MenuChoiceItem::displayedOption() const {
     return pendingOption_ != kNoOption ? pendingOption_ : storedOption();

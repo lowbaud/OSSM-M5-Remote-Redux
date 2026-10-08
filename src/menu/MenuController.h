@@ -16,6 +16,8 @@ struct MenuInput {
     std::array<std::int32_t, kMenuKnobCount> knobSteps{};
     bool back = false;
     bool select = false;
+    // A row touched on the top page; it is highlighted and selected.
+    std::size_t tappedRow = MenuPage::kNoItem;
 };
 
 // What the view has to redraw since it last asked.

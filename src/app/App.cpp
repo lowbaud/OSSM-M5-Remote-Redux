@@ -10,13 +10,15 @@
 #include "app/BacklightController.h"
 #include "app/BuildInfo.h"
 #include "app/IdleTimer.h"
+#include "app/menu/AppMenuCommands.h"
+#include "app/menu/OssmSettingsSource.h"
+#include "app/menu/RemoteSettingsSource.h"
 #include "app/screens/BootScreen.h"
 #include "app/screens/ConnectScreen.h"
 #include "app/screens/DiagnosticsScreen.h"
 #include "app/screens/OssmControlScreen.h"
 #include "app/screens/OssmPatternsScreen.h"
 #include "app/screens/ScanScreen.h"
-#include "app/screens/SettingsScreen.h"
 #include "app/screens/WelcomeScreen.h"
 #include "devices/ossm/OssmClient.h"
 #include "devices/ossm/OssmConnectionController.h"
@@ -25,10 +27,13 @@
 #include "diagnostics/Log.h"
 #include "diagnostics/SerialConsole.h"
 #include "diagnostics/SystemInfo.h"
+#include "menu/MenuController.h"
+#include "menu/MenuPage.h"
 #include "platform/LvglPort.h"
 #include "platform/M5Platform.h"
 #include "platform/RemoteInput.h"
 #include "settings/SettingsStore.h"
+#include "ui/MenuPanel.h"
 #include "ui/generated/ui.h"
 
 namespace m5_redux {
@@ -46,7 +51,8 @@ enum class Screen : std::uint8_t {
     Connect,
     OssmControl,
     OssmPatterns,
-    Settings,
+    // The menu panel over the welcome or control screen.
+    Menu,
     Diagnostics,
 };
 
@@ -70,12 +76,19 @@ ScanScreen scanScreen(ossmDiscovery);
 ConnectScreen connectScreen;
 OssmControlScreen ossmControlScreen(ossmControl);
 OssmPatternsScreen ossmPatternsScreen(ossmControl);
-SettingsScreen settingsScreen(settingsStore);
 DiagnosticsScreen diagnosticsScreen(ossmClient);
+MenuController menuController;
+MenuPanel menuPanel(menuController);
+OssmSettingsSource ossmSettings(settingsStore, ossmControlScreen);
+RemoteSettingsSource
+    remoteSettings(settingsStore, backlightController, autoPowerOffController, idleTimer);
+MenuPage settingsPage("Settings");
 
 Screen currentScreen = Screen::Boot;
-Screen settingsReturnScreen = Screen::Welcome;
-bool returningFromDiagnostics = false;
+// The screen under the menu panel, and where closing the menu returns to.
+Screen menuBaseScreen = Screen::Welcome;
+// The menu keeps its pages while the diagnostics screen is shown from it.
+bool menuSuspended = false;
 ConnectionOrigin connectionOrigin = ConnectionOrigin::Startup;
 SavedOssmConnection connectionTarget{};
 SavedOssmConnection startupConnection{};
@@ -165,9 +178,14 @@ void leaveScreen(Screen screen) {
         case Screen::OssmPatterns:
             ossmPatternsScreen.leave();
             break;
-        case Screen::Settings:
+        case Screen::Menu:
+            if (menuSuspended) {
+                menuPanel.hide();
+            } else {
+                menuPanel.close();
+            }
+            // Undo a brightness preview that did not finish.
             backlightController.setBrightnessLevel(settingsStore.brightnessLevel());
-            settingsScreen.leave();
             break;
         case Screen::Diagnostics:
             diagnosticsScreen.leave();
@@ -195,24 +213,34 @@ void enterScreen(Screen screen) {
         case Screen::OssmPatterns:
             ossmPatternsScreen.enter();
             break;
-        case Screen::Settings: {
+        case Screen::Menu: {
             const bool connected =
-                settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady();
+                menuBaseScreen == Screen::OssmControl && ossmConnection.isReady();
             ossm::OssmClient::PatternList catalog{};
             if (connected) {
                 ossmClient.patternList(catalog);
             }
-            settingsScreen.setPatternCatalog(catalog);
-            settingsScreen.setStopAvailable(connected);
-            settingsScreen.setDisconnectAvailable(connected);
-            settingsScreen.setMotionActive(ossmControl.values().speed > 0);
-            settingsScreen.enter(returningFromDiagnostics);
-            returningFromDiagnostics = false;
+            ossmSettings.setConnected(connected);
+            ossmSettings.setPatternCatalog(catalog);
+            menuPanel.setStopAvailable(connected);
+            menuPanel.setMotionActive(ossmControl.values().speed > 0);
+            if (menuSuspended) {
+                // Back from the diagnostics screen: bring back the screen under the menu.
+                menuSuspended = false;
+                if (menuBaseScreen == Screen::OssmControl) {
+                    ossmControlScreen.enter();
+                } else {
+                    welcomeScreen.enter();
+                }
+                menuPanel.show();
+            } else {
+                menuPanel.open(settingsPage);
+            }
             break;
         }
         case Screen::Diagnostics:
             diagnosticsScreen.setStopAvailable(
-                settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady());
+                menuBaseScreen == Screen::OssmControl && ossmConnection.isReady());
             diagnosticsScreen.setMotionActive(ossmControl.values().speed > 0);
             diagnosticsScreen.enter();
             break;
@@ -225,6 +253,11 @@ void navigateTo(Screen screen) {
     }
 
     leaveScreen(currentScreen);
+    if (menuSuspended && screen != Screen::Menu && screen != Screen::Diagnostics) {
+        // Leaving the diagnostics screen anywhere but back to the menu ends the menu.
+        menuSuspended = false;
+        menuPanel.close();
+    }
     currentScreen = screen;
     enterScreen(currentScreen);
     idleTimer.reset(millis());
@@ -276,101 +309,13 @@ void handleBootAction(BootScreenAction action) {
     }
 }
 
-void handleSettingsEvent(const SettingsScreenEvent& event) {
-    switch (event.action) {
-        case SettingsScreenAction::Back:
-            if (settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady()) {
-                navigateTo(Screen::OssmControl);
-            } else {
-                navigateTo(Screen::Welcome);
-            }
-            break;
-        case SettingsScreenAction::PreviewBrightness:
-            backlightController.setBrightnessLevel(event.brightnessLevel);
-            break;
-        case SettingsScreenAction::RestoreBrightness:
-            backlightController.setBrightnessLevel(settingsStore.brightnessLevel());
-            break;
-        case SettingsScreenAction::CommitBrightness:
-            if (settingsStore.setBrightnessLevel(event.brightnessLevel)) {
-                backlightController.setBrightnessLevel(event.brightnessLevel);
-                settingsScreen.commitSucceeded();
-            } else {
-                backlightController.setBrightnessLevel(settingsStore.brightnessLevel());
-                settingsScreen.commitFailed();
-                LOGE(kTag, "Unable to save display brightness setting");
-            }
-            break;
-        case SettingsScreenAction::CommitIdleDimTimeout:
-            if (settingsStore.setIdleDimTimeout(event.idleDimTimeout)) {
-                backlightController.setIdleDimTimeoutSeconds(
-                    static_cast<std::uint32_t>(event.idleDimTimeout));
-                idleTimer.reset(millis());
-                settingsScreen.commitSucceeded();
-            } else {
-                settingsScreen.commitFailed();
-                LOGE(kTag, "Unable to save idle dim setting");
-            }
-            break;
-        case SettingsScreenAction::CommitIdlePowerOffTimeout:
-            if (settingsStore.setIdlePowerOffTimeout(event.idlePowerOffTimeout)) {
-                const std::uint32_t now = millis();
-                autoPowerOffController.setTimeoutSeconds(
-                    static_cast<std::uint32_t>(event.idlePowerOffTimeout));
-                idleTimer.reset(now);
-                settingsScreen.commitSucceeded();
-            } else {
-                settingsScreen.commitFailed();
-                LOGE(kTag, "Unable to save idle power-off setting");
-            }
-            break;
-        case SettingsScreenAction::CommitAutoConnect:
-            if (settingsStore.setAutoConnectEnabled(event.autoConnectEnabled)) {
-                settingsScreen.commitSucceeded();
-            } else {
-                settingsScreen.commitFailed();
-                LOGE(kTag, "Unable to save auto-connect setting");
-            }
-            break;
-        case SettingsScreenAction::CommitDepthControl:
-            if (settingsStore.setDepthControlMode(event.depthControlMode)) {
-                ossmControlScreen.setDepthControlMode(event.depthControlMode);
-                settingsScreen.commitSucceeded();
-            } else {
-                settingsScreen.commitFailed();
-                LOGE(kTag, "Unable to save depth control setting");
-            }
-            break;
-        case SettingsScreenAction::CommitStrokeDirection:
-            if (settingsStore.setStrokeEncoderReversed(event.strokeEncoderReversed)) {
-                ossmControlScreen.setStrokeEncoderReversed(event.strokeEncoderReversed);
-                settingsScreen.commitSucceeded();
-            } else {
-                settingsScreen.commitFailed();
-                LOGE(kTag, "Unable to save stroke direction setting");
-            }
-            break;
-        case SettingsScreenAction::CommitTouchscreen:
-            if (settingsStore.setTouchscreenEnabled(event.touchscreenEnabled)) {
-                lvgl_port::setTouchscreenEnabled(event.touchscreenEnabled);
-                settingsScreen.commitSucceeded();
-            } else {
-                settingsScreen.commitFailed();
-                LOGE(kTag, "Unable to save touchscreen setting");
-            }
-            break;
-        case SettingsScreenAction::CommitDefaultPattern:
-            if (settingsStore.setDefaultPattern(event.defaultPattern)) {
-                settingsScreen.commitSucceeded();
-            } else {
-                settingsScreen.commitFailed();
-                LOGE(kTag, "Unable to save default pattern setting");
-            }
-            break;
-        case SettingsScreenAction::ShowDiagnostics:
+void handleMenuCommand(AppMenuCommand command) {
+    switch (command) {
+        case AppMenuCommand::ShowDiagnostics:
+            menuSuspended = true;
             navigateTo(Screen::Diagnostics);
             break;
-        case SettingsScreenAction::Disconnect:
+        case AppMenuCommand::Disconnect:
             // The client stops motion before it drops the link. A requested disconnect raises
             // no readiness-lost event, so reset the control state here.
             ossmConnection.disconnect();
@@ -379,7 +324,22 @@ void handleSettingsEvent(const SettingsScreenEvent& event) {
             LOGI(kTag, "Disconnected from OSSM");
             navigateTo(Screen::Welcome);
             break;
-        case SettingsScreenAction::None:
+    }
+}
+
+void handleMenuEvent(const MenuEvent& event) {
+    switch (event.type) {
+        case MenuEvent::Type::Closed:
+            if (menuBaseScreen == Screen::OssmControl && ossmConnection.isReady()) {
+                navigateTo(Screen::OssmControl);
+            } else {
+                navigateTo(Screen::Welcome);
+            }
+            break;
+        case MenuEvent::Type::Command:
+            handleMenuCommand(static_cast<AppMenuCommand>(event.command));
+            break;
+        case MenuEvent::Type::None:
             break;
     }
 }
@@ -445,7 +405,7 @@ void dispatchInput(const RemoteInputEvents& events, bool connectedScreenWasReady
         case Screen::Welcome:
             switch (welcomeScreen.update(events)) {
                 case WelcomeScreenAction::Settings:
-                    app::showSettings();
+                    app::showMenu();
                     break;
                 case WelcomeScreenAction::Scan:
                     app::showScan();
@@ -484,7 +444,7 @@ void dispatchInput(const RemoteInputEvents& events, bool connectedScreenWasReady
             }
             switch (ossmControlScreen.update(events)) {
                 case OssmControlScreenAction::Settings:
-                    app::showSettings();
+                    app::showMenu();
                     break;
                 case OssmControlScreenAction::Patterns:
                     app::showOssmPatterns();
@@ -508,13 +468,12 @@ void dispatchInput(const RemoteInputEvents& events, bool connectedScreenWasReady
                     break;
             }
             break;
-        case Screen::Settings:
-            handleSettingsEvent(settingsScreen.update(events));
+        case Screen::Menu:
+            handleMenuEvent(menuPanel.update(events));
             break;
         case Screen::Diagnostics:
             if (diagnosticsScreen.update(events) == DiagnosticsScreenAction::Back) {
-                returningFromDiagnostics = true;
-                navigateTo(Screen::Settings);
+                navigateTo(Screen::Menu);
             }
             break;
     }
@@ -557,8 +516,10 @@ void begin() {
     connectScreen.begin();
     ossmControlScreen.begin();
     ossmPatternsScreen.begin();
-    settingsScreen.begin();
     diagnosticsScreen.begin();
+    settingsPage.addSource(ossmSettings);
+    settingsPage.addSource(remoteSettings);
+    menuPanel.begin();
     updateBatteryIndicator(true);
     ossmConnection.begin(APP_DISPLAY_NAME);
     if (!ossmDiscovery.begin()) {
@@ -631,33 +592,25 @@ void stopMotion() {
         ossmControlScreen.refresh();
     } else if (currentScreen == Screen::OssmPatterns) {
         ossmPatternsScreen.refresh();
-    } else if (currentScreen == Screen::Settings) {
-        settingsScreen.setMotionActive(false);
+    } else if (currentScreen == Screen::Menu) {
+        menuPanel.setMotionActive(false);
+        // The control screen stays visible next to the panel.
+        if (menuBaseScreen == Screen::OssmControl) {
+            ossmControlScreen.refresh();
+        }
     } else if (currentScreen == Screen::Diagnostics) {
         diagnosticsScreen.setMotionActive(false);
     }
 }
 
-void showSettings() {
+void showMenu() {
     if (currentScreen != Screen::Welcome &&
         (currentScreen != Screen::OssmControl || !ossmConnection.isReady())) {
         return;
     }
 
-    settingsReturnScreen = currentScreen;
-    navigateTo(Screen::Settings);
-}
-
-void activateSettingsBack() {
-    if (currentScreen == Screen::Settings) {
-        settingsScreen.requestBack();
-    }
-}
-
-void activateSettingsSelect() {
-    if (currentScreen == Screen::Settings) {
-        settingsScreen.requestSelect();
-    }
+    menuBaseScreen = currentScreen;
+    navigateTo(Screen::Menu);
 }
 
 void activateDiagnosticsBack() {

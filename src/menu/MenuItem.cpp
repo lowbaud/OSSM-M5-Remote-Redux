@@ -34,6 +34,10 @@ const char* MenuItem::valueText() const {
     return "";
 }
 
+bool MenuItem::showsChevron() const {
+    return false;
+}
+
 const char* MenuItem::selectLabel() const {
     return "Select";
 }

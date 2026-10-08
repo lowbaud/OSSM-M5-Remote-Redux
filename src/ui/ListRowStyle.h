@@ -26,4 +26,15 @@ lv_obj_t* addListRowValue(lv_obj_t* row, const char* text);
 // LV_STATE_CHECKED appearance.
 void setListRowSelected(lv_obj_t* row, bool selected);
 
+// Shared styles with the look of the functions above, for rows that are created once and kept.
+// Each object holds a reference per style instead of its own copy of every property. Remove the
+// theme styles first with lv_obj_remove_style_all() on plain objects and bars.
+void addSharedListStyles(lv_obj_t* list);
+void addSharedListRowStyles(lv_obj_t* row);
+void addSharedListRowNameStyles(lv_obj_t* label);
+// Accent labels, like the check mark of a stored option, stay in the accent color.
+void addSharedListRowValueStyles(lv_obj_t* label, bool accent);
+// A small level bar in place of the value label.
+void addSharedListRowLevelStyles(lv_obj_t* bar);
+
 }  // namespace m5_redux

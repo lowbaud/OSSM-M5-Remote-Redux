@@ -6,9 +6,7 @@ namespace app {
 void begin();
 void update();
 void stopMotion();
-void showSettings();
-void activateSettingsBack();
-void activateSettingsSelect();
+void showMenu();
 void activateDiagnosticsBack();
 void activateDiagnosticsAction();
 void showScan();
