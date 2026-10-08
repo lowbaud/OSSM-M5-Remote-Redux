@@ -119,13 +119,6 @@ TileStyles& tileStyles() {
     return styles;
 }
 
-lv_obj_t* createPlainObject(lv_obj_t* parent) {
-    lv_obj_t* object = lv_obj_create(parent);
-    lv_obj_remove_style_all(object);
-    lv_obj_remove_flag(object, LV_OBJ_FLAG_SCROLLABLE);
-    return object;
-}
-
 lv_obj_t* createName(lv_obj_t* parent) {
     lv_obj_t* name = lv_label_create(parent);
     addSharedListRowNameStyles(name);
@@ -176,6 +169,20 @@ void setHidden(lv_obj_t* object, bool hidden) {
 
 }  // namespace
 
+lv_obj_t* createMenuObject(lv_obj_t* parent) {
+    lv_obj_t* object = lv_obj_create(parent);
+    lv_obj_remove_style_all(object);
+    lv_obj_remove_flag(object, LV_OBJ_FLAG_SCROLLABLE);
+    return object;
+}
+
+lv_obj_t* createMenuScrollArea(lv_obj_t* parent) {
+    lv_obj_t* area = createMenuObject(parent);
+    lv_obj_add_flag(area, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(area, LV_DIR_VER);
+    return area;
+}
+
 void styleMenuTileGrid(lv_obj_t* grid) {
     addSharedListStyles(grid);
     // Added after the list styles, so the grid padding and wrapping take precedence.
@@ -189,7 +196,7 @@ std::int32_t menuTileWidth(std::int32_t gridWidth) {
 void createMenuRow(MenuItemView& view, lv_obj_t* list) {
     view.tile = false;
     view.container = list;
-    view.root = createPlainObject(list);
+    view.root = createMenuObject(list);
     addSharedListRowStyles(view.root);
     view.name = createName(view.root);
 
@@ -205,7 +212,7 @@ void createMenuTile(MenuItemView& view, lv_obj_t* grid, std::int32_t tileWidth) 
     TileStyles& styles = tileStyles();
     view.tile = true;
     view.container = grid;
-    view.root = createPlainObject(grid);
+    view.root = createMenuObject(grid);
     lv_obj_add_style(view.root, &styles.tile, LV_PART_MAIN);
     lv_obj_add_style(view.root, &styles.tileSelected, LV_STATE_CHECKED);
 
@@ -226,7 +233,7 @@ void createMenuTile(MenuItemView& view, lv_obj_t* grid, std::int32_t tileWidth) 
 
     lv_obj_add_style(view.root, &styles.regular, LV_PART_MAIN);
     lv_obj_set_width(view.root, tileWidth);
-    lv_obj_t* header = createPlainObject(view.root);
+    lv_obj_t* header = createMenuObject(view.root);
     lv_obj_add_style(header, &styles.header, LV_PART_MAIN);
     // Taps anywhere on the tile select it.
     lv_obj_remove_flag(header, LV_OBJ_FLAG_CLICKABLE);

@@ -13,6 +13,10 @@ bool MenuCommandItem::showsChevron() const {
     return style_ == Style::OpensScreen;
 }
 
+bool MenuCommandItem::wideTile() const {
+    return style_ == Style::OpensScreen;
+}
+
 const char* MenuCommandItem::selectLabel() const {
     return style_ == Style::OpensScreen ? "Open" : "Select";
 }

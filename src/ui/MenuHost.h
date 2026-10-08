@@ -13,52 +13,65 @@
 
 namespace m5_redux {
 
-// Draws the menu over the current screen, with its own button bar over the screen's. A tile
-// page, like the quick actions, is a see-through panel that slides in from the left above the
-// button bar. A list page, like the settings, fills the screen like the old settings screen.
-// Everything lives on LVGL's top layer and is built once; an item's widgets are created the
-// first time it is shown and kept.
-class MenuPanel {
+// Shows menu pages: the pages themselves in a container of the subclass, option popups, a button
+// bar over the one of the screens, and the message when saving fails. Owns the page stack.
+// Everything is built once; an item's widgets are created the first time it is shown and kept.
+class MenuHost {
   public:
-    explicit MenuPanel(MenuController& controller);
+    MenuHost(const MenuHost&) = delete;
+    MenuHost& operator=(const MenuHost&) = delete;
+    virtual ~MenuHost() = default;
 
-    void begin();
-    void open(MenuPage& root);
-    void close();
-    // Hides the menu but keeps the open pages, e.g. while the diagnostics screen is shown.
-    void hide();
-    // Shows hidden pages again after repopulating them.
-    void show();
-    // Repopulates the open pages after the device or settings changed.
-    void refresh();
+    bool isOpen() const;
+    // Feeds the knobs, buttons and taps to the open pages and redraws what changed.
     MenuEvent update(const RemoteInputEvents& events);
     void setStopAvailable(bool available);
     void setMotionActive(bool active);
 
+  protected:
+    struct PageLayout {
+        // Where pages are drawn; popups have their own list.
+        lv_obj_t* container = nullptr;
+        bool tiles = false;
+        std::int32_t tileWidth = 0;
+        // Label of the back button on the first page.
+        const char* rootBackLabel = "Back";
+    };
+
+    MenuHost() = default;
+
+    // Builds the popup, button bar and save message in parent, above what is already there.
+    void buildChrome(lv_obj_t* parent, const PageLayout& layout);
+    void openPages(MenuPage& root);
+    void closePages();
+    // Repopulates the open pages and redraws them, e.g. when shown again.
+    void refreshPages();
+    // Closes the pages on the next update, e.g. after a tap beside the panel.
+    void requestClose();
+    // Called when Back on the first page or requestClose() closed the pages.
+    virtual void pagesClosed();
+
   private:
     struct PageView {
-        // Popups have a title; the panel and the full-screen page do not.
+        // Only popups have a title.
         lv_obj_t* title = nullptr;
-        // Either a list or a tile grid.
         lv_obj_t* container = nullptr;
         bool tiles = false;
         char titleText[32] = {};
     };
 
-    // Settings, the quick actions and the most options a choice can list.
-    static constexpr std::size_t kMaxViews = 64;
+    // The settings and the most options a choice can list.
+    static constexpr std::size_t kMaxViews = 48;
 
-    MenuController& controller_;
+    MenuController controller_;
     std::array<MenuItemView, kMaxViews> views_{};
     std::size_t viewCount_ = 0;
-    lv_obj_t* root_ = nullptr;
-    lv_obj_t* panel_ = nullptr;
-    PageView panelPage_;
-    lv_obj_t* screen_ = nullptr;
-    PageView screenPage_;
+    PageView pageView_;
+    std::int32_t tileWidth_ = 0;
+    const char* rootBackLabel_ = "Back";
     lv_obj_t* popupScrim_ = nullptr;
     lv_obj_t* popup_ = nullptr;
-    PageView popupPage_;
+    PageView popupView_;
     lv_obj_t* backLabel_ = nullptr;
     lv_obj_t* stopButton_ = nullptr;
     lv_obj_t* selectButton_ = nullptr;
@@ -69,27 +82,17 @@ class MenuPanel {
     std::size_t tappedRow_ = MenuPage::kNoItem;
     bool backTapped_ = false;
     bool selectTapped_ = false;
-    bool closeTapped_ = false;
-    bool visible_ = false;
-    // The panel is in place or sliding in.
-    bool panelIn_ = false;
+    bool closeRequested_ = false;
 
-    void buildPanel(std::int32_t buttonBarTop);
-    void buildScreen(std::int32_t buttonBarTop);
-    void buildPopup();
-    void buildButtonBar();
-    void buildSaveFailureLabel();
-    void clearTaps();
-    void slideIn();
-    void slideOut();
-    void movePanelIn();
-    void hideNow();
+    void buildPopup(lv_obj_t* parent);
+    void buildButtonBar(lv_obj_t* parent);
+    void buildSaveFailureLabel(lv_obj_t* parent);
+    void clearInput();
     void renderAll();
     void render(const MenuChanges& changes);
     // The deepest page that is not a popup; popups above it are drawn over it.
     std::size_t baseLevel() const;
-    bool drawsTiles(std::size_t level) const;
-    PageView& pageView(std::size_t level);
+    PageView& viewOf(std::size_t level);
     void showPage(PageView& view, std::size_t level);
     void updateHighlight(std::size_t level);
     void updateValues(std::size_t level);
@@ -102,12 +105,9 @@ class MenuPanel {
     MenuItemView* findView(const MenuItem& item, bool tile);
     void handleViewClicked(lv_obj_t* root);
 
-    static void setPanelX(void* panel, std::int32_t x);
-    static void handleSlideOutCompleted(lv_anim_t* animation);
     static void handleViewEvent(lv_event_t* event);
     static void handleBackEvent(lv_event_t* event);
     static void handleSelectEvent(lv_event_t* event);
-    static void handleCloseEvent(lv_event_t* event);
 };
 
 }  // namespace m5_redux

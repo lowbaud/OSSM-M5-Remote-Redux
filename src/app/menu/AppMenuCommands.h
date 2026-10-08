@@ -8,6 +8,7 @@ namespace m5_redux {
 enum class AppMenuCommand : MenuCommand {
     ShowDiagnostics = 1,
     Disconnect,
+    ShowSettings,
 };
 
 }  // namespace m5_redux

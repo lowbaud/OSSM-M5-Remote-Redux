@@ -22,6 +22,11 @@ struct MenuItemView {
     lv_obj_t* level = nullptr;
 };
 
+// A plain object without theme styles or scrolling.
+lv_obj_t* createMenuObject(lv_obj_t* parent);
+// A plain object that scrolls vertically.
+lv_obj_t* createMenuScrollArea(lv_obj_t* parent);
+
 // Lays out tiles in rows of two inside a scrollable container.
 void styleMenuTileGrid(lv_obj_t* grid);
 // Width of a regular tile in a grid of the given width; wide tiles take the whole line.

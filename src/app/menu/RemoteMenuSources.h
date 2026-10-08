@@ -84,14 +84,14 @@ class RemoteSettingsSource : public MenuSource {
 // Quick actions of the remote itself. Settings comes last, below every other quick action.
 class RemoteQuickActionsSource : public MenuSource {
   public:
-    RemoteQuickActionsSource(
-        SettingsStore& settings, BacklightController& backlight, MenuPage& settingsPage);
+    RemoteQuickActionsSource(SettingsStore& settings, BacklightController& backlight);
 
     void addItems(MenuPage& page) override;
 
   private:
     BrightnessItem brightness_;
-    MenuLinkItem settings_;
+    // Opens the settings screen.
+    MenuCommandItem settings_;
 };
 
 }  // namespace m5_redux

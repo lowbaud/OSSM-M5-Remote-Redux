@@ -592,16 +592,14 @@ void test_tile_hints_follow_the_kind_of_row() {
         }
     };
 
-    MenuPage quickActions("Quick actions", MenuPage::Layout::Tiles);
     MenuPage settings("Settings");
-    TEST_ASSERT_TRUE(quickActions.layout() == MenuPage::Layout::Tiles);
-    TEST_ASSERT_TRUE(settings.layout() == MenuPage::Layout::List);
-
     MenuLinkItem settingsLink("settings", "Settings", settings);
     MenuCommandItem pause("pause", "Pause", 1);
+    MenuCommandItem settingsScreen("settings", "Settings", 2, MenuCommandItem::Style::OpensScreen);
     FakeChoice depthMode("Depth mode", {"Stroke / Depth", "Min / Max"}, 0);
     LevelChoice brightness("Brightness", fourOptions(), 1);
     TEST_ASSERT_TRUE(settingsLink.wideTile());
+    TEST_ASSERT_TRUE(settingsScreen.wideTile());
     TEST_ASSERT_FALSE(pause.wideTile());
     TEST_ASSERT_FALSE(depthMode.wideTile());
     TEST_ASSERT_TRUE(brightness.wideTile());

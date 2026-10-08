@@ -12,7 +12,7 @@ class MenuCommandItem : public MenuItem {
   public:
     enum class Style : std::uint8_t {
         Plain,
-        // Shows a chevron and selects with "Open".
+        // Shows a chevron, selects with "Open" and takes a whole line of tiles, like a link.
         OpensScreen,
         // Acts at once, e.g. Disconnect, so a page never starts on it.
         Destructive,
@@ -23,6 +23,7 @@ class MenuCommandItem : public MenuItem {
 
     MenuItemKind kind() const override;
     bool showsChevron() const override;
+    bool wideTile() const override;
     const char* selectLabel() const override;
     bool destructive() const override;
     MenuResult activate() override;

@@ -83,8 +83,12 @@ void RemoteSettingsSource::addItems(MenuPage& page) {
 }
 
 RemoteQuickActionsSource::RemoteQuickActionsSource(
-    SettingsStore& settings, BacklightController& backlight, MenuPage& settingsPage)
-    : brightness_(settings, backlight), settings_("remote.settings", "Settings", settingsPage) {
+    SettingsStore& settings, BacklightController& backlight)
+    : brightness_(settings, backlight), settings_(
+                                            "remote.settings",
+                                            "Settings",
+                                            static_cast<MenuCommand>(AppMenuCommand::ShowSettings),
+                                            MenuCommandItem::Style::OpensScreen) {
     settings_.setIcon(LV_SYMBOL_SETTINGS);
 }
 
