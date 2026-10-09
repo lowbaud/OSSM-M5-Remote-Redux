@@ -59,7 +59,7 @@ typedef struct _objects_t {
     lv_obj_t *ossm_control_patterns_btn;
     lv_obj_t *ossm_control_battery_lbl;
     lv_obj_t *ossm_control_motion_range_lbl;
-    lv_obj_t *ossm_control_settings_btn;
+    lv_obj_t *ossm_control_menu_btn;
     lv_obj_t *ossm_patterns_list;
     lv_obj_t *ossm_patterns_cancel_btn;
     lv_obj_t *ossm_patterns_select_btn;

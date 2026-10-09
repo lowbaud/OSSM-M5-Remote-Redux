@@ -76,7 +76,7 @@ class MenuScreen {
     void clearInput();
     void renderAll();
     void render(const MenuChanges& changes);
-    // The deepest page that is not a popup; popups above it are drawn over it.
+    // The page in the list; an open popup is drawn over it.
     std::size_t baseLevel() const;
     PageView& viewOf(std::size_t level);
     void showPage(PageView& view, std::size_t level);

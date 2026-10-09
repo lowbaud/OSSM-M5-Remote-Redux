@@ -474,12 +474,12 @@ void create_screen_ossm_control() {
             lv_label_set_text_static(obj, "STROKE / DEPTH");
         }
         {
-            // ossm_control_settings_btn
+            // ossm_control_menu_btn
             lv_obj_t *obj = lv_button_create(parent_obj);
-            objects.ossm_control_settings_btn = obj;
+            objects.ossm_control_menu_btn = obj;
             lv_obj_set_pos(obj, 10, 207);
             lv_obj_set_size(obj, 98, 26);
-            lv_obj_add_event_cb(obj, action_ossm_control_settings, LV_EVENT_CLICKED, (void *)0);
+            lv_obj_add_event_cb(obj, action_ossm_control_menu, LV_EVENT_CLICKED, (void *)0);
             add_style_button_secondary(obj);
             {
                 lv_obj_t *parent_obj = obj;
@@ -488,7 +488,7 @@ void create_screen_ossm_control() {
                     lv_obj_set_pos(obj, 0, 0);
                     lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                     lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-                    lv_label_set_text_static(obj, "Settings");
+                    lv_label_set_text_static(obj, "Menu");
                 }
             }
         }

@@ -179,7 +179,6 @@ void MenuScreen::render(const MenuChanges& changes) {
     const std::size_t base = baseLevel();
     if (changes.pages) {
         showPage(pageView_, base);
-        // A popup opened from a popup replaces it rather than stacking.
         if (top != base) {
             showPage(popupView_, top);
             resizePopup(controller_.page(top).count());
@@ -209,11 +208,7 @@ void MenuScreen::render(const MenuChanges& changes) {
 }
 
 std::size_t MenuScreen::baseLevel() const {
-    std::size_t level = controller_.depth() - 1;
-    while (level > 0 && controller_.isPopup(level)) {
-        --level;
-    }
-    return level;
+    return controller_.depth() - (controller_.popupOpen() ? 2 : 1);
 }
 
 MenuScreen::PageView& MenuScreen::viewOf(std::size_t level) {

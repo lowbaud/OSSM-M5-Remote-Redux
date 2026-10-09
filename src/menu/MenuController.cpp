@@ -6,7 +6,7 @@ namespace m5_redux {
 
 void MenuController::open(MenuPage& root) {
     close();
-    push(root, false);
+    push(root);
 }
 
 void MenuController::close() {
@@ -75,7 +75,7 @@ MenuEvent MenuController::update(const MenuInput& input) {
         moveHighlight(input.steps);
     }
 
-    if (inlineAdjustEnabled_ && input.adjustSteps != 0) {
+    if (input.adjustSteps != 0) {
         MenuItem* item = highlightedItem();
         if (item != nullptr && item->adjust(input.adjustSteps)) {
             changes_.values = true;
@@ -119,10 +119,6 @@ MenuChanges MenuController::takeChanges() {
     return changes;
 }
 
-void MenuController::setInlineAdjustEnabled(bool enabled) {
-    inlineAdjustEnabled_ = enabled;
-}
-
 std::size_t MenuController::depth() const {
     return depth_;
 }
@@ -131,8 +127,8 @@ MenuPage& MenuController::page(std::size_t level) const {
     return *frames_[level].page;
 }
 
-bool MenuController::isPopup(std::size_t level) const {
-    return frames_[level].popup;
+bool MenuController::popupOpen() const {
+    return depth_ > 0 && frames_[depth_ - 1].page == &optionsPage_;
 }
 
 std::size_t MenuController::highlight(std::size_t level) const {
@@ -143,7 +139,7 @@ MenuItem* MenuController::highlightedItem() const {
     return depth_ == 0 ? nullptr : itemAt(frames_[depth_ - 1]);
 }
 
-void MenuController::push(MenuPage& page, bool popup) {
+void MenuController::push(MenuPage& page) {
     if (depth_ >= frames_.size()) {
         return;
     }
@@ -156,7 +152,6 @@ void MenuController::push(MenuPage& page, bool popup) {
     page.populate();
     Frame& frame = frames_[depth_++];
     frame.page = &page;
-    frame.popup = popup;
     frame.highlight = page.initialHighlight();
     MenuItem* item = itemAt(frame);
     if (item != nullptr) {
@@ -239,14 +234,14 @@ MenuEvent MenuController::apply(const MenuResult& result) {
             break;
         case MenuResult::Type::OpenPage:
             if (result.page != nullptr) {
-                push(*result.page, false);
+                push(*result.page);
             }
             break;
         case MenuResult::Type::OpenChoice:
             // One options page serves every choice, so a choice cannot open from inside it.
-            if (result.choice != nullptr && !optionsPageOpen()) {
+            if (result.choice != nullptr && !popupOpen()) {
                 optionsPage_.configure(*result.choice);
-                push(optionsPage_, true);
+                push(optionsPage_);
             }
             break;
         case MenuResult::Type::ClosePage:
@@ -268,15 +263,6 @@ void MenuController::noteResult(const MenuResult& result) {
         changes_.values = true;
         changes_.saveFailed = true;
     }
-}
-
-bool MenuController::optionsPageOpen() const {
-    for (std::size_t level = 0; level < depth_; ++level) {
-        if (frames_[level].page == &optionsPage_) {
-            return true;
-        }
-    }
-    return false;
 }
 
 MenuItem* MenuController::itemAt(const Frame& frame) {

@@ -57,13 +57,12 @@ class MenuController {
     void refresh();
     MenuEvent update(const MenuInput& input);
     MenuChanges takeChanges();
-    // Without inline adjustment the inner knobs do nothing and rows change through select.
-    void setInlineAdjustEnabled(bool enabled);
 
     // Level 0 is the root page; the last level is the one taking input.
     std::size_t depth() const;
     MenuPage& page(std::size_t level) const;
-    bool isPopup(std::size_t level) const;
+    // The options of a choice are open on the last level, over the page they belong to.
+    bool popupOpen() const;
     // Highlighted row index on the level, or kNoItem.
     std::size_t highlight(std::size_t level) const;
     // Highlighted row on the top page, or nullptr.
@@ -73,16 +72,14 @@ class MenuController {
     struct Frame {
         MenuPage* page = nullptr;
         std::size_t highlight = kNoItem;
-        bool popup = false;
     };
 
     std::array<Frame, kMaxDepth> frames_{};
     std::size_t depth_ = 0;
     MenuOptionsPage optionsPage_;
     MenuChanges changes_{};
-    bool inlineAdjustEnabled_ = true;
 
-    void push(MenuPage& page, bool popup);
+    void push(MenuPage& page);
     void pop(bool dismissed);
     // Dismisses the pages from the top down to, but not including, the given depth.
     void truncate(std::size_t depth);
@@ -90,7 +87,6 @@ class MenuController {
     void setHighlight(std::size_t index);
     MenuEvent apply(const MenuResult& result);
     void noteResult(const MenuResult& result);
-    bool optionsPageOpen() const;
     static MenuItem* itemAt(const Frame& frame);
 };
 

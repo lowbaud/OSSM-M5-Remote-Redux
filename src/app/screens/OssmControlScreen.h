@@ -15,7 +15,7 @@ namespace m5_redux {
 
 enum class OssmControlScreenAction : std::uint8_t {
     None,
-    Settings,
+    Menu,
     Patterns,
 };
 

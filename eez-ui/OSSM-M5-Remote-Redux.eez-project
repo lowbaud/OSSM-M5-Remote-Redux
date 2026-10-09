@@ -116,6 +116,15 @@
   },
   "actions": [
     {
+      "objID": "eedbd5ce-8eb6-47b3-c8c5-397318314d5e",
+      "components": [],
+      "connectionLines": [],
+      "localVariables": [],
+      "componentGroups": [],
+      "userProperties": [],
+      "name": "welcome_settings"
+    },
+    {
       "objID": "a64e7dda-2300-41ef-8638-866c81674c8a",
       "components": [],
       "connectionLines": [],
@@ -170,22 +179,13 @@
       "name": "ossm_control_patterns"
     },
     {
-      "objID": "eedbd5ce-8eb6-47b3-c8c5-397318314d5e",
-      "components": [],
-      "connectionLines": [],
-      "localVariables": [],
-      "componentGroups": [],
-      "userProperties": [],
-      "name": "welcome_settings"
-    },
-    {
       "objID": "cc155b80-028e-4133-a9cd-bc5fcb570e3c",
       "components": [],
       "connectionLines": [],
       "localVariables": [],
       "componentGroups": [],
       "userProperties": [],
-      "name": "ossm_control_settings"
+      "name": "ossm_control_menu"
     },
     {
       "objID": "52c374c2-1a1f-4c76-c400-b6582aaab3e4",
@@ -2350,11 +2350,11 @@
                   "objID": "57a41f25-eb83-46a4-ccd0-cac511435545",
                   "eventName": "CLICKED",
                   "handlerType": "action",
-                  "action": "ossm_control_settings",
+                  "action": "ossm_control_menu",
                   "userData": 0
                 }
               ],
-              "identifier": "ossm_control_settings_btn",
+              "identifier": "ossm_control_menu_btn",
               "leftUnit": "px",
               "topUnit": "px",
               "widthUnit": "px",
@@ -2365,7 +2365,7 @@
                   "type": "LVGLLabelWidget",
                   "left": 0,
                   "top": 0,
-                  "width": 61,
+                  "width": 42,
                   "height": 16,
                   "customInputs": [],
                   "customOutputs": [],
@@ -2404,7 +2404,7 @@
                   },
                   "group": "",
                   "groupIndex": 0,
-                  "text": "Settings",
+                  "text": "Menu",
                   "textType": "literal",
                   "longMode": "WRAP",
                   "recolor": false

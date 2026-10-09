@@ -29,7 +29,7 @@ extern "C" void action_ossm_control_patterns(lv_event_t*) {
     m5_redux::app::showOssmPatterns();
 }
 
-extern "C" void action_ossm_control_settings(lv_event_t*) {
+extern "C" void action_ossm_control_menu(lv_event_t*) {
     m5_redux::app::showMenu();
 }
 

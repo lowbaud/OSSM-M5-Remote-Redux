@@ -84,7 +84,7 @@ void OssmControlScreen::leave() {
 
 OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& events) {
     if (events.leftClick) {
-        return OssmControlScreenAction::Settings;
+        return OssmControlScreenAction::Menu;
     }
     if (events.rightClick) {
         return OssmControlScreenAction::Patterns;

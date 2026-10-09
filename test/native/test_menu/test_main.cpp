@@ -235,7 +235,7 @@ void test_link_opens_a_page_and_back_returns_to_the_same_row() {
 
     menu.update(selectInput());
     TEST_ASSERT_EQUAL_UINT(2, menu.depth());
-    TEST_ASSERT_FALSE(menu.isPopup(1));
+    TEST_ASSERT_FALSE(menu.popupOpen());
     TEST_ASSERT_TRUE(&menu.page(1) == &settings);
     TEST_ASSERT_EQUAL_UINT(0, menu.highlight(1));
     TEST_ASSERT_TRUE(menu.takeChanges().pages);
@@ -283,7 +283,7 @@ void test_choice_popup_previews_options_and_back_cancels_the_preview() {
 
     menu.update(selectInput());
     TEST_ASSERT_EQUAL_UINT(2, menu.depth());
-    TEST_ASSERT_TRUE(menu.isPopup(1));
+    TEST_ASSERT_TRUE(menu.popupOpen());
     TEST_ASSERT_EQUAL_STRING("Brightness", menu.page(1).title());
     TEST_ASSERT_EQUAL_UINT(4, menu.page(1).count());
     TEST_ASSERT_EQUAL_UINT(1, menu.highlight(1));
@@ -465,22 +465,6 @@ void test_select_saves_a_pending_inline_adjustment_before_opening_the_options() 
     TEST_ASSERT_EQUAL_UINT(2, menu.highlight(1));
 }
 
-void test_disabled_inline_adjustment_ignores_the_inner_knobs() {
-    FakeChoice brightness("Brightness", fourOptions(), 1);
-    FakeSource source;
-    source.items = {&brightness};
-    MenuPage page;
-    page.addSource(source);
-    MenuController menu;
-    menu.setInlineAdjustEnabled(false);
-    menu.open(page);
-
-    menu.update(adjustInput(1));
-
-    TEST_ASSERT_TRUE(brightness.previews.empty());
-    TEST_ASSERT_FALSE(menu.takeChanges().values);
-}
-
 void test_refresh_keeps_the_highlight_on_the_same_row() {
     MenuCommandItem disconnect(
         "disconnect", "Disconnect", kDisconnectCommand, MenuCommandItem::Style::Destructive);
@@ -629,7 +613,6 @@ int main() {
     RUN_TEST(test_failed_inline_save_cancels_the_preview_and_reports_it);
     RUN_TEST(test_closing_the_menu_saves_a_pending_inline_adjustment);
     RUN_TEST(test_select_saves_a_pending_inline_adjustment_before_opening_the_options);
-    RUN_TEST(test_disabled_inline_adjustment_ignores_the_inner_knobs);
     RUN_TEST(test_refresh_keeps_the_highlight_on_the_same_row);
     RUN_TEST(test_refresh_closes_pages_opened_from_a_row_that_went_away);
     RUN_TEST(test_sources_add_rows_in_registration_order_up_to_the_capacity);

@@ -7,14 +7,14 @@
 extern "C" {
 #endif
 
+extern void action_welcome_settings(lv_event_t * e);
 extern void action_welcome_scan(lv_event_t * e);
 extern void action_scan_cancel(lv_event_t * e);
 extern void action_scan_connect(lv_event_t * e);
 extern void action_ossm_patterns_cancel(lv_event_t * e);
 extern void action_ossm_patterns_select(lv_event_t * e);
 extern void action_ossm_control_patterns(lv_event_t * e);
-extern void action_welcome_settings(lv_event_t * e);
-extern void action_ossm_control_settings(lv_event_t * e);
+extern void action_ossm_control_menu(lv_event_t * e);
 extern void action_menu_back(lv_event_t * e);
 extern void action_menu_select(lv_event_t * e);
 extern void action_connect_cancel(lv_event_t * e);

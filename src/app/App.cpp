@@ -204,8 +204,6 @@ void leaveScreen(Screen screen, Screen next) {
             if (next != Screen::Diagnostics) {
                 menuScreen.close();
             }
-            // Undo a brightness preview that did not finish.
-            backlightController.setBrightnessLevel(settingsStore.brightnessLevel());
             break;
         case Screen::Diagnostics:
             diagnosticsScreen.leave();
@@ -477,7 +475,7 @@ void dispatchInput(const RemoteInputEvents& events, bool connectedScreenWasReady
                 break;
             }
             switch (ossmControlScreen.update(events)) {
-                case OssmControlScreenAction::Settings:
+                case OssmControlScreenAction::Menu:
                     app::showMenu();
                     break;
                 case OssmControlScreenAction::Patterns:
