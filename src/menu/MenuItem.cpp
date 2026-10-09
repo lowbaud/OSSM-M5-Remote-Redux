@@ -30,14 +30,6 @@ const char* MenuItem::name() const {
     return name_;
 }
 
-const char* MenuItem::shortName() const {
-    return shortName_ != nullptr ? shortName_ : name();
-}
-
-void MenuItem::setShortName(const char* shortName) {
-    shortName_ = shortName;
-}
-
 const char* MenuItem::valueText() const {
     return "";
 }
@@ -52,10 +44,6 @@ const char* MenuItem::icon() const {
 
 void MenuItem::setIcon(const char* icon) {
     icon_ = icon;
-}
-
-bool MenuItem::wideTile() const {
-    return false;
 }
 
 const char* MenuItem::selectLabel() const {

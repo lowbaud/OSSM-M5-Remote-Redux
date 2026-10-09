@@ -33,8 +33,24 @@ bool MenuPage::add(MenuItem& item) {
     return true;
 }
 
+bool MenuPage::addTile(MenuItem& item) {
+    if (tileCount_ >= kMaxTiles || count_ >= items_.size()) {
+        return false;
+    }
+    for (std::size_t index = count_; index > tileCount_; --index) {
+        items_[index] = items_[index - 1];
+    }
+    items_[tileCount_++] = &item;
+    ++count_;
+    return true;
+}
+
 std::size_t MenuPage::count() const {
     return count_;
+}
+
+std::size_t MenuPage::tileCount() const {
+    return tileCount_;
 }
 
 MenuItem& MenuPage::item(std::size_t index) const {
@@ -67,6 +83,7 @@ void MenuPage::dismissed() {}
 
 void MenuPage::clear() {
     count_ = 0;
+    tileCount_ = 0;
 }
 
 MenuOptionsPage::MenuOptionsPage() : MenuPage("") {}

@@ -70,6 +70,9 @@ class RemoteSettingsSource : public MenuSource {
         AutoPowerOffController& autoPowerOff,
         IdleTimer& idleTimer);
 
+    // Also shown in the quick actions.
+    MenuItem& brightness();
+
     void addItems(MenuPage& page) override;
 
   private:
@@ -81,17 +84,18 @@ class RemoteSettingsSource : public MenuSource {
     MenuCommandItem diagnostics_;
 };
 
-// Quick actions of the remote itself. Settings comes last, below every other quick action.
+// Quick actions of the remote itself: the Lock tile, Brightness from the settings, and the link
+// to the settings, which comes last below every other quick action.
 class RemoteQuickActionsSource : public MenuSource {
   public:
-    RemoteQuickActionsSource(SettingsStore& settings, BacklightController& backlight);
+    RemoteQuickActionsSource(RemoteSettingsSource& settings, MenuPage& settingsPage);
 
     void addItems(MenuPage& page) override;
 
   private:
-    BrightnessItem brightness_;
-    // Opens the settings screen.
-    MenuCommandItem settings_;
+    RemoteSettingsSource& settings_;
+    MenuCommandItem lock_;
+    MenuLinkItem settingsLink_;
 };
 
 }  // namespace m5_redux

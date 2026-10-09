@@ -83,26 +83,17 @@ const char* DefaultPatternItem::valueText() const {
     return storedName_;
 }
 
-DepthModeItem::DepthModeItem(
-    SettingsStore& settings, OssmControlScreen& controlScreen, SelectAction selectAction)
-    : SettingChoiceItem("ossm.depthmode", "Depth mode", settings, kDepthModeSetting, selectAction),
-      controlScreen_(controlScreen) {
-    setShortName("Depth");
-    setIcon(LV_SYMBOL_BARS);
-}
+DepthModeItem::DepthModeItem(SettingsStore& settings, OssmControlScreen& controlScreen)
+    : SettingChoiceItem("ossm.depthmode", "Depth mode", settings, kDepthModeSetting),
+      controlScreen_(controlScreen) {}
 
 void DepthModeItem::applied(DepthControlMode mode) {
     controlScreen_.setDepthControlMode(mode);
 }
 
-StrokeDirectionItem::StrokeDirectionItem(
-    SettingsStore& settings, OssmControlScreen& controlScreen, SelectAction selectAction)
-    : SettingChoiceItem(
-          "ossm.strokedir", "Stroke dir.", settings, kStrokeDirectionSetting, selectAction),
-      controlScreen_(controlScreen) {
-    setShortName("Stroke");
-    setIcon(LV_SYMBOL_LOOP);
-}
+StrokeDirectionItem::StrokeDirectionItem(SettingsStore& settings, OssmControlScreen& controlScreen)
+    : SettingChoiceItem("ossm.strokedir", "Stroke dir.", settings, kStrokeDirectionSetting),
+      controlScreen_(controlScreen) {}
 
 void StrokeDirectionItem::applied(bool reversed) {
     controlScreen_.setStrokeEncoderReversed(reversed);
@@ -114,9 +105,8 @@ OssmSettingsSource::OssmSettingsSource(SettingsStore& settings, OssmControlScree
           "Disconnect",
           static_cast<MenuCommand>(AppMenuCommand::Disconnect),
           MenuCommandItem::Style::Destructive),
-      defaultPattern_(settings),
-      depthMode_(settings, controlScreen, MenuChoiceItem::SelectAction::OpenOptions),
-      strokeDirection_(settings, controlScreen, MenuChoiceItem::SelectAction::OpenOptions) {}
+      defaultPattern_(settings), depthMode_(settings, controlScreen),
+      strokeDirection_(settings, controlScreen) {}
 
 void OssmSettingsSource::setConnected(bool connected) {
     connected_ = connected;
@@ -124,6 +114,10 @@ void OssmSettingsSource::setConnected(bool connected) {
 
 void OssmSettingsSource::setPatternCatalog(const ossm::OssmClient::PatternList& catalog) {
     defaultPattern_.setCatalog(catalog);
+}
+
+MenuItem& OssmSettingsSource::depthMode() {
+    return depthMode_;
 }
 
 void OssmSettingsSource::addItems(MenuPage& page) {
@@ -137,14 +131,21 @@ void OssmSettingsSource::addItems(MenuPage& page) {
     page.add(strokeDirection_);
 }
 
-OssmQuickActionsSource::OssmQuickActionsSource(
-    SettingsStore& settings, OssmControlScreen& controlScreen)
-    : depthMode_(settings, controlScreen, MenuChoiceItem::SelectAction::NextOption),
-      strokeDirection_(settings, controlScreen, MenuChoiceItem::SelectAction::NextOption) {}
+OssmQuickActionsSource::OssmQuickActionsSource(OssmSettingsSource& settings)
+    : settings_(settings),
+      pause_("ossm.pause", "Pause", static_cast<MenuCommand>(AppMenuCommand::Pause)),
+      pullOut_("ossm.pullout", "Pull out", static_cast<MenuCommand>(AppMenuCommand::PullOut)),
+      ramp_("ossm.ramp", "Ramp", static_cast<MenuCommand>(AppMenuCommand::Ramp)) {
+    pause_.setIcon(LV_SYMBOL_PAUSE);
+    pullOut_.setIcon(LV_SYMBOL_PREV);
+    ramp_.setIcon(LV_SYMBOL_UP);
+}
 
 void OssmQuickActionsSource::addItems(MenuPage& page) {
-    page.add(depthMode_);
-    page.add(strokeDirection_);
+    page.addTile(pause_);
+    page.addTile(pullOut_);
+    page.addTile(ramp_);
+    page.add(settings_.depthMode());
 }
 
 }  // namespace m5_redux

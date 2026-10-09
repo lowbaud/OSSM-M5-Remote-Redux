@@ -34,8 +34,7 @@ class DefaultPatternItem : public MenuChoiceItem {
 
 class DepthModeItem : public SettingChoiceItem<DepthControlOption, DepthControlMode> {
   public:
-    DepthModeItem(
-        SettingsStore& settings, OssmControlScreen& controlScreen, SelectAction selectAction);
+    DepthModeItem(SettingsStore& settings, OssmControlScreen& controlScreen);
 
   protected:
     void applied(DepthControlMode mode) override;
@@ -46,8 +45,7 @@ class DepthModeItem : public SettingChoiceItem<DepthControlOption, DepthControlM
 
 class StrokeDirectionItem : public SettingChoiceItem<StrokeDirectionOption, bool> {
   public:
-    StrokeDirectionItem(
-        SettingsStore& settings, OssmControlScreen& controlScreen, SelectAction selectAction);
+    StrokeDirectionItem(SettingsStore& settings, OssmControlScreen& controlScreen);
 
   protected:
     void applied(bool reversed) override;
@@ -65,6 +63,8 @@ class OssmSettingsSource : public MenuSource {
     void setConnected(bool connected);
     // An empty catalog hides the default pattern.
     void setPatternCatalog(const ossm::OssmClient::PatternList& catalog);
+    // Also shown in the quick actions.
+    MenuItem& depthMode();
 
     void addItems(MenuPage& page) override;
 
@@ -76,16 +76,18 @@ class OssmSettingsSource : public MenuSource {
     bool connected_ = false;
 };
 
-// Quick actions while an OSSM is under control. The two-way settings switch with one press.
+// Quick actions while an OSSM is under control: action tiles, then Depth mode from the settings.
 class OssmQuickActionsSource : public MenuSource {
   public:
-    OssmQuickActionsSource(SettingsStore& settings, OssmControlScreen& controlScreen);
+    explicit OssmQuickActionsSource(OssmSettingsSource& settings);
 
     void addItems(MenuPage& page) override;
 
   private:
-    DepthModeItem depthMode_;
-    StrokeDirectionItem strokeDirection_;
+    OssmSettingsSource& settings_;
+    MenuCommandItem pause_;
+    MenuCommandItem pullOut_;
+    MenuCommandItem ramp_;
 };
 
 }  // namespace m5_redux

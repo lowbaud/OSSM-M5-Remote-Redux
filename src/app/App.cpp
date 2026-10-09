@@ -34,7 +34,6 @@
 #include "platform/RemoteInput.h"
 #include "settings/SettingsStore.h"
 #include "ui/MenuScreen.h"
-#include "ui/QuickMenuPanel.h"
 #include "ui/generated/ui.h"
 
 namespace m5_redux {
@@ -52,9 +51,8 @@ enum class Screen : std::uint8_t {
     Connect,
     OssmControl,
     OssmPatterns,
-    // The quick actions panel over the control screen.
-    QuickActions,
-    Settings,
+    // The quick actions from the control screen, the settings from the welcome screen.
+    Menu,
     Diagnostics,
 };
 
@@ -79,19 +77,18 @@ ConnectScreen connectScreen;
 OssmControlScreen ossmControlScreen(ossmControl);
 OssmPatternsScreen ossmPatternsScreen(ossmControl);
 DiagnosticsScreen diagnosticsScreen(ossmClient);
-QuickMenuPanel quickMenu;
-MenuScreen settingsMenu;
+MenuScreen menuScreen;
 OssmSettingsSource ossmSettings(settingsStore, ossmControlScreen);
 RemoteSettingsSource
     remoteSettings(settingsStore, backlightController, autoPowerOffController, idleTimer);
 MenuPage settingsPage("Settings");
-OssmQuickActionsSource ossmQuickActions(settingsStore, ossmControlScreen);
-RemoteQuickActionsSource remoteQuickActions(settingsStore, backlightController);
+OssmQuickActionsSource ossmQuickActions(ossmSettings);
+RemoteQuickActionsSource remoteQuickActions(remoteSettings, settingsPage);
 MenuPage quickActionsPage("Quick actions");
 
 Screen currentScreen = Screen::Boot;
-// Where the settings were opened from, and where Back returns to.
-Screen settingsReturnScreen = Screen::Welcome;
+// Where the menu was opened from, and where closing it returns to.
+Screen menuReturnScreen = Screen::Welcome;
 ConnectionOrigin connectionOrigin = ConnectionOrigin::Startup;
 SavedOssmConnection connectionTarget{};
 SavedOssmConnection startupConnection{};
@@ -161,6 +158,28 @@ void updateExternalPower() {
     }
 }
 
+// The menu belongs to the OSSM under control when it was opened from the control screen.
+bool menuConnected() {
+    return menuReturnScreen == Screen::OssmControl && ossmConnection.isReady();
+}
+
+// Repeats the pattern, speed and sensation of the control screen above the menu.
+void updateMenuStatus() {
+    if (!menuConnected()) {
+        menuScreen.hideStatus();
+        return;
+    }
+
+    const OssmControlValues& values = ossmControl.values();
+    const char* name = ossmPatternsScreen.patternName(values.pattern);
+    char fallback[16];
+    if (name == nullptr || name[0] == '\0') {
+        std::snprintf(fallback, sizeof(fallback), "Pattern %d", values.pattern);
+        name = fallback;
+    }
+    menuScreen.showStatus(name, values.speed, values.sensation);
+}
+
 void leaveScreen(Screen screen, Screen next) {
     switch (screen) {
         case Screen::Boot:
@@ -181,17 +200,12 @@ void leaveScreen(Screen screen, Screen next) {
         case Screen::OssmPatterns:
             ossmPatternsScreen.leave();
             break;
-        case Screen::QuickActions:
-            // Slides away when returning to the control screen; another screen replaces it.
-            quickMenu.close(next == Screen::OssmControl);
-            // Undo a brightness preview that did not finish.
-            backlightController.setBrightnessLevel(settingsStore.brightnessLevel());
-            break;
-        case Screen::Settings:
+        case Screen::Menu:
             // Kept open so Back from the diagnostics screen returns to the same row.
             if (next != Screen::Diagnostics) {
-                settingsMenu.close();
+                menuScreen.close();
             }
+            // Undo a brightness preview that did not finish.
             backlightController.setBrightnessLevel(settingsStore.brightnessLevel());
             break;
         case Screen::Diagnostics:
@@ -220,32 +234,28 @@ void enterScreen(Screen screen, Screen previous) {
         case Screen::OssmPatterns:
             ossmPatternsScreen.enter();
             break;
-        case Screen::QuickActions:
-            quickMenu.setStopAvailable(ossmConnection.isReady());
-            quickMenu.setMotionActive(ossmControl.values().speed > 0);
-            quickMenu.open(quickActionsPage);
-            break;
-        case Screen::Settings: {
-            const bool connected =
-                settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady();
+        case Screen::Menu: {
+            const bool connected = menuConnected();
             ossm::OssmClient::PatternList catalog{};
             if (connected) {
                 ossmClient.patternList(catalog);
             }
             ossmSettings.setConnected(connected);
             ossmSettings.setPatternCatalog(catalog);
-            settingsMenu.setStopAvailable(connected);
-            settingsMenu.setMotionActive(ossmControl.values().speed > 0);
-            if (previous == Screen::Diagnostics && settingsMenu.isOpen()) {
-                settingsMenu.resume();
+            menuScreen.setStopAvailable(connected);
+            menuScreen.setMotionActive(ossmControl.values().speed > 0);
+            updateMenuStatus();
+            if (previous == Screen::Diagnostics && menuScreen.isOpen()) {
+                menuScreen.resume();
+            } else if (connected) {
+                menuScreen.open(quickActionsPage, "Close");
             } else {
-                settingsMenu.open(settingsPage);
+                menuScreen.open(settingsPage, "Back");
             }
             break;
         }
         case Screen::Diagnostics:
-            diagnosticsScreen.setStopAvailable(
-                settingsReturnScreen == Screen::OssmControl && ossmConnection.isReady());
+            diagnosticsScreen.setStopAvailable(menuConnected());
             diagnosticsScreen.setMotionActive(ossmControl.values().speed > 0);
             diagnosticsScreen.enter();
             break;
@@ -310,12 +320,21 @@ void handleBootAction(BootScreenAction action) {
     }
 }
 
+// Back to where the menu was opened from, unless the OSSM went away meanwhile.
+void closeMenu() {
+    navigateTo(menuConnected() ? Screen::OssmControl : Screen::Welcome);
+}
+
 void handleMenuCommand(AppMenuCommand command) {
     switch (command) {
-        case AppMenuCommand::ShowSettings:
-            // Only the quick actions offer it, and they belong to the control screen.
-            settingsReturnScreen = Screen::OssmControl;
-            navigateTo(Screen::Settings);
+        case AppMenuCommand::Pause:
+        case AppMenuCommand::PullOut:
+        case AppMenuCommand::Ramp:
+        case AppMenuCommand::Lock:
+            // Mock-ups of the quick action tiles: they only close the menu, as the real actions
+            // will after running.
+            LOGI(kTag, "Quick action %u is not implemented yet", static_cast<unsigned>(command));
+            closeMenu();
             break;
         case AppMenuCommand::ShowDiagnostics:
             navigateTo(Screen::Diagnostics);
@@ -334,13 +353,9 @@ void handleMenuCommand(AppMenuCommand command) {
 
 void handleMenuEvent(const MenuEvent& event) {
     switch (event.type) {
-        case MenuEvent::Type::Closed: {
-            const bool fromControl = currentScreen == Screen::QuickActions ||
-                                     settingsReturnScreen == Screen::OssmControl;
-            navigateTo(
-                fromControl && ossmConnection.isReady() ? Screen::OssmControl : Screen::Welcome);
+        case MenuEvent::Type::Closed:
+            closeMenu();
             break;
-        }
         case MenuEvent::Type::Command:
             handleMenuCommand(static_cast<AppMenuCommand>(event.command));
             break;
@@ -473,15 +488,12 @@ void dispatchInput(const RemoteInputEvents& events, bool connectedScreenWasReady
                     break;
             }
             break;
-        case Screen::QuickActions:
-            handleMenuEvent(quickMenu.update(events));
-            break;
-        case Screen::Settings:
-            handleMenuEvent(settingsMenu.update(events));
+        case Screen::Menu:
+            handleMenuEvent(menuScreen.update(events));
             break;
         case Screen::Diagnostics:
             if (diagnosticsScreen.update(events) == DiagnosticsScreenAction::Back) {
-                navigateTo(Screen::Settings);
+                navigateTo(Screen::Menu);
             }
             break;
     }
@@ -529,8 +541,7 @@ void begin() {
     settingsPage.addSource(remoteSettings);
     quickActionsPage.addSource(ossmQuickActions);
     quickActionsPage.addSource(remoteQuickActions);
-    quickMenu.begin();
-    settingsMenu.begin();
+    menuScreen.begin();
     updateBatteryIndicator(true);
     ossmConnection.begin(APP_DISPLAY_NAME);
     if (!ossmDiscovery.begin()) {
@@ -603,12 +614,9 @@ void stopMotion() {
         ossmControlScreen.refresh();
     } else if (currentScreen == Screen::OssmPatterns) {
         ossmPatternsScreen.refresh();
-    } else if (currentScreen == Screen::QuickActions) {
-        quickMenu.setMotionActive(false);
-        // The control screen stays visible next to the panel.
-        ossmControlScreen.refresh();
-    } else if (currentScreen == Screen::Settings) {
-        settingsMenu.setMotionActive(false);
+    } else if (currentScreen == Screen::Menu) {
+        menuScreen.setMotionActive(false);
+        updateMenuStatus();
     } else if (currentScreen == Screen::Diagnostics) {
         diagnosticsScreen.setMotionActive(false);
     }
@@ -616,11 +624,13 @@ void stopMotion() {
 
 void showMenu() {
     if (currentScreen == Screen::Welcome) {
-        settingsReturnScreen = Screen::Welcome;
-        navigateTo(Screen::Settings);
+        menuReturnScreen = Screen::Welcome;
     } else if (currentScreen == Screen::OssmControl && ossmConnection.isReady()) {
-        navigateTo(Screen::QuickActions);
+        menuReturnScreen = Screen::OssmControl;
+    } else {
+        return;
     }
+    navigateTo(Screen::Menu);
 }
 
 void activateDiagnosticsBack() {

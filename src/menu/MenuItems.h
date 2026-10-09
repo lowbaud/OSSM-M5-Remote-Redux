@@ -11,8 +11,9 @@ namespace m5_redux {
 class MenuCommandItem : public MenuItem {
   public:
     enum class Style : std::uint8_t {
+        // An action such as Pause; selects with "Run".
         Plain,
-        // Shows a chevron, selects with "Open" and takes a whole line of tiles, like a link.
+        // Shows a chevron and selects with "Open".
         OpensScreen,
         // Acts at once, e.g. Disconnect, so a page never starts on it.
         Destructive,
@@ -23,7 +24,6 @@ class MenuCommandItem : public MenuItem {
 
     MenuItemKind kind() const override;
     bool showsChevron() const override;
-    bool wideTile() const override;
     const char* selectLabel() const override;
     bool destructive() const override;
     MenuResult activate() override;
@@ -40,7 +40,6 @@ class MenuLinkItem : public MenuItem {
 
     MenuItemKind kind() const override;
     bool showsChevron() const override;
-    bool wideTile() const override;
     const char* selectLabel() const override;
     MenuResult activate() override;
 
@@ -48,20 +47,13 @@ class MenuLinkItem : public MenuItem {
     MenuPage& page_;
 };
 
-// A value picked from a fixed list of options. Select opens the options popup or moves to the
-// next option; the inner knobs step through the options in place and save when the row loses
-// the highlight.
+// A value picked from a fixed list of options. Select opens the options popup; the inner knobs
+// step through the options in place and save when the row loses the highlight.
 class MenuChoiceItem : public MenuItem {
   public:
     static constexpr std::size_t kNoOption = static_cast<std::size_t>(-1);
 
-    enum class SelectAction : std::uint8_t {
-        OpenOptions,
-        NextOption,
-    };
-
-    MenuChoiceItem(
-        const char* id, const char* name, SelectAction selectAction = SelectAction::OpenOptions);
+    MenuChoiceItem(const char* id, const char* name);
 
     virtual std::size_t optionCount() const = 0;
     virtual const char* optionName(std::size_t index) const = 0;
@@ -78,12 +70,8 @@ class MenuChoiceItem : public MenuItem {
 
     // The inline adjustment while one is pending, otherwise the stored option.
     std::size_t displayedOption() const;
-    // Two-option choices count as switched on while their second option shows, e.g. Min / Max.
-    bool toggledOn() const;
 
     MenuItemKind kind() const override;
-    // Level bars take a whole line.
-    bool wideTile() const override;
     const char* valueText() const override;
     const char* selectLabel() const override;
     bool adjust(std::size_t knob, std::int32_t steps) override;
@@ -91,7 +79,6 @@ class MenuChoiceItem : public MenuItem {
     MenuResult unhighlighted() override;
 
   private:
-    SelectAction selectAction_;
     std::size_t pendingOption_ = kNoOption;
 
     MenuResult commitPending();

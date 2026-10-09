@@ -16,13 +16,9 @@ constexpr MenuCommand kDiagnosticsCommand = 2;
 
 class FakeChoice : public MenuChoiceItem {
   public:
-    FakeChoice(
-        const char* name,
-        std::vector<const char*> optionNames,
-        std::size_t storedIndex,
-        SelectAction selectAction = SelectAction::OpenOptions)
-        : MenuChoiceItem(name, name, selectAction), names(std::move(optionNames)),
-          stored(storedIndex), applied(storedIndex) {}
+    FakeChoice(const char* name, std::vector<const char*> optionNames, std::size_t storedIndex)
+        : MenuChoiceItem(name, name), names(std::move(optionNames)), stored(storedIndex),
+          applied(storedIndex) {}
 
     std::size_t optionCount() const override {
         return names.size();
@@ -68,11 +64,15 @@ class FakeChoice : public MenuChoiceItem {
 class FakeSource : public MenuSource {
   public:
     void addItems(MenuPage& page) override {
+        for (MenuItem* tile : tiles) {
+            page.addTile(*tile);
+        }
         for (MenuItem* item : items) {
             page.add(*item);
         }
     }
 
+    std::vector<MenuItem*> tiles;
     std::vector<MenuItem*> items;
 };
 
@@ -482,26 +482,6 @@ void test_disabled_inline_adjustment_ignores_the_inner_knobs() {
     TEST_ASSERT_FALSE(menu.takeChanges().values);
 }
 
-void test_next_option_choice_toggles_on_select() {
-    FakeChoice depthMode(
-        "Depth mode", {"Stroke/Depth", "Min/Max"}, 0, MenuChoiceItem::SelectAction::NextOption);
-    FakeSource source;
-    source.items = {&depthMode};
-    MenuPage page("Quick actions");
-    page.addSource(source);
-    MenuController menu;
-    menu.open(page);
-    TEST_ASSERT_EQUAL_STRING("Toggle", depthMode.selectLabel());
-
-    menu.update(selectInput());
-    TEST_ASSERT_EQUAL_UINT(1, menu.depth());
-    TEST_ASSERT_EQUAL_UINT(1, depthMode.stored);
-
-    menu.update(selectInput());
-    TEST_ASSERT_EQUAL_UINT(0, depthMode.stored);
-    TEST_ASSERT_EQUAL_UINT(2, depthMode.commits.size());
-}
-
 void test_refresh_keeps_the_highlight_on_the_same_row() {
     MenuCommandItem disconnect(
         "disconnect", "Disconnect", kDisconnectCommand, MenuCommandItem::Style::Destructive);
@@ -582,40 +562,49 @@ void test_step_index_starts_at_either_end_without_a_current_index() {
     TEST_ASSERT_TRUE(stepMenuIndex(none, 0, 1) == none);
 }
 
-void test_tile_hints_follow_the_kind_of_row() {
-    class LevelChoice : public FakeChoice {
-      public:
-        using FakeChoice::FakeChoice;
-
-        bool showsLevel() const override {
-            return true;
-        }
-    };
-
-    MenuPage settings("Settings");
-    MenuLinkItem settingsLink("settings", "Settings", settings);
+void test_tiles_from_every_source_come_before_the_rows() {
     MenuCommandItem pause("pause", "Pause", 1);
-    MenuCommandItem settingsScreen("settings", "Settings", 2, MenuCommandItem::Style::OpensScreen);
+    MenuCommandItem pullOut("pullout", "Pull out", 2);
+    MenuCommandItem lock("lock", "Lock", 3);
     FakeChoice depthMode("Depth mode", {"Stroke / Depth", "Min / Max"}, 0);
-    LevelChoice brightness("Brightness", fourOptions(), 1);
-    TEST_ASSERT_TRUE(settingsLink.wideTile());
-    TEST_ASSERT_TRUE(settingsScreen.wideTile());
-    TEST_ASSERT_FALSE(pause.wideTile());
-    TEST_ASSERT_FALSE(depthMode.wideTile());
-    TEST_ASSERT_TRUE(brightness.wideTile());
+    FakeChoice brightness("Brightness", fourOptions(), 1);
+    FakeSource deviceSource;
+    deviceSource.tiles = {&pause, &pullOut};
+    deviceSource.items = {&depthMode};
+    FakeSource remoteSource;
+    remoteSource.tiles = {&lock};
+    remoteSource.items = {&brightness};
+    MenuPage page("Quick actions");
+    page.addSource(deviceSource);
+    page.addSource(remoteSource);
 
-    TEST_ASSERT_EQUAL_STRING("Pause", pause.shortName());
-    depthMode.setShortName("Depth");
-    TEST_ASSERT_EQUAL_STRING("Depth", depthMode.shortName());
-    TEST_ASSERT_EQUAL_STRING("Depth mode", depthMode.name());
-    TEST_ASSERT_EQUAL_STRING("", pause.icon());
-    pause.setIcon("P");
-    TEST_ASSERT_EQUAL_STRING("P", pause.icon());
+    MenuController menu;
+    menu.open(page);
+    TEST_ASSERT_EQUAL_UINT(5, page.count());
+    TEST_ASSERT_EQUAL_UINT(3, page.tileCount());
+    TEST_ASSERT_TRUE(&page.item(0) == &pause);
+    TEST_ASSERT_TRUE(&page.item(1) == &pullOut);
+    TEST_ASSERT_TRUE(&page.item(2) == &lock);
+    TEST_ASSERT_TRUE(&page.item(3) == &depthMode);
+    TEST_ASSERT_TRUE(&page.item(4) == &brightness);
+    TEST_ASSERT_EQUAL_STRING("Run", pause.selectLabel());
+    TEST_ASSERT_EQUAL_STRING("Change", depthMode.selectLabel());
 
-    TEST_ASSERT_FALSE(depthMode.toggledOn());
-    depthMode.adjust(0, 1);
-    TEST_ASSERT_TRUE(depthMode.toggledOn());
-    TEST_ASSERT_FALSE(brightness.toggledOn());
+    // The highlight starts on the first tile and moves on through the rows.
+    TEST_ASSERT_TRUE(menu.highlightedItem() == &pause);
+    menu.update(stepInput(3));
+    TEST_ASSERT_TRUE(menu.highlightedItem() == &depthMode);
+
+    page.populate();
+    TEST_ASSERT_EQUAL_UINT(5, page.count());
+    TEST_ASSERT_EQUAL_UINT(3, page.tileCount());
+
+    MenuPage full("Full");
+    for (std::size_t index = 0; index < MenuPage::kMaxTiles; ++index) {
+        TEST_ASSERT_TRUE(full.addTile(pause));
+    }
+    TEST_ASSERT_FALSE(full.addTile(pause));
+    TEST_ASSERT_EQUAL_UINT(MenuPage::kMaxTiles, full.tileCount());
 }
 
 }  // namespace
@@ -642,11 +631,10 @@ int main() {
     RUN_TEST(test_closing_the_menu_saves_a_pending_inline_adjustment);
     RUN_TEST(test_select_saves_a_pending_inline_adjustment_before_opening_the_options);
     RUN_TEST(test_disabled_inline_adjustment_ignores_the_inner_knobs);
-    RUN_TEST(test_next_option_choice_toggles_on_select);
     RUN_TEST(test_refresh_keeps_the_highlight_on_the_same_row);
     RUN_TEST(test_refresh_closes_pages_opened_from_a_row_that_went_away);
     RUN_TEST(test_sources_add_rows_in_registration_order_up_to_the_capacity);
     RUN_TEST(test_step_index_starts_at_either_end_without_a_current_index);
-    RUN_TEST(test_tile_hints_follow_the_kind_of_row);
+    RUN_TEST(test_tiles_from_every_source_come_before_the_rows);
     return UNITY_END();
 }

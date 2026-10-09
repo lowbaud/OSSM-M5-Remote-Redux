@@ -73,6 +73,10 @@ RemoteSettingsSource::RemoteSettingsSource(
                                   static_cast<MenuCommand>(AppMenuCommand::ShowDiagnostics),
                                   MenuCommandItem::Style::OpensScreen) {}
 
+MenuItem& RemoteSettingsSource::brightness() {
+    return brightness_;
+}
+
 void RemoteSettingsSource::addItems(MenuPage& page) {
     page.add(brightness_);
     page.add(idleDim_);
@@ -83,25 +87,23 @@ void RemoteSettingsSource::addItems(MenuPage& page) {
 }
 
 RemoteQuickActionsSource::RemoteQuickActionsSource(
-    SettingsStore& settings, BacklightController& backlight)
-    : brightness_(settings, backlight), settings_(
-                                            "remote.settings",
-                                            "Settings",
-                                            static_cast<MenuCommand>(AppMenuCommand::ShowSettings),
-                                            MenuCommandItem::Style::OpensScreen) {
-    settings_.setIcon(LV_SYMBOL_SETTINGS);
+    RemoteSettingsSource& settings, MenuPage& settingsPage)
+    : settings_(settings),
+      lock_("remote.lock", "Lock", static_cast<MenuCommand>(AppMenuCommand::Lock)),
+      settingsLink_("remote.settings", "Settings", settingsPage) {
+    // LVGL has no lock symbol; a stand-in until the action and its icon exist.
+    lock_.setIcon(LV_SYMBOL_EYE_CLOSE);
 }
 
 void RemoteQuickActionsSource::addItems(MenuPage& page) {
-    page.add(brightness_);
-    page.add(settings_);
+    page.addTile(lock_);
+    page.add(settings_.brightness());
+    page.add(settingsLink_);
 }
 
 BrightnessItem::BrightnessItem(SettingsStore& settings, BacklightController& backlight)
     : SettingChoiceItem("remote.brightness", "Brightness", settings, kBrightnessSetting),
-      backlight_(backlight) {
-    setIcon(LV_SYMBOL_EYE_OPEN);
-}
+      backlight_(backlight) {}
 
 void BrightnessItem::previewOption(std::size_t index) {
     backlight_.setBrightnessLevel(optionValue(index));

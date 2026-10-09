@@ -23,6 +23,8 @@ class MenuPage {
     // Holds the default pattern options: every pattern plus Auto.
     static constexpr std::size_t kMaxItems = 40;
     static constexpr std::size_t kMaxSources = 4;
+    // Actions shown as one row of tiles above the other rows.
+    static constexpr std::size_t kMaxTiles = 4;
     static constexpr std::size_t kNoItem = static_cast<std::size_t>(-1);
 
     explicit MenuPage(const char* title);
@@ -37,7 +39,12 @@ class MenuPage {
     virtual void populate();
     // Returns false when the page is full.
     bool add(MenuItem& item);
+    // Adds a tile after the tiles added before it; tiles come before every other row, whichever
+    // source adds them. Returns false when the tiles or the page are full.
+    bool addTile(MenuItem& item);
     std::size_t count() const;
+    // The first tileCount() items are tiles.
+    std::size_t tileCount() const;
     MenuItem& item(std::size_t index) const;
     std::size_t indexOf(const MenuItem& item) const;
     // The first row that is not destructive, or kNoItem when there is none.
@@ -54,6 +61,7 @@ class MenuPage {
     const char* title_;
     std::array<MenuItem*, kMaxItems> items_{};
     std::size_t count_ = 0;
+    std::size_t tileCount_ = 0;
     std::array<MenuSource*, kMaxSources> sources_{};
     std::size_t sourceCount_ = 0;
 };

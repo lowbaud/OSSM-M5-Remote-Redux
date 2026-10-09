@@ -23,12 +23,8 @@ template <typename Option, typename Value> class SettingChoiceItem : public Menu
     };
 
     SettingChoiceItem(
-        const char* id,
-        const char* name,
-        SettingsStore& settings,
-        const Setting& setting,
-        SelectAction selectAction = SelectAction::OpenOptions)
-        : MenuChoiceItem(id, name, selectAction), settings_(settings), setting_(setting) {}
+        const char* id, const char* name, SettingsStore& settings, const Setting& setting)
+        : MenuChoiceItem(id, name), settings_(settings), setting_(setting) {}
 
     std::size_t optionCount() const override {
         return setting_.optionCount;

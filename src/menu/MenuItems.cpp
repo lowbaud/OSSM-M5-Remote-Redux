@@ -13,12 +13,11 @@ bool MenuCommandItem::showsChevron() const {
     return style_ == Style::OpensScreen;
 }
 
-bool MenuCommandItem::wideTile() const {
-    return style_ == Style::OpensScreen;
-}
-
 const char* MenuCommandItem::selectLabel() const {
-    return style_ == Style::OpensScreen ? "Open" : "Select";
+    if (style_ == Style::OpensScreen) {
+        return "Open";
+    }
+    return style_ == Style::Destructive ? "Select" : "Run";
 }
 
 bool MenuCommandItem::destructive() const {
@@ -40,10 +39,6 @@ bool MenuLinkItem::showsChevron() const {
     return true;
 }
 
-bool MenuLinkItem::wideTile() const {
-    return true;
-}
-
 const char* MenuLinkItem::selectLabel() const {
     return "Open";
 }
@@ -52,8 +47,7 @@ MenuResult MenuLinkItem::activate() {
     return MenuResult::openPage(page_);
 }
 
-MenuChoiceItem::MenuChoiceItem(const char* id, const char* name, SelectAction selectAction)
-    : MenuItem(id, name), selectAction_(selectAction) {}
+MenuChoiceItem::MenuChoiceItem(const char* id, const char* name) : MenuItem(id, name) {}
 
 void MenuChoiceItem::previewOption(std::size_t) {}
 
@@ -67,16 +61,8 @@ std::size_t MenuChoiceItem::displayedOption() const {
     return pendingOption_ != kNoOption ? pendingOption_ : storedOption();
 }
 
-bool MenuChoiceItem::toggledOn() const {
-    return optionCount() == 2 && displayedOption() == 1;
-}
-
 MenuItemKind MenuChoiceItem::kind() const {
     return MenuItemKind::Choice;
-}
-
-bool MenuChoiceItem::wideTile() const {
-    return showsLevel();
 }
 
 const char* MenuChoiceItem::valueText() const {
@@ -85,7 +71,7 @@ const char* MenuChoiceItem::valueText() const {
 }
 
 const char* MenuChoiceItem::selectLabel() const {
-    return selectAction_ == SelectAction::NextOption ? "Toggle" : "Change";
+    return "Change";
 }
 
 bool MenuChoiceItem::adjust(std::size_t, std::int32_t steps) {
@@ -112,23 +98,10 @@ MenuResult MenuChoiceItem::activate() {
         return pending;
     }
 
-    const std::size_t count = optionCount();
-    if (count == 0) {
+    if (optionCount() == 0) {
         return pending;
     }
-
-    if (selectAction_ == SelectAction::OpenOptions) {
-        return MenuResult::openChoice(*this);
-    }
-
-    // Wraps around, and starts at the first option when the stored value matches none.
-    const std::size_t stored = storedOption();
-    const std::size_t next = stored < count - 1 ? stored + 1 : 0;
-    if (commitOption(next)) {
-        return MenuResult::changed();
-    }
-    cancelPreview();
-    return MenuResult::failed();
+    return MenuResult::openChoice(*this);
 }
 
 MenuResult MenuChoiceItem::unhighlighted() {
