@@ -28,7 +28,8 @@ void setListRowSelected(lv_obj_t* row, bool selected);
 
 // Shared styles with the look of the functions above, for rows that are created once and kept.
 // Each object holds a reference per style instead of its own copy of every property. Remove the
-// theme styles first with lv_obj_remove_style_all() on plain objects and bars.
+// theme styles first with lv_obj_remove_style_all() on rows and bars. Lists may keep them when
+// their own styles clear the theme's background, border and radius, like the EEZ menu lists.
 void addSharedListStyles(lv_obj_t* list);
 void addSharedListRowStyles(lv_obj_t* row);
 void addSharedListRowNameStyles(lv_obj_t* label);

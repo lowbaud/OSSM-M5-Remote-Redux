@@ -17,7 +17,7 @@ enum ScreensEnum {
     SCREEN_ID_CONNECT = 4,
     SCREEN_ID_OSSM_CONTROL = 5,
     SCREEN_ID_OSSM_PATTERNS = 6,
-    SCREEN_ID_SETTINGS = 7,
+    SCREEN_ID_MENU = 7,
     SCREEN_ID_DIAGNOSTICS = 8,
     _SCREEN_ID_LAST = 8
 };
@@ -29,7 +29,7 @@ typedef struct _objects_t {
     lv_obj_t *connect;
     lv_obj_t *ossm_control;
     lv_obj_t *ossm_patterns;
-    lv_obj_t *settings;
+    lv_obj_t *menu;
     lv_obj_t *diagnostics;
     lv_obj_t *redux_logo_img;
     lv_obj_t *boot_message_lbl;
@@ -64,12 +64,17 @@ typedef struct _objects_t {
     lv_obj_t *ossm_patterns_cancel_btn;
     lv_obj_t *ossm_patterns_select_btn;
     lv_obj_t *ossm_patterns_stop_btn;
-    lv_obj_t *settings_list;
-    lv_obj_t *settings_options_scrim;
-    lv_obj_t *settings_options;
-    lv_obj_t *settings_back_btn;
-    lv_obj_t *settings_select_btn;
-    lv_obj_t *settings_stop_btn;
+    lv_obj_t *menu_list;
+    lv_obj_t *menu_popup_scrim;
+    lv_obj_t *menu_popup;
+    lv_obj_t *menu_popup_title;
+    lv_obj_t *menu_popup_list;
+    lv_obj_t *menu_back_btn;
+    lv_obj_t *menu_back_lbl;
+    lv_obj_t *menu_select_btn;
+    lv_obj_t *menu_select_lbl;
+    lv_obj_t *menu_stop_btn;
+    lv_obj_t *menu_save_failure_lbl;
     lv_obj_t *diagnostics_panel;
     lv_obj_t *diagnostics_back_btn;
     lv_obj_t *diagnostics_action_btn;
@@ -96,8 +101,8 @@ void tick_screen_ossm_control();
 void create_screen_ossm_patterns();
 void tick_screen_ossm_patterns();
 
-void create_screen_settings();
-void tick_screen_settings();
+void create_screen_menu();
+void tick_screen_menu();
 
 void create_screen_diagnostics();
 void tick_screen_diagnostics();

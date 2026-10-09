@@ -644,6 +644,18 @@ void showMenu() {
     navigateTo(Screen::Menu);
 }
 
+void activateMenuBack() {
+    if (currentScreen == Screen::Menu) {
+        menuScreen.requestBack();
+    }
+}
+
+void activateMenuSelect() {
+    if (currentScreen == Screen::Menu) {
+        menuScreen.requestSelect();
+    }
+}
+
 void activateDiagnosticsBack() {
     if (currentScreen == Screen::Diagnostics) {
         diagnosticsScreen.requestBack();

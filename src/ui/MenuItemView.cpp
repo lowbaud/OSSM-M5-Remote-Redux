@@ -87,6 +87,14 @@ TileStyles& tileStyles() {
     return styles;
 }
 
+// A plain object without theme styles or scrolling.
+lv_obj_t* createMenuObject(lv_obj_t* parent) {
+    lv_obj_t* object = lv_obj_create(parent);
+    lv_obj_remove_style_all(object);
+    lv_obj_remove_flag(object, LV_OBJ_FLAG_SCROLLABLE);
+    return object;
+}
+
 lv_obj_t* createLevel(lv_obj_t* parent) {
     lv_obj_t* level = lv_bar_create(parent);
     lv_obj_remove_style_all(level);
@@ -117,20 +125,6 @@ void refreshTile(const MenuItemView& view) {
 }
 
 }  // namespace
-
-lv_obj_t* createMenuObject(lv_obj_t* parent) {
-    lv_obj_t* object = lv_obj_create(parent);
-    lv_obj_remove_style_all(object);
-    lv_obj_remove_flag(object, LV_OBJ_FLAG_SCROLLABLE);
-    return object;
-}
-
-lv_obj_t* createMenuScrollArea(lv_obj_t* parent) {
-    lv_obj_t* area = createMenuObject(parent);
-    lv_obj_add_flag(area, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scroll_dir(area, LV_DIR_VER);
-    return area;
-}
 
 lv_obj_t* createMenuTileRow(lv_obj_t* list) {
     lv_obj_t* row = createMenuObject(list);

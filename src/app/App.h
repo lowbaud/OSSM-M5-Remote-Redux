@@ -7,6 +7,8 @@ void begin();
 void update();
 void stopMotion();
 void showMenu();
+void activateMenuBack();
+void activateMenuSelect();
 void activateDiagnosticsBack();
 void activateDiagnosticsAction();
 void showScan();

@@ -22,10 +22,6 @@ struct MenuItemView {
     lv_obj_t* level = nullptr;
 };
 
-// A plain object without theme styles or scrolling.
-lv_obj_t* createMenuObject(lv_obj_t* parent);
-// A plain object that scrolls vertically.
-lv_obj_t* createMenuScrollArea(lv_obj_t* parent);
 // The line of up to four tiles above the rows of a list.
 lv_obj_t* createMenuTileRow(lv_obj_t* list);
 

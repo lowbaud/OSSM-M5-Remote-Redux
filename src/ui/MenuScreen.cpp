@@ -7,51 +7,17 @@
 
 #include "diagnostics/Log.h"
 #include "ui/ListRowStyle.h"
-#include "ui/ThemeColors.h"
-#include "ui/generated/actions.h"
 #include "ui/generated/screens.h"
-#include "ui/generated/styles.h"
+#include "ui/generated/ui.h"
 
 namespace m5_redux {
 
 namespace {
 
 constexpr const char* kTag = "menu";
-constexpr std::int32_t kListBarGap = 7;
-constexpr std::int32_t kListPadX = 10;
-// Pages start close to the top to fit more rows; tiles add their own space above them.
-constexpr std::int32_t kListPadTop = 4;
-constexpr std::int32_t kTitleHeight = 28;
-constexpr std::int32_t kTitlePadX = 12;
-constexpr std::int32_t kPopupWidth = 263;
-constexpr std::int32_t kPopupOffsetY = -20;
-constexpr std::int32_t kPopupBorderWidth = 1;
 // The popup grows with its rows up to this many, then scrolls.
 constexpr std::size_t kMaxVisiblePopupRows = 4;
-constexpr lv_opa_t kPopupScrimOpacity = LV_OPA_50;
-constexpr std::int32_t kSaveFailureWidth = 236;
 constexpr std::uint32_t kSaveFailureDurationMs = 2000;
-// Matches the screen changes of the EEZ screens.
-constexpr std::uint32_t kScreenFadeMs = 200;
-
-// Places the button where the screens put theirs, so the bar does not move when a menu shows.
-void copyGeometry(lv_obj_t* button, const lv_obj_t* reference) {
-    lv_obj_set_pos(
-        button,
-        lv_obj_get_style_x(reference, LV_PART_MAIN),
-        lv_obj_get_style_y(reference, LV_PART_MAIN));
-    lv_obj_set_size(
-        button,
-        lv_obj_get_style_width(reference, LV_PART_MAIN),
-        lv_obj_get_style_height(reference, LV_PART_MAIN));
-}
-
-lv_obj_t* addButtonLabel(lv_obj_t* button, const char* text) {
-    lv_obj_t* label = lv_label_create(button);
-    lv_obj_set_align(label, LV_ALIGN_CENTER);
-    lv_label_set_text_static(label, text);
-    return label;
-}
 
 // Setting the same static text again would still redraw the label.
 void setStaticText(lv_obj_t* label, const char* text) {
@@ -68,32 +34,29 @@ void setHidden(lv_obj_t* object, bool hidden) {
     }
 }
 
+// The EEZ containers that hold the rows; the rows stack and scroll vertically.
+void setUpList(lv_obj_t* list) {
+    addSharedListStyles(list);
+    lv_obj_set_scroll_dir(list, LV_DIR_VER);
+}
+
 }  // namespace
 
 void MenuScreen::begin() {
-    const lv_style_selector_t mainStyle = LV_PART_MAIN;
+    setUpList(objects.menu_list);
+    pageView_.container = objects.menu_list;
+    // The tiles are the first child of the list, so the EEZ list has no children of its own.
+    pageView_.tileRow = createMenuTileRow(objects.menu_list);
 
-    screen_ = lv_obj_create(nullptr);
-    lv_obj_remove_style_all(screen_);
-    lv_obj_remove_flag(screen_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(screen_, themeColor(COLOR_ID_BACKGROUND), mainStyle);
-    lv_obj_set_style_bg_opa(screen_, LV_OPA_COVER, mainStyle);
+    setUpList(objects.menu_popup_list);
+    popupView_.container = objects.menu_popup_list;
+    popupView_.title = objects.menu_popup_title;
+    lv_label_set_text_static(popupView_.title, popupView_.titleText);
 
-    const std::int32_t buttonBarTop =
-        lv_obj_get_style_y(objects.ossm_control_settings_btn, LV_PART_MAIN);
-    lv_obj_t* list = createMenuScrollArea(screen_);
-    lv_obj_set_pos(list, 0, 0);
-    lv_obj_set_size(list, lv_pct(100), buttonBarTop - kListBarGap);
-    addSharedListStyles(list);
-    lv_obj_set_style_pad_left(list, kListPadX, mainStyle);
-    lv_obj_set_style_pad_right(list, kListPadX, mainStyle);
-    lv_obj_set_style_pad_top(list, kListPadTop, mainStyle);
-    pageView_.container = list;
-    pageView_.tileRow = createMenuTileRow(list);
-
-    buildPopup();
-    buildButtonBar();
-    buildSaveFailureLabel();
+    stopButtonFeedback_.begin(objects.menu_stop_btn);
+    // Shown only while a popup is open or after a failed save, whatever the EEZ design shows.
+    lv_obj_add_flag(objects.menu_popup_scrim, LV_OBJ_FLAG_HIDDEN);
+    hideSaveFailure();
     setStopAvailable(false);
 }
 
@@ -129,7 +92,7 @@ MenuEvent MenuScreen::update(const RemoteInputEvents& events) {
         return {};
     }
 
-    if (!lv_obj_has_flag(saveFailureLabel_, LV_OBJ_FLAG_HIDDEN) &&
+    if (!lv_obj_has_flag(objects.menu_save_failure_lbl, LV_OBJ_FLAG_HIDDEN) &&
         millis() - saveFailureShownAtMs_ >= kSaveFailureDurationMs) {
         hideSaveFailure();
     }
@@ -155,10 +118,10 @@ MenuEvent MenuScreen::update(const RemoteInputEvents& events) {
 
 void MenuScreen::setStopAvailable(bool available) {
     if (available) {
-        lv_obj_remove_flag(stopButton_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(objects.menu_stop_btn, LV_OBJ_FLAG_HIDDEN);
     } else {
         stopButtonFeedback_.reset();
-        lv_obj_add_flag(stopButton_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(objects.menu_stop_btn, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -166,93 +129,17 @@ void MenuScreen::setMotionActive(bool active) {
     stopButtonFeedback_.setMotionActive(active);
 }
 
-void MenuScreen::buildPopup() {
-    const lv_style_selector_t mainStyle = LV_PART_MAIN;
-    const lv_font_t* titleFont = &lv_font_montserrat_14;
-
-    popupScrim_ = createMenuObject(screen_);
-    lv_obj_set_size(popupScrim_, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_bg_color(popupScrim_, lv_color_black(), mainStyle);
-    lv_obj_set_style_bg_opa(popupScrim_, kPopupScrimOpacity, mainStyle);
-    lv_obj_add_event_cb(popupScrim_, handleBackEvent, LV_EVENT_CLICKED, this);
-    lv_obj_add_flag(popupScrim_, LV_OBJ_FLAG_HIDDEN);
-
-    popup_ = createMenuObject(popupScrim_);
-    lv_obj_set_width(popup_, kPopupWidth);
-    lv_obj_align(popup_, LV_ALIGN_CENTER, 0, kPopupOffsetY);
-    lv_obj_set_style_bg_color(popup_, themeColor(COLOR_ID_SURFACE), mainStyle);
-    lv_obj_set_style_bg_opa(popup_, LV_OPA_COVER, mainStyle);
-    lv_obj_set_style_border_color(popup_, themeColor(COLOR_ID_BORDER), mainStyle);
-    lv_obj_set_style_border_opa(popup_, LV_OPA_COVER, mainStyle);
-    lv_obj_set_style_border_width(popup_, kPopupBorderWidth, mainStyle);
-    lv_obj_set_style_radius(popup_, 8, mainStyle);
-    lv_obj_set_style_clip_corner(popup_, true, mainStyle);
-
-    // Uppercase label in the style of the value captions on the control screen.
-    lv_obj_t* title = lv_label_create(popup_);
-    popupView_.title = title;
-    lv_obj_set_pos(title, 0, 0);
-    lv_obj_set_size(title, lv_pct(100), kTitleHeight);
-    lv_obj_set_style_text_font(title, titleFont, mainStyle);
-    lv_obj_set_style_text_color(title, themeColor(COLOR_ID_TEXT_SECONDARY), mainStyle);
-    lv_obj_set_style_pad_left(title, kTitlePadX, mainStyle);
-    lv_obj_set_style_pad_right(title, kTitlePadX, mainStyle);
-    lv_obj_set_style_pad_top(
-        title, (kTitleHeight - 1 - lv_font_get_line_height(titleFont)) / 2, mainStyle);
-    lv_obj_set_style_border_color(title, themeColor(COLOR_ID_BORDER), mainStyle);
-    lv_obj_set_style_border_opa(title, LV_OPA_COVER, mainStyle);
-    lv_obj_set_style_border_width(title, 1, mainStyle);
-    lv_obj_set_style_border_side(title, LV_BORDER_SIDE_BOTTOM, mainStyle);
-    lv_label_set_text_static(title, popupView_.titleText);
-
-    popupView_.container = createMenuScrollArea(popup_);
-    lv_obj_set_pos(popupView_.container, 0, kTitleHeight);
-    lv_obj_set_width(popupView_.container, lv_pct(100));
-    addSharedListStyles(popupView_.container);
+void MenuScreen::requestBack() {
+    backTapped_ = true;
 }
 
-void MenuScreen::buildButtonBar() {
-    lv_obj_t* backButton = lv_button_create(screen_);
-    copyGeometry(backButton, objects.ossm_control_settings_btn);
-    add_style_button_secondary(backButton);
-    lv_obj_add_event_cb(backButton, handleBackEvent, LV_EVENT_CLICKED, this);
-    backLabel_ = addButtonLabel(backButton, rootBackLabel_);
-
-    stopButton_ = lv_button_create(screen_);
-    copyGeometry(stopButton_, objects.ossm_control_stop_btn);
-    add_style_button_danger(stopButton_);
-    lv_obj_add_event_cb(stopButton_, action_stop, LV_EVENT_PRESSED, nullptr);
-    addButtonLabel(stopButton_, "Stop");
-    stopButtonFeedback_.begin(stopButton_);
-
-    selectButton_ = lv_button_create(screen_);
-    copyGeometry(selectButton_, objects.ossm_control_patterns_btn);
-    add_style_button_primary(selectButton_);
-    lv_obj_add_event_cb(selectButton_, handleSelectEvent, LV_EVENT_CLICKED, this);
-    selectLabel_ = addButtonLabel(selectButton_, "Select");
-}
-
-void MenuScreen::buildSaveFailureLabel() {
-    const lv_style_selector_t mainStyle = LV_PART_MAIN;
-
-    saveFailureLabel_ = lv_label_create(screen_);
-    lv_label_set_text_static(saveFailureLabel_, "Couldn't save. Try again.");
-    lv_obj_set_width(saveFailureLabel_, kSaveFailureWidth);
-    lv_obj_set_style_text_align(saveFailureLabel_, LV_TEXT_ALIGN_CENTER, mainStyle);
-    lv_obj_set_style_text_color(saveFailureLabel_, themeColor(COLOR_ID_TEXT_PRIMARY), mainStyle);
-    lv_obj_set_style_bg_color(saveFailureLabel_, themeColor(COLOR_ID_SURFACE), mainStyle);
-    lv_obj_set_style_bg_opa(saveFailureLabel_, LV_OPA_COVER, mainStyle);
-    lv_obj_set_style_pad_all(saveFailureLabel_, 8, mainStyle);
-    lv_obj_set_style_radius(saveFailureLabel_, 6, mainStyle);
-    lv_obj_set_style_border_width(saveFailureLabel_, 1, mainStyle);
-    lv_obj_set_style_border_color(saveFailureLabel_, lv_palette_main(LV_PALETTE_RED), mainStyle);
-    lv_obj_align(saveFailureLabel_, LV_ALIGN_CENTER, 0, kPopupOffsetY);
-    lv_obj_add_flag(saveFailureLabel_, LV_OBJ_FLAG_HIDDEN);
+void MenuScreen::requestSelect() {
+    selectTapped_ = true;
 }
 
 void MenuScreen::load() {
-    if (lv_screen_active() != screen_) {
-        lv_screen_load_anim(screen_, LV_SCREEN_LOAD_ANIM_FADE_IN, kScreenFadeMs, 0, false);
+    if (lv_screen_active() != objects.menu) {
+        loadScreen(SCREEN_ID_MENU);
     }
 }
 
@@ -261,7 +148,7 @@ void MenuScreen::closePages() {
     controller_.takeChanges();
     clearInput();
     hideSaveFailure();
-    lv_obj_add_flag(popupScrim_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(objects.menu_popup_scrim, LV_OBJ_FLAG_HIDDEN);
     // Opening the menu again starts at the top.
     pageView_.shownPage = nullptr;
     popupView_.shownPage = nullptr;
@@ -296,9 +183,9 @@ void MenuScreen::render(const MenuChanges& changes) {
         if (top != base) {
             showPage(popupView_, top);
             resizePopup(controller_.page(top).count());
-            lv_obj_remove_flag(popupScrim_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(objects.menu_popup_scrim, LV_OBJ_FLAG_HIDDEN);
         } else {
-            lv_obj_add_flag(popupScrim_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(objects.menu_popup_scrim, LV_OBJ_FLAG_HIDDEN);
             // One options page serves every choice, so the next popup has to start at the top
             // even though its page is the same.
             popupView_.shownPage = nullptr;
@@ -414,14 +301,14 @@ void MenuScreen::updateValues(std::size_t level) {
 }
 
 void MenuScreen::updateButtonBar() {
-    setStaticText(backLabel_, controller_.depth() > 1 ? "Back" : rootBackLabel_);
+    setStaticText(objects.menu_back_lbl, controller_.depth() > 1 ? "Back" : rootBackLabel_);
 
     const MenuItem* item = controller_.highlightedItem();
-    setStaticText(selectLabel_, item != nullptr ? item->selectLabel() : "Select");
+    setStaticText(objects.menu_select_lbl, item != nullptr ? item->selectLabel() : "Select");
     if (item != nullptr) {
-        lv_obj_remove_state(selectButton_, LV_STATE_DISABLED);
+        lv_obj_remove_state(objects.menu_select_btn, LV_STATE_DISABLED);
     } else {
-        lv_obj_add_state(selectButton_, LV_STATE_DISABLED);
+        lv_obj_add_state(objects.menu_select_btn, LV_STATE_DISABLED);
     }
 }
 
@@ -429,16 +316,19 @@ void MenuScreen::resizePopup(std::size_t rowCount) {
     const std::size_t visibleRows = std::min(rowCount, kMaxVisiblePopupRows);
     const std::int32_t listHeight = static_cast<std::int32_t>(visibleRows) * listRowHeight();
     lv_obj_set_height(popupView_.container, listHeight);
-    lv_obj_set_height(popup_, kTitleHeight + listHeight + 2 * kPopupBorderWidth);
+    // The list ends the popup, wherever the EEZ design places it below the title.
+    const std::int32_t listTop = lv_obj_get_style_y(popupView_.container, LV_PART_MAIN);
+    const std::int32_t border = lv_obj_get_style_border_width(objects.menu_popup, LV_PART_MAIN);
+    lv_obj_set_height(objects.menu_popup, listTop + listHeight + 2 * border);
 }
 
 void MenuScreen::showSaveFailure() {
     saveFailureShownAtMs_ = millis();
-    lv_obj_remove_flag(saveFailureLabel_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(objects.menu_save_failure_lbl, LV_OBJ_FLAG_HIDDEN);
 }
 
 void MenuScreen::hideSaveFailure() {
-    lv_obj_add_flag(saveFailureLabel_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(objects.menu_save_failure_lbl, LV_OBJ_FLAG_HIDDEN);
 }
 
 void MenuScreen::setTitle(PageView& view, const char* title) {
@@ -504,14 +394,6 @@ void MenuScreen::handleViewClicked(lv_obj_t* root) {
 void MenuScreen::handleViewEvent(lv_event_t* event) {
     auto* menu = static_cast<MenuScreen*>(lv_event_get_user_data(event));
     menu->handleViewClicked(static_cast<lv_obj_t*>(lv_event_get_current_target(event)));
-}
-
-void MenuScreen::handleBackEvent(lv_event_t* event) {
-    static_cast<MenuScreen*>(lv_event_get_user_data(event))->backTapped_ = true;
-}
-
-void MenuScreen::handleSelectEvent(lv_event_t* event) {
-    static_cast<MenuScreen*>(lv_event_get_user_data(event))->selectTapped_ = true;
 }
 
 }  // namespace m5_redux
