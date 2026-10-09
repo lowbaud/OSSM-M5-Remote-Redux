@@ -63,8 +63,6 @@ class OssmSettingsSource : public MenuSource {
     void setConnected(bool connected);
     // An empty catalog hides the default pattern.
     void setPatternCatalog(const ossm::OssmClient::PatternList& catalog);
-    // Also shown in the quick actions.
-    MenuItem& depthMode();
 
     void addItems(MenuPage& page) override;
 
@@ -76,18 +74,18 @@ class OssmSettingsSource : public MenuSource {
     bool connected_ = false;
 };
 
-// Quick actions while an OSSM is under control: action tiles, then Depth mode from the settings.
+// Action tiles while an OSSM is under control.
 class OssmQuickActionsSource : public MenuSource {
   public:
-    explicit OssmQuickActionsSource(OssmSettingsSource& settings);
+    OssmQuickActionsSource();
 
     void addItems(MenuPage& page) override;
 
   private:
-    OssmSettingsSource& settings_;
     MenuCommandItem pause_;
     MenuCommandItem pullOut_;
-    MenuCommandItem ramp_;
+    // Switches the depth mode; the control screen shows which one is active.
+    MenuCommandItem range_;
 };
 
 }  // namespace m5_redux

@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cstdio>
 
 #include "diagnostics/Log.h"
 #include "ui/ListRowStyle.h"
@@ -18,14 +17,10 @@ namespace m5_redux {
 namespace {
 
 constexpr const char* kTag = "menu";
-// The list matches the old settings screen.
 constexpr std::int32_t kListBarGap = 7;
 constexpr std::int32_t kListPadX = 10;
-constexpr std::int32_t kListPadTop = 6;
-constexpr std::int32_t kStatusHeight = 30;
-constexpr std::int32_t kStatusPadX = 12;
-constexpr std::int32_t kStatusGap = 6;
-constexpr std::int32_t kStatusDotSize = 8;
+// Pages start close to the top to fit more rows; tiles add their own space above them.
+constexpr std::int32_t kListPadTop = 4;
 constexpr std::int32_t kTitleHeight = 28;
 constexpr std::int32_t kTitlePadX = 12;
 constexpr std::int32_t kPopupWidth = 263;
@@ -58,13 +53,6 @@ lv_obj_t* addButtonLabel(lv_obj_t* button, const char* text) {
     return label;
 }
 
-lv_obj_t* addStatusLabel(lv_obj_t* bar, const lv_font_t* font, Colors color) {
-    lv_obj_t* label = lv_label_create(bar);
-    lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
-    lv_obj_set_style_text_color(label, themeColor(color), LV_PART_MAIN);
-    return label;
-}
-
 // Setting the same static text again would still redraw the label.
 void setStaticText(lv_obj_t* label, const char* text) {
     if (lv_label_get_text(label) != text) {
@@ -91,18 +79,17 @@ void MenuScreen::begin() {
     lv_obj_set_style_bg_color(screen_, themeColor(COLOR_ID_BACKGROUND), mainStyle);
     lv_obj_set_style_bg_opa(screen_, LV_OPA_COVER, mainStyle);
 
-    buildStatusBar();
-
-    listBottom_ = lv_obj_get_style_y(objects.ossm_control_settings_btn, LV_PART_MAIN) - kListBarGap;
-    list_ = createMenuScrollArea(screen_);
-    lv_obj_set_width(list_, lv_pct(100));
-    addSharedListStyles(list_);
-    lv_obj_set_style_pad_left(list_, kListPadX, mainStyle);
-    lv_obj_set_style_pad_right(list_, kListPadX, mainStyle);
-    lv_obj_set_style_pad_top(list_, kListPadTop, mainStyle);
-    pageView_.container = list_;
-    pageView_.tileRow = createMenuTileRow(list_);
-    hideStatus();
+    const std::int32_t buttonBarTop =
+        lv_obj_get_style_y(objects.ossm_control_settings_btn, LV_PART_MAIN);
+    lv_obj_t* list = createMenuScrollArea(screen_);
+    lv_obj_set_pos(list, 0, 0);
+    lv_obj_set_size(list, lv_pct(100), buttonBarTop - kListBarGap);
+    addSharedListStyles(list);
+    lv_obj_set_style_pad_left(list, kListPadX, mainStyle);
+    lv_obj_set_style_pad_right(list, kListPadX, mainStyle);
+    lv_obj_set_style_pad_top(list, kListPadTop, mainStyle);
+    pageView_.container = list;
+    pageView_.tileRow = createMenuTileRow(list);
 
     buildPopup();
     buildButtonBar();
@@ -177,73 +164,6 @@ void MenuScreen::setStopAvailable(bool available) {
 
 void MenuScreen::setMotionActive(bool active) {
     stopButtonFeedback_.setMotionActive(active);
-}
-
-void MenuScreen::showStatus(const char* pattern, int speed, int sensation) {
-    std::snprintf(patternText_, sizeof(patternText_), "%s", pattern);
-    std::snprintf(speedText_, sizeof(speedText_), "%d", speed);
-    std::snprintf(sensationText_, sizeof(sensationText_), "%d", sensation);
-    // The same buffers again, so the labels have to be told to read them.
-    lv_label_set_text_static(statusPattern_, patternText_);
-    lv_label_set_text_static(statusSpeed_, speedText_);
-    lv_label_set_text_static(statusSensation_, sensationText_);
-    if (speed > 0) {
-        lv_obj_add_state(statusDot_, LV_STATE_CHECKED);
-    } else {
-        lv_obj_remove_state(statusDot_, LV_STATE_CHECKED);
-    }
-
-    lv_obj_remove_flag(statusBar_, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_y(list_, kStatusHeight);
-    lv_obj_set_height(list_, listBottom_ - kStatusHeight);
-}
-
-void MenuScreen::hideStatus() {
-    lv_obj_add_flag(statusBar_, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_y(list_, 0);
-    lv_obj_set_height(list_, listBottom_);
-}
-
-void MenuScreen::buildStatusBar() {
-    const lv_style_selector_t mainStyle = LV_PART_MAIN;
-
-    statusBar_ = createMenuObject(screen_);
-    lv_obj_set_pos(statusBar_, 0, 0);
-    lv_obj_set_size(statusBar_, lv_pct(100), kStatusHeight);
-    lv_obj_set_flex_flow(statusBar_, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(
-        statusBar_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_left(statusBar_, kStatusPadX, mainStyle);
-    lv_obj_set_style_pad_right(statusBar_, kStatusPadX, mainStyle);
-    lv_obj_set_style_pad_column(statusBar_, kStatusGap, mainStyle);
-    lv_obj_set_style_border_color(statusBar_, themeColor(COLOR_ID_DIVIDER), mainStyle);
-    lv_obj_set_style_border_opa(statusBar_, LV_OPA_COVER, mainStyle);
-    lv_obj_set_style_border_width(statusBar_, 1, mainStyle);
-    lv_obj_set_style_border_side(statusBar_, LV_BORDER_SIDE_BOTTOM, mainStyle);
-
-    // Lit while the device moves.
-    statusDot_ = createMenuObject(statusBar_);
-    lv_obj_set_size(statusDot_, kStatusDotSize, kStatusDotSize);
-    lv_obj_set_style_radius(statusDot_, LV_RADIUS_CIRCLE, mainStyle);
-    lv_obj_set_style_bg_opa(statusDot_, LV_OPA_COVER, mainStyle);
-    lv_obj_set_style_bg_color(statusDot_, themeColor(COLOR_ID_DIVIDER), mainStyle);
-    lv_obj_set_style_bg_color(statusDot_, themeColor(COLOR_ID_ACCENT), LV_STATE_CHECKED);
-
-    statusPattern_ = addStatusLabel(statusBar_, &lv_font_montserrat_14, COLOR_ID_TEXT_PRIMARY);
-    lv_obj_set_flex_grow(statusPattern_, 1);
-    lv_label_set_long_mode(statusPattern_, LV_LABEL_LONG_MODE_DOTS);
-
-    // Captions in the style of the control screen's.
-    lv_obj_t* speedCaption =
-        addStatusLabel(statusBar_, &lv_font_montserrat_12, COLOR_ID_TEXT_SECONDARY);
-    lv_label_set_text_static(speedCaption, "SPEED");
-    statusSpeed_ = addStatusLabel(statusBar_, &lv_font_montserrat_16, COLOR_ID_TEXT_PRIMARY);
-    lv_obj_t* sensationCaption =
-        addStatusLabel(statusBar_, &lv_font_montserrat_12, COLOR_ID_TEXT_SECONDARY);
-    lv_label_set_text_static(sensationCaption, "SENS");
-    // Separates the two pairs.
-    lv_obj_set_style_pad_left(sensationCaption, kStatusGap, mainStyle);
-    statusSensation_ = addStatusLabel(statusBar_, &lv_font_montserrat_16, COLOR_ID_TEXT_PRIMARY);
 }
 
 void MenuScreen::buildPopup() {
@@ -342,6 +262,9 @@ void MenuScreen::closePages() {
     clearInput();
     hideSaveFailure();
     lv_obj_add_flag(popupScrim_, LV_OBJ_FLAG_HIDDEN);
+    // Opening the menu again starts at the top.
+    pageView_.shownPage = nullptr;
+    popupView_.shownPage = nullptr;
 }
 
 void MenuScreen::clearInput() {
@@ -376,6 +299,9 @@ void MenuScreen::render(const MenuChanges& changes) {
             lv_obj_remove_flag(popupScrim_, LV_OBJ_FLAG_HIDDEN);
         } else {
             lv_obj_add_flag(popupScrim_, LV_OBJ_FLAG_HIDDEN);
+            // One options page serves every choice, so the next popup has to start at the top
+            // even though its page is the same.
+            popupView_.shownPage = nullptr;
         }
     } else {
         if (changes.highlight) {
@@ -439,6 +365,13 @@ void MenuScreen::showPage(PageView& view, std::size_t level) {
         refreshMenuItemView(*itemView);
     }
 
+    // Scrolling the highlight into view only scrolls as far as needed, so a page left scrolled
+    // down, e.g. Settings, would otherwise keep the tiles of the page before it out of view.
+    // The same page again, e.g. under a closing popup, stays where it was.
+    if (view.shownPage != &page) {
+        view.shownPage = &page;
+        lv_obj_scroll_to_y(view.container, 0, LV_ANIM_OFF);
+    }
     updateHighlight(level);
 }
 

@@ -11,7 +11,11 @@ namespace m5_redux {
 namespace {
 
 constexpr std::int32_t kTileGap = 6;
-constexpr std::int32_t kTileHeight = 46;
+// Lowers the tiles from the top of the screen; pages without tiles start higher.
+constexpr std::int32_t kTileRowGapAbove = 8;
+constexpr std::int32_t kTileRowGapBelow = 8;
+constexpr std::int32_t kTileHeight = 48;
+constexpr std::int32_t kTileIconGap = 4;
 constexpr std::int32_t kTilePadX = 4;
 constexpr std::int32_t kTileRadius = 8;
 constexpr std::int32_t kSelectedBorderWidth = 2;
@@ -25,14 +29,15 @@ struct TileStyles {
 };
 
 void initTileStyles(TileStyles& styles) {
-    // Equal tiles across the list, with the same gap below them as between them.
+    // Equal tiles across the list.
     lv_style_init(&styles.row);
     lv_style_set_width(&styles.row, lv_pct(100));
     lv_style_set_height(&styles.row, LV_SIZE_CONTENT);
     lv_style_set_layout(&styles.row, LV_LAYOUT_FLEX);
     lv_style_set_flex_flow(&styles.row, LV_FLEX_FLOW_ROW);
     lv_style_set_pad_column(&styles.row, kTileGap);
-    lv_style_set_pad_bottom(&styles.row, kTileGap);
+    lv_style_set_pad_top(&styles.row, kTileRowGapAbove);
+    lv_style_set_pad_bottom(&styles.row, kTileRowGapBelow);
 
     // Icon above the name, both centered.
     lv_style_init(&styles.tile);
@@ -42,7 +47,7 @@ void initTileStyles(TileStyles& styles) {
     lv_style_set_flex_flow(&styles.tile, LV_FLEX_FLOW_COLUMN);
     lv_style_set_flex_main_place(&styles.tile, LV_FLEX_ALIGN_CENTER);
     lv_style_set_flex_cross_place(&styles.tile, LV_FLEX_ALIGN_CENTER);
-    lv_style_set_pad_row(&styles.tile, 2);
+    lv_style_set_pad_row(&styles.tile, kTileIconGap);
     lv_style_set_pad_left(&styles.tile, kTilePadX);
     lv_style_set_pad_right(&styles.tile, kTilePadX);
     lv_style_set_bg_color(&styles.tile, themeColor(COLOR_ID_SURFACE));

@@ -82,7 +82,7 @@ OssmSettingsSource ossmSettings(settingsStore, ossmControlScreen);
 RemoteSettingsSource
     remoteSettings(settingsStore, backlightController, autoPowerOffController, idleTimer);
 MenuPage settingsPage("Settings");
-OssmQuickActionsSource ossmQuickActions(ossmSettings);
+OssmQuickActionsSource ossmQuickActions;
 RemoteQuickActionsSource remoteQuickActions(remoteSettings, settingsPage);
 MenuPage quickActionsPage("Quick actions");
 
@@ -163,23 +163,6 @@ bool menuConnected() {
     return menuReturnScreen == Screen::OssmControl && ossmConnection.isReady();
 }
 
-// Repeats the pattern, speed and sensation of the control screen above the menu.
-void updateMenuStatus() {
-    if (!menuConnected()) {
-        menuScreen.hideStatus();
-        return;
-    }
-
-    const OssmControlValues& values = ossmControl.values();
-    const char* name = ossmPatternsScreen.patternName(values.pattern);
-    char fallback[16];
-    if (name == nullptr || name[0] == '\0') {
-        std::snprintf(fallback, sizeof(fallback), "Pattern %d", values.pattern);
-        name = fallback;
-    }
-    menuScreen.showStatus(name, values.speed, values.sensation);
-}
-
 void leaveScreen(Screen screen, Screen next) {
     switch (screen) {
         case Screen::Boot:
@@ -244,7 +227,6 @@ void enterScreen(Screen screen, Screen previous) {
             ossmSettings.setPatternCatalog(catalog);
             menuScreen.setStopAvailable(connected);
             menuScreen.setMotionActive(ossmControl.values().speed > 0);
-            updateMenuStatus();
             if (previous == Screen::Diagnostics && menuScreen.isOpen()) {
                 menuScreen.resume();
             } else if (connected) {
@@ -325,11 +307,27 @@ void closeMenu() {
     navigateTo(menuConnected() ? Screen::OssmControl : Screen::Welcome);
 }
 
+// The same change as picking the other option of the Depth mode setting.
+void switchDepthMode() {
+    const DepthControlMode mode = settingsStore.depthControlMode() == DepthControlMode::MinMax
+                                      ? DepthControlMode::StrokeDepth
+                                      : DepthControlMode::MinMax;
+    if (!settingsStore.setDepthControlMode(mode)) {
+        LOGE(kTag, "Unable to save depth mode");
+        return;
+    }
+    ossmControlScreen.setDepthControlMode(mode);
+}
+
 void handleMenuCommand(AppMenuCommand command) {
     switch (command) {
+        case AppMenuCommand::SwitchDepthMode:
+            // The control screen's range caption shows the new mode.
+            switchDepthMode();
+            closeMenu();
+            break;
         case AppMenuCommand::Pause:
         case AppMenuCommand::PullOut:
-        case AppMenuCommand::Ramp:
         case AppMenuCommand::Lock:
             // Mock-ups of the quick action tiles: they only close the menu, as the real actions
             // will after running.
@@ -616,7 +614,6 @@ void stopMotion() {
         ossmPatternsScreen.refresh();
     } else if (currentScreen == Screen::Menu) {
         menuScreen.setMotionActive(false);
-        updateMenuStatus();
     } else if (currentScreen == Screen::Diagnostics) {
         diagnosticsScreen.setMotionActive(false);
     }

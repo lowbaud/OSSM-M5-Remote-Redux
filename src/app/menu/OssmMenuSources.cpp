@@ -116,10 +116,6 @@ void OssmSettingsSource::setPatternCatalog(const ossm::OssmClient::PatternList& 
     defaultPattern_.setCatalog(catalog);
 }
 
-MenuItem& OssmSettingsSource::depthMode() {
-    return depthMode_;
-}
-
 void OssmSettingsSource::addItems(MenuPage& page) {
     if (connected_) {
         page.add(disconnect_);
@@ -131,21 +127,19 @@ void OssmSettingsSource::addItems(MenuPage& page) {
     page.add(strokeDirection_);
 }
 
-OssmQuickActionsSource::OssmQuickActionsSource(OssmSettingsSource& settings)
-    : settings_(settings),
-      pause_("ossm.pause", "Pause", static_cast<MenuCommand>(AppMenuCommand::Pause)),
+OssmQuickActionsSource::OssmQuickActionsSource()
+    : pause_("ossm.pause", "Pause", static_cast<MenuCommand>(AppMenuCommand::Pause)),
       pullOut_("ossm.pullout", "Pull out", static_cast<MenuCommand>(AppMenuCommand::PullOut)),
-      ramp_("ossm.ramp", "Ramp", static_cast<MenuCommand>(AppMenuCommand::Ramp)) {
+      range_("ossm.range", "Range", static_cast<MenuCommand>(AppMenuCommand::SwitchDepthMode)) {
     pause_.setIcon(LV_SYMBOL_PAUSE);
     pullOut_.setIcon(LV_SYMBOL_PREV);
-    ramp_.setIcon(LV_SYMBOL_UP);
+    range_.setIcon(LV_SYMBOL_SHUFFLE);
 }
 
 void OssmQuickActionsSource::addItems(MenuPage& page) {
     page.addTile(pause_);
     page.addTile(pullOut_);
-    page.addTile(ramp_);
-    page.add(settings_.depthMode());
+    page.addTile(range_);
 }
 
 }  // namespace m5_redux

@@ -14,10 +14,10 @@
 
 namespace m5_redux {
 
-// The menu on a screen of its own: an optional status line, the pages as a list with action
-// tiles at the top, option popups, a button bar like the other screens, and the message when
-// saving fails. App shows it like any other screen; the next screen App loads replaces it.
-// Everything is built once; an item's widgets are created the first time it is shown and kept.
+// The menu on a screen of its own: the pages as a list with action tiles at the top, option
+// popups, a button bar like the other screens, and the message when saving fails. App shows it like
+// any other screen; the next screen App loads replaces it. Everything is built once; an item's
+// widgets are created the first time it is shown and kept.
 class MenuScreen {
   public:
     MenuScreen() = default;
@@ -36,9 +36,6 @@ class MenuScreen {
     MenuEvent update(const RemoteInputEvents& events);
     void setStopAvailable(bool available);
     void setMotionActive(bool active);
-    // The pattern, speed and sensation of the device under control, above the list.
-    void showStatus(const char* pattern, int speed, int sensation);
-    void hideStatus();
 
   private:
     struct PageView {
@@ -47,6 +44,8 @@ class MenuScreen {
         lv_obj_t* container = nullptr;
         // Only the screen's list has tiles; the row is its first child.
         lv_obj_t* tileRow = nullptr;
+        // The page shown last; another page starts scrolled to the top.
+        const MenuPage* shownPage = nullptr;
         char titleText[32] = {};
     };
 
@@ -57,18 +56,8 @@ class MenuScreen {
     std::array<MenuItemView, kMaxViews> views_{};
     std::size_t viewCount_ = 0;
     lv_obj_t* screen_ = nullptr;
-    lv_obj_t* list_ = nullptr;
-    std::int32_t listBottom_ = 0;
     PageView pageView_;
     const char* rootBackLabel_ = "Back";
-    lv_obj_t* statusBar_ = nullptr;
-    lv_obj_t* statusDot_ = nullptr;
-    lv_obj_t* statusPattern_ = nullptr;
-    lv_obj_t* statusSpeed_ = nullptr;
-    lv_obj_t* statusSensation_ = nullptr;
-    char patternText_[32] = {};
-    char speedText_[12] = {};
-    char sensationText_[12] = {};
     lv_obj_t* popupScrim_ = nullptr;
     lv_obj_t* popup_ = nullptr;
     PageView popupView_;
@@ -83,7 +72,6 @@ class MenuScreen {
     bool backTapped_ = false;
     bool selectTapped_ = false;
 
-    void buildStatusBar();
     void buildPopup();
     void buildButtonBar();
     void buildSaveFailureLabel();
