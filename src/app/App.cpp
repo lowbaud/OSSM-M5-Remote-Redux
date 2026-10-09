@@ -77,14 +77,17 @@ ConnectScreen connectScreen;
 OssmControlScreen ossmControlScreen(ossmControl);
 OssmPatternsScreen ossmPatternsScreen(ossmControl);
 DiagnosticsScreen diagnosticsScreen(ossmClient);
+
+// Defined below; the menu calls it after saving a setting.
+void applySettings();
+
 MenuScreen menuScreen;
-OssmSettingsSource ossmSettings(settingsStore, ossmControlScreen);
-RemoteSettingsSource
-    remoteSettings(settingsStore, backlightController, autoPowerOffController, idleTimer);
-MenuPage settingsPage("Settings");
+OssmSettingsSource ossmSettings(settingsStore, applySettings);
+RemoteSettingsSource remoteSettings(settingsStore, backlightController, applySettings);
+MenuPage settingsPage;
 OssmQuickActionsSource ossmQuickActions;
 RemoteQuickActionsSource remoteQuickActions(remoteSettings, settingsPage);
-MenuPage quickActionsPage("Quick actions");
+MenuPage quickActionsPage;
 
 Screen currentScreen = Screen::Boot;
 // Where the menu was opened from, and where closing it returns to.
@@ -119,6 +122,19 @@ bool hasInputActivity(const RemoteInputEvents& events) {
     }
 
     return false;
+}
+
+// Pushes the stored settings to the parts of the remote that use them, at startup and after a
+// change. A new setting that affects the remote only needs a line here.
+void applySettings() {
+    backlightController.setBrightnessLevel(settingsStore.brightnessLevel());
+    backlightController.setIdleDimTimeoutSeconds(
+        static_cast<std::uint32_t>(settingsStore.idleDimTimeout()));
+    autoPowerOffController.setTimeoutSeconds(
+        static_cast<std::uint32_t>(settingsStore.idlePowerOffTimeout()));
+    lvgl_port::setTouchscreenEnabled(settingsStore.touchscreenEnabled());
+    ossmControlScreen.setDepthControlMode(settingsStore.depthControlMode());
+    ossmControlScreen.setStrokeEncoderReversed(settingsStore.strokeEncoderReversed());
 }
 
 void updateBatteryIndicator(bool force = false) {
@@ -316,7 +332,7 @@ void switchDepthMode() {
         LOGE(kTag, "Unable to save depth mode");
         return;
     }
-    ossmControlScreen.setDepthControlMode(mode);
+    applySettings();
 }
 
 void handleMenuCommand(AppMenuCommand command) {
@@ -509,8 +525,6 @@ void begin() {
     if (!settingsStore.begin()) {
         LOGE(kTag, "Redux settings initialization failed");
     }
-    ossmControlScreen.setStrokeEncoderReversed(settingsStore.strokeEncoderReversed());
-    ossmControlScreen.setDepthControlMode(settingsStore.depthControlMode());
     const std::uint32_t now = millis();
     idleTimer.begin(now);
     backlightController.begin(
@@ -525,7 +539,7 @@ void begin() {
     const bool hasSavedConnection = settingsStore.savedOssmConnection(savedConnection);
     const bool autoConnectEnabled = settingsStore.autoConnectEnabled();
     lvgl_port::begin();
-    lvgl_port::setTouchscreenEnabled(settingsStore.touchscreenEnabled());
+    applySettings();
     ui_init();
 
     bootScreen.enter(hasSavedConnection && autoConnectEnabled);

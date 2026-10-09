@@ -27,11 +27,12 @@ class MenuPage {
     static constexpr std::size_t kMaxTiles = 4;
     static constexpr std::size_t kNoItem = static_cast<std::size_t>(-1);
 
-    explicit MenuPage(const char* title);
+    MenuPage() = default;
     MenuPage(const MenuPage&) = delete;
     MenuPage& operator=(const MenuPage&) = delete;
     virtual ~MenuPage() = default;
 
+    // Shown above popups; full-screen pages have none.
     virtual const char* title() const;
     // Sources are registered once at startup and add their rows in registration order.
     bool addSource(MenuSource& source);
@@ -58,7 +59,6 @@ class MenuPage {
     void clear();
 
   private:
-    const char* title_;
     std::array<MenuItem*, kMaxItems> items_{};
     std::size_t count_ = 0;
     std::size_t tileCount_ = 0;
@@ -69,10 +69,7 @@ class MenuPage {
 // The popup listing the options of a choice. One instance serves every choice.
 class MenuOptionsPage : public MenuPage {
   public:
-    MenuOptionsPage();
-
     void configure(MenuChoiceItem& choice);
-    MenuChoiceItem* choice() const;
 
     const char* title() const override;
     void populate() override;

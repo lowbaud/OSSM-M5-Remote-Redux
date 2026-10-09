@@ -83,30 +83,16 @@ const char* DefaultPatternItem::valueText() const {
     return storedName_;
 }
 
-DepthModeItem::DepthModeItem(SettingsStore& settings, OssmControlScreen& controlScreen)
-    : SettingChoiceItem("ossm.depthmode", "Depth mode", settings, kDepthModeSetting),
-      controlScreen_(controlScreen) {}
-
-void DepthModeItem::applied(DepthControlMode mode) {
-    controlScreen_.setDepthControlMode(mode);
-}
-
-StrokeDirectionItem::StrokeDirectionItem(SettingsStore& settings, OssmControlScreen& controlScreen)
-    : SettingChoiceItem("ossm.strokedir", "Stroke dir.", settings, kStrokeDirectionSetting),
-      controlScreen_(controlScreen) {}
-
-void StrokeDirectionItem::applied(bool reversed) {
-    controlScreen_.setStrokeEncoderReversed(reversed);
-}
-
-OssmSettingsSource::OssmSettingsSource(SettingsStore& settings, OssmControlScreen& controlScreen)
+OssmSettingsSource::OssmSettingsSource(SettingsStore& settings, ApplySettingsFn applySettings)
     : disconnect_(
           "ossm.disconnect",
           "Disconnect",
           static_cast<MenuCommand>(AppMenuCommand::Disconnect),
           MenuCommandItem::Style::Destructive),
-      defaultPattern_(settings), depthMode_(settings, controlScreen),
-      strokeDirection_(settings, controlScreen) {}
+      defaultPattern_(settings),
+      depthMode_("ossm.depthmode", "Depth mode", settings, kDepthModeSetting, applySettings),
+      strokeDirection_(
+          "ossm.strokedir", "Stroke dir.", settings, kStrokeDirectionSetting, applySettings) {}
 
 void OssmSettingsSource::setConnected(bool connected) {
     connected_ = connected;

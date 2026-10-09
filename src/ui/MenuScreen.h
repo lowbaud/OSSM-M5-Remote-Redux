@@ -49,12 +49,17 @@ class MenuScreen {
         char titleText[32] = {};
     };
 
-    // The settings and the most options a choice can list.
-    static constexpr std::size_t kMaxViews = 48;
+    // Rows and tiles of the pages; an item on two pages shares its view. Raise it when the pages
+    // outgrow it.
+    static constexpr std::size_t kMaxPageViews = 24;
+    // The options popup reuses its rows for every choice, so options never need more views than
+    // a page holds rows.
+    static constexpr std::size_t kMaxViews = kMaxPageViews + MenuPage::kMaxItems;
 
     MenuController controller_;
     std::array<MenuItemView, kMaxViews> views_{};
     std::size_t viewCount_ = 0;
+    std::size_t pageViewCount_ = 0;
     lv_obj_t* screen_ = nullptr;
     PageView pageView_;
     const char* rootBackLabel_ = "Back";

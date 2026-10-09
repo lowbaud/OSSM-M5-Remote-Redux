@@ -12,8 +12,8 @@ namespace m5_redux {
 struct MenuInput {
     // Outer knobs move the highlight.
     std::int32_t steps = 0;
-    // Inner knobs adjust the highlighted row, left to right.
-    std::array<std::int32_t, kMenuKnobCount> knobSteps{};
+    // Inner knobs adjust the highlighted row.
+    std::int32_t adjustSteps = 0;
     bool back = false;
     bool select = false;
     // A row touched on the top page; it is highlighted and selected.

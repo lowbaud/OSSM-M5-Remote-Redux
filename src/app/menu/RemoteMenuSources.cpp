@@ -1,12 +1,8 @@
 #include "RemoteMenuSources.h"
 
-#include <Arduino.h>
 #include <lvgl.h>
 
-#include <cstdint>
-
 #include "app/menu/AppMenuCommands.h"
-#include "platform/LvglPort.h"
 
 namespace m5_redux {
 
@@ -60,18 +56,19 @@ const SettingChoiceItem<TouchscreenOption, bool>::Setting kTouchscreenSetting = 
 }  // namespace
 
 RemoteSettingsSource::RemoteSettingsSource(
-    SettingsStore& settings,
-    BacklightController& backlight,
-    AutoPowerOffController& autoPowerOff,
-    IdleTimer& idleTimer)
-    : brightness_(settings, backlight), idleDim_(settings, backlight, idleTimer),
-      idlePowerOff_(settings, autoPowerOff, idleTimer),
-      autoConnect_("remote.autoconnect", "Auto-connect", settings, kAutoConnectSetting),
-      touchscreen_(settings), diagnostics_(
-                                  "remote.diagnostics",
-                                  "Diagnostics",
-                                  static_cast<MenuCommand>(AppMenuCommand::ShowDiagnostics),
-                                  MenuCommandItem::Style::OpensScreen) {}
+    SettingsStore& settings, BacklightController& backlight, ApplySettingsFn applySettings)
+    : brightness_(settings, backlight, applySettings),
+      idleDim_("remote.dim", "Dim", settings, kIdleDimSetting, applySettings),
+      idlePowerOff_("remote.poweroff", "Power off", settings, kIdlePowerOffSetting, applySettings),
+      autoConnect_(
+          "remote.autoconnect", "Auto-connect", settings, kAutoConnectSetting, applySettings),
+      touchscreen_(
+          "remote.touchscreen", "Touchscreen", settings, kTouchscreenSetting, applySettings),
+      diagnostics_(
+          "remote.diagnostics",
+          "Diagnostics",
+          static_cast<MenuCommand>(AppMenuCommand::ShowDiagnostics),
+          MenuCommandItem::Style::OpensScreen) {}
 
 MenuItem& RemoteSettingsSource::brightness() {
     return brightness_;
@@ -101,8 +98,10 @@ void RemoteQuickActionsSource::addItems(MenuPage& page) {
     page.add(settingsLink_);
 }
 
-BrightnessItem::BrightnessItem(SettingsStore& settings, BacklightController& backlight)
-    : SettingChoiceItem("remote.brightness", "Brightness", settings, kBrightnessSetting),
+BrightnessItem::BrightnessItem(
+    SettingsStore& settings, BacklightController& backlight, ApplySettingsFn applySettings)
+    : SettingChoiceItem(
+          "remote.brightness", "Brightness", settings, kBrightnessSetting, applySettings),
       backlight_(backlight) {}
 
 void BrightnessItem::previewOption(std::size_t index) {
@@ -115,37 +114,6 @@ void BrightnessItem::cancelPreview() {
 
 bool BrightnessItem::showsLevel() const {
     return true;
-}
-
-void BrightnessItem::applied(BrightnessLevel level) {
-    backlight_.setBrightnessLevel(level);
-}
-
-IdleDimItem::IdleDimItem(
-    SettingsStore& settings, BacklightController& backlight, IdleTimer& idleTimer)
-    : SettingChoiceItem("remote.dim", "Dim", settings, kIdleDimSetting), backlight_(backlight),
-      idleTimer_(idleTimer) {}
-
-void IdleDimItem::applied(IdleDimTimeout timeout) {
-    backlight_.setIdleDimTimeoutSeconds(static_cast<std::uint32_t>(timeout));
-    idleTimer_.reset(millis());
-}
-
-IdlePowerOffItem::IdlePowerOffItem(
-    SettingsStore& settings, AutoPowerOffController& autoPowerOff, IdleTimer& idleTimer)
-    : SettingChoiceItem("remote.poweroff", "Power off", settings, kIdlePowerOffSetting),
-      autoPowerOff_(autoPowerOff), idleTimer_(idleTimer) {}
-
-void IdlePowerOffItem::applied(IdlePowerOffTimeout timeout) {
-    autoPowerOff_.setTimeoutSeconds(static_cast<std::uint32_t>(timeout));
-    idleTimer_.reset(millis());
-}
-
-TouchscreenItem::TouchscreenItem(SettingsStore& settings)
-    : SettingChoiceItem("remote.touchscreen", "Touchscreen", settings, kTouchscreenSetting) {}
-
-void TouchscreenItem::applied(bool enabled) {
-    lvgl_port::setTouchscreenEnabled(enabled);
 }
 
 }  // namespace m5_redux

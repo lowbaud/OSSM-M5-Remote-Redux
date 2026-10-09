@@ -4,10 +4,8 @@
 
 namespace m5_redux {
 
-MenuPage::MenuPage(const char* title) : title_(title) {}
-
 const char* MenuPage::title() const {
-    return title_;
+    return "";
 }
 
 bool MenuPage::addSource(MenuSource& source) {
@@ -86,14 +84,8 @@ void MenuPage::clear() {
     tileCount_ = 0;
 }
 
-MenuOptionsPage::MenuOptionsPage() : MenuPage("") {}
-
 void MenuOptionsPage::configure(MenuChoiceItem& choice) {
     choice_ = &choice;
-}
-
-MenuChoiceItem* MenuOptionsPage::choice() const {
-    return choice_;
 }
 
 const char* MenuOptionsPage::title() const {

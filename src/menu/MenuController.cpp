@@ -75,13 +75,10 @@ MenuEvent MenuController::update(const MenuInput& input) {
         moveHighlight(input.steps);
     }
 
-    if (inlineAdjustEnabled_) {
-        for (std::size_t knob = 0; knob < input.knobSteps.size(); ++knob) {
-            MenuItem* item = highlightedItem();
-            if (item != nullptr && input.knobSteps[knob] != 0 &&
-                item->adjust(knob, input.knobSteps[knob])) {
-                changes_.values = true;
-            }
+    if (inlineAdjustEnabled_ && input.adjustSteps != 0) {
+        MenuItem* item = highlightedItem();
+        if (item != nullptr && item->adjust(input.adjustSteps)) {
+            changes_.values = true;
         }
     }
 
@@ -241,9 +238,8 @@ MenuEvent MenuController::apply(const MenuResult& result) {
             }
             break;
         case MenuResult::Type::OpenPage:
-        case MenuResult::Type::OpenPopup:
             if (result.page != nullptr) {
-                push(*result.page, result.type == MenuResult::Type::OpenPopup);
+                push(*result.page, false);
             }
             break;
         case MenuResult::Type::OpenChoice:

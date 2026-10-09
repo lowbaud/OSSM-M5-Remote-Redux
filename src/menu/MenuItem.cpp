@@ -54,7 +54,7 @@ bool MenuItem::destructive() const {
     return false;
 }
 
-bool MenuItem::adjust(std::size_t, std::int32_t) {
+bool MenuItem::adjust(std::int32_t) {
     return false;
 }
 

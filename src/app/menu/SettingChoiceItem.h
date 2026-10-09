@@ -8,8 +8,11 @@
 
 namespace m5_redux {
 
-// A choice over one of the option tables in SettingsStore. Subclasses apply a saved value to
-// the rest of the remote in applied().
+// Pushes the stored settings to the parts of the remote that use them.
+using ApplySettingsFn = void (*)();
+
+// A choice over one of the option tables in SettingsStore. A saved value reaches the rest of the
+// remote through the shared apply function, so a setting needs no item class of its own.
 template <typename Option, typename Value> class SettingChoiceItem : public MenuChoiceItem {
   public:
     struct Setting {
@@ -23,8 +26,13 @@ template <typename Option, typename Value> class SettingChoiceItem : public Menu
     };
 
     SettingChoiceItem(
-        const char* id, const char* name, SettingsStore& settings, const Setting& setting)
-        : MenuChoiceItem(id, name), settings_(settings), setting_(setting) {}
+        const char* id,
+        const char* name,
+        SettingsStore& settings,
+        const Setting& setting,
+        ApplySettingsFn applySettings)
+        : MenuChoiceItem(id, name), settings_(settings), setting_(setting),
+          applySettings_(applySettings) {}
 
     std::size_t optionCount() const override {
         return setting_.optionCount;
@@ -39,18 +47,15 @@ template <typename Option, typename Value> class SettingChoiceItem : public Menu
     }
 
     bool commitOption(std::size_t index) override {
-        const Value value = optionValue(index);
-        if (!(settings_.*setting_.set)(value)) {
+        if (!(settings_.*setting_.set)(optionValue(index))) {
             LOGE("menu", "Unable to save %s setting", name());
             return false;
         }
-        applied(value);
+        applySettings_();
         return true;
     }
 
   protected:
-    virtual void applied(Value) {}
-
     Value storedValue() const {
         return (settings_.*setting_.get)();
     }
@@ -62,6 +67,7 @@ template <typename Option, typename Value> class SettingChoiceItem : public Menu
   private:
     SettingsStore& settings_;
     Setting setting_;
+    ApplySettingsFn applySettings_;
 };
 
 }  // namespace m5_redux

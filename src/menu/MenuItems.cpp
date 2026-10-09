@@ -74,7 +74,7 @@ const char* MenuChoiceItem::selectLabel() const {
     return "Change";
 }
 
-bool MenuChoiceItem::adjust(std::size_t, std::int32_t steps) {
+bool MenuChoiceItem::adjust(std::int32_t steps) {
     const std::size_t count = optionCount();
     if (steps == 0 || count == 0) {
         return false;

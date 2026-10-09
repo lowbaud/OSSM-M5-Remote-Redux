@@ -11,9 +11,6 @@ class MenuChoiceItem;
 // Host-defined request handed out by MenuController::update(), such as opening another screen.
 using MenuCommand = std::uint16_t;
 
-// Inner knobs that adjust the highlighted row in place, left to right.
-constexpr std::size_t kMenuKnobCount = 2;
-
 // Moves an index through count entries, stopping at the first and last one. Without a valid
 // current index, turning forward starts at the first entry and turning back at the last.
 std::size_t stepMenuIndex(std::size_t current, std::size_t count, std::int32_t steps);
@@ -23,8 +20,6 @@ enum class MenuItemKind : std::uint8_t {
     Link,
     Choice,
     Option,
-    // Rows that draw their own control; the view asks the item how to present it.
-    Custom,
 };
 
 struct MenuResult {
@@ -35,7 +30,6 @@ struct MenuResult {
         // Saving failed and the row went back to the stored value.
         Failed,
         OpenPage,
-        OpenPopup,
         OpenChoice,
         // Closes the page holding the row after it finished, e.g. an option was picked.
         ClosePage,
@@ -57,10 +51,6 @@ struct MenuResult {
 
     static MenuResult openPage(MenuPage& page) {
         return {Type::OpenPage, &page};
-    }
-
-    static MenuResult openPopup(MenuPage& page) {
-        return {Type::OpenPopup, &page};
     }
 
     static MenuResult openChoice(MenuChoiceItem& choice) {
@@ -101,7 +91,7 @@ class MenuItem {
     // A page never starts on a destructive row, so a quick select cannot trigger it by accident.
     virtual bool destructive() const;
     // Inner knob turns while the row is highlighted. Returns true when the row changed.
-    virtual bool adjust(std::size_t knob, std::int32_t steps);
+    virtual bool adjust(std::int32_t steps);
     virtual MenuResult activate();
     virtual void highlighted();
     // Called when the highlight leaves the row, a page opens above it, or the menu closes.

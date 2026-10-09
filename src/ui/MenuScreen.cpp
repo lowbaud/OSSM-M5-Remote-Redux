@@ -137,7 +137,7 @@ MenuEvent MenuScreen::update(const RemoteInputEvents& events) {
     MenuInput input;
     input.steps = events.menuSteps();
     // Raw knob directions, so the stroke direction setting has no effect in the menu.
-    input.knobSteps = {events.encoderSteps[1], events.encoderSteps[2]};
+    input.adjustSteps = events.encoderSteps[1] + events.encoderSteps[2];
     input.back = events.leftClick || backTapped_;
     input.select = events.rightClick || selectTapped_;
     input.tappedRow = tappedRow_;
@@ -454,17 +454,17 @@ void MenuScreen::setTitle(PageView& view, const char* title) {
 MenuItemView* MenuScreen::viewFor(MenuItem& item, lv_obj_t* container, bool tile) {
     MenuItemView* existing = findView(item, tile);
     if (existing != nullptr) {
-        // List rows move between the page and the popup.
-        if (existing->container != container) {
-            lv_obj_set_parent(existing->root, container);
-            existing->container = container;
-        }
         return existing;
     }
 
-    if (viewCount_ >= views_.size()) {
-        LOGW(kTag, "No room for menu item %s", item.name());
+    // Options have room of their own, so a long list of them never crowds out the other rows.
+    const bool option = item.kind() == MenuItemKind::Option;
+    if (viewCount_ >= views_.size() || (!option && pageViewCount_ >= kMaxPageViews)) {
+        LOGE(kTag, "No room for menu item %s; raise MenuScreen::kMaxPageViews", item.name());
         return nullptr;
+    }
+    if (!option) {
+        ++pageViewCount_;
     }
 
     MenuItemView& view = views_[viewCount_++];

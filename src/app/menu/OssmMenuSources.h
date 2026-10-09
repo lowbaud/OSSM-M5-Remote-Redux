@@ -3,7 +3,6 @@
 #include <cstddef>
 
 #include "app/menu/SettingChoiceItem.h"
-#include "app/screens/OssmControlScreen.h"
 #include "devices/ossm/OssmClient.h"
 #include "menu/MenuItems.h"
 #include "menu/MenuPage.h"
@@ -32,33 +31,11 @@ class DefaultPatternItem : public MenuChoiceItem {
     mutable char storedName_[ossm::OssmClient::kPatternNameCapacity] = {};
 };
 
-class DepthModeItem : public SettingChoiceItem<DepthControlOption, DepthControlMode> {
-  public:
-    DepthModeItem(SettingsStore& settings, OssmControlScreen& controlScreen);
-
-  protected:
-    void applied(DepthControlMode mode) override;
-
-  private:
-    OssmControlScreen& controlScreen_;
-};
-
-class StrokeDirectionItem : public SettingChoiceItem<StrokeDirectionOption, bool> {
-  public:
-    StrokeDirectionItem(SettingsStore& settings, OssmControlScreen& controlScreen);
-
-  protected:
-    void applied(bool reversed) override;
-
-  private:
-    OssmControlScreen& controlScreen_;
-};
-
 // Settings for controlling an OSSM. Disconnect and the default pattern only appear while one is
 // connected.
 class OssmSettingsSource : public MenuSource {
   public:
-    OssmSettingsSource(SettingsStore& settings, OssmControlScreen& controlScreen);
+    OssmSettingsSource(SettingsStore& settings, ApplySettingsFn applySettings);
 
     void setConnected(bool connected);
     // An empty catalog hides the default pattern.
@@ -69,8 +46,8 @@ class OssmSettingsSource : public MenuSource {
   private:
     MenuCommandItem disconnect_;
     DefaultPatternItem defaultPattern_;
-    DepthModeItem depthMode_;
-    StrokeDirectionItem strokeDirection_;
+    SettingChoiceItem<DepthControlOption, DepthControlMode> depthMode_;
+    SettingChoiceItem<StrokeDirectionOption, bool> strokeDirection_;
     bool connected_ = false;
 };
 

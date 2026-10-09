@@ -82,9 +82,9 @@ MenuInput stepInput(std::int32_t steps) {
     return input;
 }
 
-MenuInput knobInput(std::size_t knob, std::int32_t steps) {
+MenuInput adjustInput(std::int32_t steps) {
     MenuInput input;
-    input.knobSteps[knob] = steps;
+    input.adjustSteps = steps;
     return input;
 }
 
@@ -110,7 +110,7 @@ void test_open_starts_on_the_first_row_that_is_not_destructive() {
     MenuCommandItem diagnostics("diagnostics", "Diagnostics", kDiagnosticsCommand);
     FakeSource source;
     source.items = {&disconnect, &diagnostics};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
 
@@ -129,7 +129,7 @@ void test_highlight_stops_at_the_first_and_last_row() {
     MenuCommandItem third("third", "Third", 3);
     FakeSource source;
     source.items = {&first, &second, &third};
-    MenuPage page("Page");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
@@ -151,7 +151,7 @@ void test_back_on_the_root_page_closes_the_menu() {
     MenuCommandItem item("item", "Item", 1);
     FakeSource source;
     source.items = {&item};
-    MenuPage page("Page");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
@@ -168,7 +168,7 @@ void test_command_rows_hand_their_command_to_the_host() {
         "diagnostics", "Diagnostics", kDiagnosticsCommand, MenuCommandItem::Style::OpensScreen);
     FakeSource source;
     source.items = {&diagnostics};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
@@ -190,7 +190,7 @@ void test_tapping_a_row_highlights_and_selects_it() {
         "diagnostics", "Diagnostics", kDiagnosticsCommand, MenuCommandItem::Style::OpensScreen);
     FakeSource source;
     source.items = {&disconnect, &diagnostics};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
@@ -216,14 +216,14 @@ void test_link_opens_a_page_and_back_returns_to_the_same_row() {
     MenuCommandItem dim("dim", "Dim", 2);
     FakeSource settingsSource;
     settingsSource.items = {&brightness, &dim};
-    MenuPage settings("Settings");
+    MenuPage settings;
     settings.addSource(settingsSource);
 
     MenuCommandItem pause("pause", "Pause", 3);
     MenuLinkItem settingsLink("settings", "Settings", settings);
     FakeSource quickSource;
     quickSource.items = {&pause, &settingsLink};
-    MenuPage quickActions("Quick actions");
+    MenuPage quickActions;
     quickActions.addSource(quickSource);
 
     MenuController menu;
@@ -249,7 +249,7 @@ void test_link_opens_a_page_and_back_returns_to_the_same_row() {
 
 void test_pages_open_no_deeper_than_the_maximum_depth() {
     static_assert(MenuController::kMaxDepth == 4, "Extend the page chain");
-    MenuPage pages[] = {MenuPage("1"), MenuPage("2"), MenuPage("3"), MenuPage("4"), MenuPage("5")};
+    MenuPage pages[MenuController::kMaxDepth + 1];
     MenuLinkItem links[] = {
         MenuLinkItem("next", "Next", pages[1]),
         MenuLinkItem("next", "Next", pages[2]),
@@ -276,7 +276,7 @@ void test_choice_popup_previews_options_and_back_cancels_the_preview() {
     FakeChoice brightness("Brightness", fourOptions(), 1);
     FakeSource source;
     source.items = {&brightness};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
@@ -304,7 +304,7 @@ void test_choice_popup_select_saves_the_option_and_closes() {
     FakeChoice brightness("Brightness", fourOptions(), 1);
     FakeSource source;
     source.items = {&brightness};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
@@ -330,7 +330,7 @@ void test_failed_popup_save_stays_open_on_the_stored_option() {
     brightness.commitSucceeds = false;
     FakeSource source;
     source.items = {&brightness};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
@@ -351,7 +351,7 @@ void test_popup_without_a_matching_option_starts_without_a_highlight() {
     FakeChoice pattern("Default pattern", {"Auto", "Simple", "Teasing"}, MenuChoiceItem::kNoOption);
     FakeSource source;
     source.items = {&pattern};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
@@ -375,13 +375,13 @@ void test_inline_adjustment_previews_and_saves_when_the_highlight_leaves() {
     MenuCommandItem diagnostics("diagnostics", "Diagnostics", kDiagnosticsCommand);
     FakeSource source;
     source.items = {&brightness, &diagnostics};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
     menu.takeChanges();
 
-    menu.update(knobInput(1, 1));
+    menu.update(adjustInput(1));
     TEST_ASSERT_TRUE(menu.takeChanges().values);
     TEST_ASSERT_EQUAL_UINT(2, brightness.applied);
     TEST_ASSERT_EQUAL_STRING("High", brightness.valueText());
@@ -397,13 +397,13 @@ void test_inline_adjustment_back_to_the_stored_option_saves_nothing() {
     MenuCommandItem diagnostics("diagnostics", "Diagnostics", kDiagnosticsCommand);
     FakeSource source;
     source.items = {&brightness, &diagnostics};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
 
-    menu.update(knobInput(0, 1));
-    menu.update(knobInput(0, -1));
+    menu.update(adjustInput(1));
+    menu.update(adjustInput(-1));
     menu.update(stepInput(1));
 
     TEST_ASSERT_TRUE(brightness.commits.empty());
@@ -416,11 +416,11 @@ void test_failed_inline_save_cancels_the_preview_and_reports_it() {
     MenuCommandItem diagnostics("diagnostics", "Diagnostics", kDiagnosticsCommand);
     FakeSource source;
     source.items = {&brightness, &diagnostics};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
-    menu.update(knobInput(0, 2));
+    menu.update(adjustInput(2));
     menu.takeChanges();
 
     menu.update(stepInput(1));
@@ -435,11 +435,11 @@ void test_closing_the_menu_saves_a_pending_inline_adjustment() {
     FakeChoice brightness("Brightness", fourOptions(), 1);
     FakeSource source;
     source.items = {&brightness};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
-    menu.update(knobInput(0, -1));
+    menu.update(adjustInput(-1));
 
     menu.close();
 
@@ -452,11 +452,11 @@ void test_select_saves_a_pending_inline_adjustment_before_opening_the_options() 
     FakeChoice brightness("Brightness", fourOptions(), 1);
     FakeSource source;
     source.items = {&brightness};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
-    menu.update(knobInput(0, 1));
+    menu.update(adjustInput(1));
 
     menu.update(selectInput());
 
@@ -469,14 +469,13 @@ void test_disabled_inline_adjustment_ignores_the_inner_knobs() {
     FakeChoice brightness("Brightness", fourOptions(), 1);
     FakeSource source;
     source.items = {&brightness};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.setInlineAdjustEnabled(false);
     menu.open(page);
 
-    menu.update(knobInput(0, 1));
-    menu.update(knobInput(1, 1));
+    menu.update(adjustInput(1));
 
     TEST_ASSERT_TRUE(brightness.previews.empty());
     TEST_ASSERT_FALSE(menu.takeChanges().values);
@@ -489,7 +488,7 @@ void test_refresh_keeps_the_highlight_on_the_same_row() {
     MenuCommandItem diagnostics("diagnostics", "Diagnostics", kDiagnosticsCommand);
     FakeSource source;
     source.items = {&disconnect, &pattern, &diagnostics};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
@@ -510,7 +509,7 @@ void test_refresh_closes_pages_opened_from_a_row_that_went_away() {
     MenuCommandItem diagnostics("diagnostics", "Diagnostics", kDiagnosticsCommand);
     FakeSource source;
     source.items = {&disconnect, &pattern, &diagnostics};
-    MenuPage page("Settings");
+    MenuPage page;
     page.addSource(source);
     MenuController menu;
     menu.open(page);
@@ -534,7 +533,7 @@ void test_sources_add_rows_in_registration_order_up_to_the_capacity() {
     deviceSource.items = {&pause};
     FakeSource remoteSource;
     remoteSource.items = {&settings};
-    MenuPage page("Quick actions");
+    MenuPage page;
     TEST_ASSERT_TRUE(page.addSource(deviceSource));
     TEST_ASSERT_TRUE(page.addSource(remoteSource));
 
@@ -544,7 +543,7 @@ void test_sources_add_rows_in_registration_order_up_to_the_capacity() {
     TEST_ASSERT_TRUE(&page.item(1) == &settings);
     TEST_ASSERT_EQUAL_UINT(1, page.indexOf(settings));
 
-    MenuPage full("Full");
+    MenuPage full;
     for (std::size_t index = 0; index < MenuPage::kMaxItems; ++index) {
         TEST_ASSERT_TRUE(full.add(pause));
     }
@@ -574,7 +573,7 @@ void test_tiles_from_every_source_come_before_the_rows() {
     FakeSource remoteSource;
     remoteSource.tiles = {&lock};
     remoteSource.items = {&brightness};
-    MenuPage page("Quick actions");
+    MenuPage page;
     page.addSource(deviceSource);
     page.addSource(remoteSource);
 
@@ -599,7 +598,7 @@ void test_tiles_from_every_source_come_before_the_rows() {
     TEST_ASSERT_EQUAL_UINT(5, page.count());
     TEST_ASSERT_EQUAL_UINT(3, page.tileCount());
 
-    MenuPage full("Full");
+    MenuPage full;
     for (std::size_t index = 0; index < MenuPage::kMaxTiles; ++index) {
         TEST_ASSERT_TRUE(full.addTile(pause));
     }

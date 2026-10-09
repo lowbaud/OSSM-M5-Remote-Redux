@@ -74,7 +74,7 @@ class MenuChoiceItem : public MenuItem {
     MenuItemKind kind() const override;
     const char* valueText() const override;
     const char* selectLabel() const override;
-    bool adjust(std::size_t knob, std::int32_t steps) override;
+    bool adjust(std::int32_t steps) override;
     MenuResult activate() override;
     MenuResult unhighlighted() override;
 
