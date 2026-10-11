@@ -54,6 +54,7 @@ class OssmClient : public OssmControlClient {
     bool isReady() const override;
     int lastError() const;
     bool supportsCollapsedRange() const override;
+    bool isOfficialFirmware() const override;
     FirmwareFamily firmwareFamily() const;
     // Signal strength of the current connection in dBm, or 0 when unknown.
     int rssi() const;

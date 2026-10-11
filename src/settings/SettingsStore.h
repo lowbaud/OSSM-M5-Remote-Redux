@@ -35,6 +35,24 @@ enum class DepthControlMode : std::uint8_t {
     MinMax = 1,
 };
 
+// How far a ramp raises the speed.
+enum class RampIncrease : std::uint8_t {
+    Plus5 = 5,
+    Plus10 = 10,
+    Plus20 = 20,
+    Plus30 = 30,
+    Plus50 = 50,
+};
+
+// How long a ramp takes, in seconds.
+enum class RampDuration : std::uint32_t {
+    Seconds30 = 30,
+    Minute1 = 60,
+    Minutes2 = 120,
+    Minutes5 = 300,
+    Minutes10 = 600,
+};
+
 struct BrightnessOption {
     BrightnessLevel level;
     const char* name;
@@ -71,6 +89,16 @@ struct DepthControlOption {
     const char* name;
 };
 
+struct RampIncreaseOption {
+    RampIncrease increase;
+    const char* name;
+};
+
+struct RampDurationOption {
+    RampDuration duration;
+    const char* name;
+};
+
 struct SavedOssmConnection {
     std::uint64_t address = 0;
     std::uint8_t addressType = 0;
@@ -87,6 +115,8 @@ class SettingsStore {
     static constexpr bool kDefaultTouchscreenEnabled = true;
     static constexpr DepthControlMode kDefaultDepthControlMode = DepthControlMode::StrokeDepth;
     static constexpr bool kDefaultStrokeEncoderReversed = false;
+    static constexpr RampIncrease kDefaultRampIncrease = RampIncrease::Plus20;
+    static constexpr RampDuration kDefaultRampDuration = RampDuration::Minutes2;
 
     static constexpr std::size_t kBrightnessOptionCount = 4;
     static constexpr std::size_t kIdleDimOptionCount = 4;
@@ -95,6 +125,8 @@ class SettingsStore {
     static constexpr std::size_t kTouchscreenOptionCount = 2;
     static constexpr std::size_t kDepthControlOptionCount = 2;
     static constexpr std::size_t kStrokeDirectionOptionCount = 2;
+    static constexpr std::size_t kRampIncreaseOptionCount = 5;
+    static constexpr std::size_t kRampDurationOptionCount = 5;
 
     bool begin();
     const std::string& defaultPattern() const;
@@ -114,6 +146,10 @@ class SettingsStore {
     bool setDepthControlMode(DepthControlMode mode);
     bool strokeEncoderReversed() const;
     bool setStrokeEncoderReversed(bool reversed);
+    RampIncrease rampIncrease() const;
+    bool setRampIncrease(RampIncrease increase);
+    RampDuration rampDuration() const;
+    bool setRampDuration(RampDuration duration);
     bool savedOssmConnection(SavedOssmConnection& connection) const;
     bool setSavedOssmConnection(const SavedOssmConnection& connection);
 
@@ -131,6 +167,10 @@ class SettingsStore {
     static std::size_t depthControlOptionIndex(DepthControlMode mode);
     static const StrokeDirectionOption& strokeDirectionOption(std::size_t index);
     static std::size_t strokeDirectionOptionIndex(bool reversed);
+    static const RampIncreaseOption& rampIncreaseOption(std::size_t index);
+    static std::size_t rampIncreaseOptionIndex(RampIncrease increase);
+    static const RampDurationOption& rampDurationOption(std::size_t index);
+    static std::size_t rampDurationOptionIndex(RampDuration duration);
 
   private:
     Preferences preferences_;
@@ -142,6 +182,8 @@ class SettingsStore {
     bool touchscreenEnabled_ = kDefaultTouchscreenEnabled;
     DepthControlMode depthControlMode_ = kDefaultDepthControlMode;
     bool strokeEncoderReversed_ = kDefaultStrokeEncoderReversed;
+    RampIncrease rampIncrease_ = kDefaultRampIncrease;
+    RampDuration rampDuration_ = kDefaultRampDuration;
     SavedOssmConnection savedOssmConnection_{};
     bool hasSavedOssmConnection_ = false;
     bool initialized_ = false;
@@ -150,6 +192,8 @@ class SettingsStore {
     static bool isValidIdleDimTimeout(std::uint32_t seconds);
     static bool isValidIdlePowerOffTimeout(std::uint32_t seconds);
     static bool isValidDepthControlMode(std::uint8_t value);
+    static bool isValidRampIncrease(std::uint8_t value);
+    static bool isValidRampDuration(std::uint32_t seconds);
     static bool isValidSavedOssmConnection(const SavedOssmConnection& connection);
 };
 

@@ -44,8 +44,8 @@ class RemoteSettingsSource : public MenuSource {
     MenuCommandItem diagnostics_;
 };
 
-// Quick actions of the remote itself: the Lock tile, Brightness from the settings, and the link
-// to the settings, which comes last below every other quick action.
+// Quick actions of the remote itself: Brightness from the settings, and the link to the
+// settings, which comes last below every other quick action.
 class RemoteQuickActionsSource : public MenuSource {
   public:
     RemoteQuickActionsSource(RemoteSettingsSource& settings, MenuPage& settingsPage);
@@ -54,7 +54,6 @@ class RemoteQuickActionsSource : public MenuSource {
 
   private:
     RemoteSettingsSource& settings_;
-    MenuCommandItem lock_;
     MenuLinkItem settingsLink_;
 };
 

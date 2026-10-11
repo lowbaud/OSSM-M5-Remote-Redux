@@ -12,6 +12,8 @@ class OssmControlClient {
     virtual bool isReady() const = 0;
     // True when the connected firmware can hold min == max without running a zero stroke.
     virtual bool supportsCollapsedRange() const = 0;
+    // The firmware from Research And Desire, which handles a few motions differently.
+    virtual bool isOfficialFirmware() const = 0;
     virtual bool setSpeed(int speed) = 0;
     virtual void setMotionRange(int depth, int stroke) = 0;
     virtual void setDepth(int depth) = 0;

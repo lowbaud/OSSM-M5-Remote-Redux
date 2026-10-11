@@ -189,6 +189,180 @@ void test_readiness_loss_restores_defaults_and_requests_zero_speed() {
     assertSingleCommand(client.commands, CommandKind::Speed, 0);
 }
 
+void test_pause_stops_and_resume_ramps_back_to_the_paused_speed() {
+    FakeOssmClient client;
+    OssmControl control(client);
+    control.apply({40, 0, 0, 0});
+    client.commands.clear();
+
+    control.togglePause(1000);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::Paused);
+    TEST_ASSERT_EQUAL_INT(0, control.values().speed);
+    TEST_ASSERT_EQUAL_INT(40, control.pausedSpeed());
+    assertSingleCommand(client.commands, CommandKind::Speed, 0);
+    TEST_ASSERT_FALSE(control.update(5000));
+
+    control.togglePause(10000);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::Resuming);
+    TEST_ASSERT_TRUE(control.update(11000));
+    TEST_ASSERT_EQUAL_INT(20, control.values().speed);
+    TEST_ASSERT_TRUE(control.update(12000));
+    TEST_ASSERT_EQUAL_INT(40, control.values().speed);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
+    TEST_ASSERT_FALSE(control.update(13000));
+}
+
+void test_pause_needs_motion_and_pausing_while_resuming_keeps_the_paused_speed() {
+    FakeOssmClient client;
+    OssmControl control(client);
+    control.togglePause(0);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
+
+    control.apply({40, 0, 0, 0});
+    control.togglePause(0);
+    control.togglePause(1000);
+    control.update(2000);
+    control.togglePause(2000);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::Paused);
+    TEST_ASSERT_EQUAL_INT(40, control.pausedSpeed());
+    TEST_ASSERT_EQUAL_INT(0, control.values().speed);
+}
+
+void test_speed_knob_ends_a_pause_while_range_and_sensation_keep_it() {
+    FakeOssmClient client;
+    OssmControl control(client);
+    control.apply({40, 0, 0, 0});
+    control.togglePause(0);
+
+    TEST_ASSERT_TRUE(control.apply({0, 5, 5, 5}));
+    TEST_ASSERT_TRUE(control.action() == OssmAction::Paused);
+    TEST_ASSERT_EQUAL_INT(15, control.values().depth);
+    TEST_ASSERT_TRUE(control.setPattern(3));
+    TEST_ASSERT_TRUE(control.action() == OssmAction::Paused);
+
+    TEST_ASSERT_TRUE(control.apply({5, 0, 0, 0}));
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
+    TEST_ASSERT_EQUAL_INT(5, control.values().speed);
+    TEST_ASSERT_EQUAL_INT(0, control.pausedSpeed());
+}
+
+void test_ramp_raises_the_speed_over_its_duration_and_stops_at_the_maximum() {
+    FakeOssmClient client;
+    OssmControl control(client);
+    control.apply({30, 0, 0, 0});
+
+    control.toggleRamp(20, 10000, 0);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::Ramping);
+    TEST_ASSERT_TRUE(control.update(5000));
+    TEST_ASSERT_EQUAL_INT(40, control.values().speed);
+    TEST_ASSERT_FALSE(control.update(5100));
+    TEST_ASSERT_TRUE(control.update(10000));
+    TEST_ASSERT_EQUAL_INT(50, control.values().speed);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
+
+    control.apply({45, 0, 0, 0});
+    control.toggleRamp(20, 10000, 0);
+    control.update(10000);
+    TEST_ASSERT_EQUAL_INT(100, control.values().speed);
+    control.toggleRamp(20, 10000, 0);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
+}
+
+void test_ramp_toggles_off_and_the_speed_knob_takes_over() {
+    FakeOssmClient client;
+    OssmControl control(client);
+    control.apply({30, 0, 0, 0});
+    control.toggleRamp(20, 10000, 0);
+    control.update(5000);
+
+    control.toggleRamp(20, 10000, 5000);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
+    TEST_ASSERT_FALSE(control.update(10000));
+    TEST_ASSERT_EQUAL_INT(40, control.values().speed);
+
+    control.toggleRamp(20, 10000, 0);
+    TEST_ASSERT_TRUE(control.apply({0, 0, 5, 5}));
+    TEST_ASSERT_TRUE(control.action() == OssmAction::Ramping);
+    TEST_ASSERT_TRUE(control.apply({-2, 0, 0, 0}));
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
+    TEST_ASSERT_EQUAL_INT(38, control.values().speed);
+}
+
+void test_pause_during_a_ramp_keeps_the_speed_reached() {
+    FakeOssmClient client;
+    OssmControl control(client);
+    control.apply({30, 0, 0, 0});
+    control.toggleRamp(20, 10000, 0);
+    control.update(5000);
+
+    control.togglePause(5000);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::Paused);
+    TEST_ASSERT_EQUAL_INT(40, control.pausedSpeed());
+}
+
+void test_pull_out_moves_to_the_start_ignores_input_and_then_stops() {
+    FakeOssmClient client;
+    client.collapsedRangeSupported = true;
+    OssmControl control(client);
+    control.apply({40, 20, 40, 0});
+    client.commands.clear();
+
+    control.pullOut(0);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::PullingOut);
+    TEST_ASSERT_EQUAL_INT(2, control.values().depth);
+    TEST_ASSERT_EQUAL_INT(0, control.values().stroke);
+    TEST_ASSERT_EQUAL_INT(10, control.values().speed);
+    assertSingleCommand(client.commands, CommandKind::Range, 2, 0);
+    assertSingleCommand(client.commands, CommandKind::Speed, 10);
+
+    client.commands.clear();
+    TEST_ASSERT_FALSE(control.apply({10, 10, 10, 10}));
+    TEST_ASSERT_FALSE(control.setPattern(3));
+    control.togglePause(500);
+    control.toggleRamp(20, 1000, 500);
+    TEST_ASSERT_TRUE(client.commands.empty());
+    TEST_ASSERT_TRUE(control.action() == OssmAction::PullingOut);
+
+    TEST_ASSERT_FALSE(control.update(1999));
+    TEST_ASSERT_TRUE(control.update(2000));
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
+    TEST_ASSERT_EQUAL_INT(0, control.values().speed);
+    TEST_ASSERT_EQUAL_INT(2, control.values().depth);
+    assertSingleCommand(client.commands, CommandKind::Speed, 0);
+}
+
+void test_official_firmware_pulls_out_to_a_short_stroke() {
+    FakeOssmClient client;
+    client.collapsedRangeSupported = true;
+    client.officialFirmware = true;
+    OssmControl control(client);
+
+    control.pullOut(0);
+    TEST_ASSERT_EQUAL_INT(7, control.values().depth);
+    TEST_ASSERT_EQUAL_INT(5, control.values().stroke);
+}
+
+void test_stop_and_a_refused_speed_end_the_running_action() {
+    FakeOssmClient client;
+    OssmControl control(client);
+    control.apply({40, 0, 0, 0});
+    control.togglePause(0);
+    control.stop();
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
+    TEST_ASSERT_EQUAL_INT(0, control.pausedSpeed());
+
+    control.pullOut(0);
+    control.stop();
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
+    TEST_ASSERT_EQUAL_INT(0, control.values().speed);
+
+    control.toggleRamp(20, 1000, 0);
+    client.acceptSpeed = false;
+    TEST_ASSERT_TRUE(control.update(500));
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
+    TEST_ASSERT_EQUAL_INT(0, control.values().speed);
+}
+
 }  // namespace
 
 void setUp() {}
@@ -208,5 +382,14 @@ int main() {
     RUN_TEST(test_stop_requests_zero_speed_even_when_not_ready);
     RUN_TEST(test_pattern_change_resets_sensation_and_repeated_selection_is_noop);
     RUN_TEST(test_readiness_loss_restores_defaults_and_requests_zero_speed);
+    RUN_TEST(test_pause_stops_and_resume_ramps_back_to_the_paused_speed);
+    RUN_TEST(test_pause_needs_motion_and_pausing_while_resuming_keeps_the_paused_speed);
+    RUN_TEST(test_speed_knob_ends_a_pause_while_range_and_sensation_keep_it);
+    RUN_TEST(test_ramp_raises_the_speed_over_its_duration_and_stops_at_the_maximum);
+    RUN_TEST(test_ramp_toggles_off_and_the_speed_knob_takes_over);
+    RUN_TEST(test_pause_during_a_ramp_keeps_the_speed_reached);
+    RUN_TEST(test_pull_out_moves_to_the_start_ignores_input_and_then_stops);
+    RUN_TEST(test_official_firmware_pulls_out_to_a_short_stroke);
+    RUN_TEST(test_stop_and_a_refused_speed_end_the_running_action);
     return UNITY_END();
 }

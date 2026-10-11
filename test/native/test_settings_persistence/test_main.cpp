@@ -65,6 +65,10 @@ void test_all_scalar_settings_persist_and_failed_writes_keep_previous_values() {
         DepthControlMode::MinMax);
     checkScalarPersistence(
         &SettingsStore::setStrokeEncoderReversed, &SettingsStore::strokeEncoderReversed, true);
+    checkScalarPersistence(
+        &SettingsStore::setRampIncrease, &SettingsStore::rampIncrease, RampIncrease::Plus50);
+    checkScalarPersistence(
+        &SettingsStore::setRampDuration, &SettingsStore::rampDuration, RampDuration::Seconds30);
 }
 
 void test_uninitialized_store_rejects_all_writes() {
@@ -76,6 +80,8 @@ void test_uninitialized_store_rejects_all_writes() {
     TEST_ASSERT_FALSE(store.setTouchscreenEnabled(false));
     TEST_ASSERT_FALSE(store.setDepthControlMode(DepthControlMode::MinMax));
     TEST_ASSERT_FALSE(store.setStrokeEncoderReversed(true));
+    TEST_ASSERT_FALSE(store.setRampIncrease(RampIncrease::Plus50));
+    TEST_ASSERT_FALSE(store.setRampDuration(RampDuration::Seconds30));
     TEST_ASSERT_FALSE(store.setDefaultPattern("Wave"));
     TEST_ASSERT_FALSE(store.setSavedOssmConnection(connection()));
     TEST_ASSERT_EQUAL_UINT(0, test_support::preferences.writeCalls);
@@ -99,11 +105,15 @@ void test_invalid_values_are_rejected_without_writes() {
     TEST_ASSERT_FALSE(store.setIdleDimTimeout(static_cast<IdleDimTimeout>(31)));
     TEST_ASSERT_FALSE(store.setIdlePowerOffTimeout(static_cast<IdlePowerOffTimeout>(1)));
     TEST_ASSERT_FALSE(store.setDepthControlMode(static_cast<DepthControlMode>(255)));
+    TEST_ASSERT_FALSE(store.setRampIncrease(static_cast<RampIncrease>(7)));
+    TEST_ASSERT_FALSE(store.setRampDuration(static_cast<RampDuration>(31)));
     TEST_ASSERT_EQUAL_UINT(0, test_support::preferences.writeCalls);
     TEST_ASSERT_TRUE(store.brightnessLevel() == SettingsStore::kDefaultBrightnessLevel);
     TEST_ASSERT_TRUE(store.idleDimTimeout() == SettingsStore::kDefaultIdleDimTimeout);
     TEST_ASSERT_TRUE(store.idlePowerOffTimeout() == SettingsStore::kDefaultIdlePowerOffTimeout);
     TEST_ASSERT_TRUE(store.depthControlMode() == SettingsStore::kDefaultDepthControlMode);
+    TEST_ASSERT_TRUE(store.rampIncrease() == SettingsStore::kDefaultRampIncrease);
+    TEST_ASSERT_TRUE(store.rampDuration() == SettingsStore::kDefaultRampDuration);
 }
 
 void test_invalid_stored_values_fall_back_to_defaults() {
@@ -113,12 +123,16 @@ void test_invalid_stored_values_fall_back_to_defaults() {
     seed.putUInt("idle_dim", 31);
     seed.putUInt("idle_power_off", 1);
     seed.putUChar("depth_control", 255);
+    seed.putUChar("ramp_increase", 7);
+    seed.putUInt("ramp_duration", 31);
     SettingsStore store;
     TEST_ASSERT_TRUE(store.begin());
     TEST_ASSERT_TRUE(store.brightnessLevel() == SettingsStore::kDefaultBrightnessLevel);
     TEST_ASSERT_TRUE(store.idleDimTimeout() == SettingsStore::kDefaultIdleDimTimeout);
     TEST_ASSERT_TRUE(store.idlePowerOffTimeout() == SettingsStore::kDefaultIdlePowerOffTimeout);
     TEST_ASSERT_TRUE(store.depthControlMode() == SettingsStore::kDefaultDepthControlMode);
+    TEST_ASSERT_TRUE(store.rampIncrease() == SettingsStore::kDefaultRampIncrease);
+    TEST_ASSERT_TRUE(store.rampDuration() == SettingsStore::kDefaultRampDuration);
 }
 
 void test_default_pattern_round_trip_and_failed_replacement() {

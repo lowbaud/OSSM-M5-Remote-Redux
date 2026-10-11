@@ -38,6 +38,23 @@ void setMotionRangeSlider(lv_obj_t* slider, int start, int end) {
     }
 }
 
+// The speed caption names the quick action that is in control of the speed.
+const char* speedCaption(OssmAction action) {
+    switch (action) {
+        case OssmAction::Paused:
+            return "PAUSED";
+        case OssmAction::Resuming:
+            return "RESUMING";
+        case OssmAction::Ramping:
+            return "RAMPING";
+        case OssmAction::PullingOut:
+            return "PULLING OUT";
+        case OssmAction::None:
+            break;
+    }
+    return "SPEED";
+}
+
 // Expands a ring outward from the range knob while fading it out.
 void setRangeKnobPing(void* object, std::int32_t progress) {
     lv_obj_t* slider = static_cast<lv_obj_t*>(object);
@@ -269,6 +286,11 @@ void OssmControlScreen::refresh() {
     const OssmControlValues& values = control_.values();
     lv_label_set_text_fmt(objects.ossm_control_speed_value_lbl, "%02d", values.speed);
     lv_label_set_text_fmt(objects.ossm_control_sensation_value_lbl, "%02d", values.sensation);
+    // Setting the same static text again would still redraw the label.
+    const char* caption = speedCaption(control_.action());
+    if (lv_label_get_text(objects.ossm_control_speed_lbl) != caption) {
+        lv_label_set_text_static(objects.ossm_control_speed_lbl, caption);
+    }
 
     stopButtonFeedback_.setMotionActive(values.speed > 0);
 

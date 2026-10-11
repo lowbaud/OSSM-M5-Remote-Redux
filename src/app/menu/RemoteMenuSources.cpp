@@ -1,7 +1,5 @@
 #include "RemoteMenuSources.h"
 
-#include <lvgl.h>
-
 #include "app/menu/AppMenuCommands.h"
 
 namespace m5_redux {
@@ -85,15 +83,9 @@ void RemoteSettingsSource::addItems(MenuPage& page) {
 
 RemoteQuickActionsSource::RemoteQuickActionsSource(
     RemoteSettingsSource& settings, MenuPage& settingsPage)
-    : settings_(settings),
-      lock_("remote.lock", "Lock", static_cast<MenuCommand>(AppMenuCommand::Lock)),
-      settingsLink_("remote.settings", "Settings", settingsPage) {
-    // LVGL has no lock symbol; a stand-in until the action and its icon exist.
-    lock_.setIcon(LV_SYMBOL_EYE_CLOSE);
-}
+    : settings_(settings), settingsLink_("remote.settings", "Settings", settingsPage) {}
 
 void RemoteQuickActionsSource::addItems(MenuPage& page) {
-    page.addTile(lock_);
     page.add(settings_.brightness());
     page.add(settingsLink_);
 }

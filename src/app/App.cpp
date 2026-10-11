@@ -85,7 +85,7 @@ MenuScreen menuScreen;
 OssmSettingsSource ossmSettings(settingsStore, applySettings);
 RemoteSettingsSource remoteSettings(settingsStore, backlightController, applySettings);
 MenuPage settingsPage;
-OssmQuickActionsSource ossmQuickActions;
+OssmQuickActionsSource ossmQuickActions(settingsStore, ossmControl, applySettings);
 RemoteQuickActionsSource remoteQuickActions(remoteSettings, settingsPage);
 MenuPage quickActionsPage;
 
@@ -316,6 +316,20 @@ void handleBootAction(BootScreenAction action) {
     }
 }
 
+// Shows motion the remote changed by itself, e.g. Stop or a ramp step, on the current screen.
+void refreshMotion() {
+    const bool moving = ossmControl.values().speed > 0;
+    if (currentScreen == Screen::OssmControl) {
+        ossmControlScreen.refresh();
+    } else if (currentScreen == Screen::OssmPatterns) {
+        ossmPatternsScreen.refresh();
+    } else if (currentScreen == Screen::Menu) {
+        menuScreen.setMotionActive(moving);
+    } else if (currentScreen == Screen::Diagnostics) {
+        diagnosticsScreen.setMotionActive(moving);
+    }
+}
+
 // Back to where the menu was opened from, unless the OSSM went away meanwhile.
 void closeMenu() {
     navigateTo(menuConnected() ? Screen::OssmControl : Screen::Welcome);
@@ -341,11 +355,18 @@ void handleMenuCommand(AppMenuCommand command) {
             closeMenu();
             break;
         case AppMenuCommand::Pause:
+            ossmControl.togglePause(millis());
+            closeMenu();
+            break;
         case AppMenuCommand::PullOut:
-        case AppMenuCommand::Lock:
-            // Mock-ups of the quick action tiles: they only close the menu, as the real actions
-            // will after running.
-            LOGI(kTag, "Quick action %u is not implemented yet", static_cast<unsigned>(command));
+            ossmControl.pullOut(millis());
+            closeMenu();
+            break;
+        case AppMenuCommand::Ramp:
+            ossmControl.toggleRamp(
+                static_cast<int>(settingsStore.rampIncrease()),
+                static_cast<std::uint32_t>(settingsStore.rampDuration()) * 1000,
+                millis());
             closeMenu();
             break;
         case AppMenuCommand::ShowDiagnostics:
@@ -600,6 +621,10 @@ void update() {
     } else if (!screenChanged && !inputConsumed) {
         dispatchInput(inputEvents, connectedScreenWasReady);
     }
+    // Pauses, ramps and pull outs move on by themselves.
+    if (ossmControl.update(millis())) {
+        refreshMotion();
+    }
 
     ui_tick();
     lvgl_port::update();
@@ -620,15 +645,7 @@ void update() {
 
 void stopMotion() {
     ossmControl.stop();
-    if (currentScreen == Screen::OssmControl) {
-        ossmControlScreen.refresh();
-    } else if (currentScreen == Screen::OssmPatterns) {
-        ossmPatternsScreen.refresh();
-    } else if (currentScreen == Screen::Menu) {
-        menuScreen.setMotionActive(false);
-    } else if (currentScreen == Screen::Diagnostics) {
-        diagnosticsScreen.setMotionActive(false);
-    }
+    refreshMotion();
 }
 
 void showMenu() {

@@ -2,8 +2,10 @@
 
 #include <cstddef>
 
+#include "app/menu/AppMenuCommands.h"
 #include "app/menu/SettingChoiceItem.h"
 #include "devices/ossm/OssmClient.h"
+#include "devices/ossm/OssmControl.h"
 #include "menu/MenuItems.h"
 #include "menu/MenuPage.h"
 #include "settings/SettingsStore.h"
@@ -51,18 +53,52 @@ class OssmSettingsSource : public MenuSource {
     bool connected_ = false;
 };
 
-// Action tiles while an OSSM is under control.
+// An action tile that reads differently while its action runs, where selecting it again ends
+// the action: Pause reads Resume while paused.
+class OssmActionTile : public MenuCommandItem {
+  public:
+    struct Running {
+        OssmAction action;
+        const char* name;
+        const char* icon;
+        const char* selectLabel;
+    };
+
+    OssmActionTile(
+        const char* id,
+        const char* name,
+        const char* icon,
+        AppMenuCommand command,
+        const OssmControl& control,
+        const Running& running);
+
+    const char* name() const override;
+    const char* icon() const override;
+    const char* selectLabel() const override;
+
+  private:
+    const OssmControl& control_;
+    Running running_;
+
+    bool isRunning() const;
+};
+
+// Action tiles while an OSSM is under control, and the settings of the Ramp tile.
 class OssmQuickActionsSource : public MenuSource {
   public:
-    OssmQuickActionsSource();
+    OssmQuickActionsSource(
+        SettingsStore& settings, const OssmControl& control, ApplySettingsFn applySettings);
 
     void addItems(MenuPage& page) override;
 
   private:
-    MenuCommandItem pause_;
+    OssmActionTile pause_;
     MenuCommandItem pullOut_;
     // Switches the depth mode; the control screen shows which one is active.
     MenuCommandItem range_;
+    OssmActionTile ramp_;
+    SettingChoiceItem<RampIncreaseOption, RampIncrease> rampIncrease_;
+    SettingChoiceItem<RampDurationOption, RampDuration> rampDuration_;
 };
 
 }  // namespace m5_redux

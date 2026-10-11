@@ -84,7 +84,7 @@ class MenuItem {
     // Marks rows that open another page or screen.
     virtual bool showsChevron() const;
     // Symbol drawn on action tiles, e.g. LV_SYMBOL_PAUSE; empty for none.
-    const char* icon() const;
+    virtual const char* icon() const;
     void setIcon(const char* icon);
     // Label of the select button while the row is highlighted.
     virtual const char* selectLabel() const;

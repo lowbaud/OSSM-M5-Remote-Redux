@@ -157,6 +157,10 @@ bool OssmClient::supportsCollapsedRange() const {
     return collapsedRangeSupported_.load();
 }
 
+bool OssmClient::isOfficialFirmware() const {
+    return firmwareFamily_.load() == FirmwareFamily::Official;
+}
+
 OssmClient::FirmwareFamily OssmClient::firmwareFamily() const {
     return firmwareFamily_.load();
 }

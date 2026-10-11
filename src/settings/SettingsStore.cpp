@@ -17,6 +17,8 @@ constexpr char kAutoConnectKey[] = "auto_connect";
 constexpr char kTouchscreenKey[] = "touchscreen";
 constexpr char kDepthControlKey[] = "depth_control";
 constexpr char kStrokeDirectionKey[] = "stroke_reverse";
+constexpr char kRampIncreaseKey[] = "ramp_increase";
+constexpr char kRampDurationKey[] = "ramp_duration";
 constexpr char kOssmConnectionKey[] = "ossm_conn";
 constexpr std::uint8_t kOssmConnectionVersion = 1;
 
@@ -76,6 +78,24 @@ constexpr StrokeDirectionOption kStrokeDirectionOptions[] = {
     {true, "Right increases"},
 };
 
+constexpr RampIncreaseOption kRampIncreaseOptions[] = {
+    {RampIncrease::Plus5, "+5%"},
+    {RampIncrease::Plus10, "+10%"},
+    {RampIncrease::Plus20, "+20%"},
+    {RampIncrease::Plus30, "+30%"},
+    {RampIncrease::Plus50, "+50%"},
+};
+constexpr std::size_t kDefaultRampIncreaseOptionIndex = 2;
+
+constexpr RampDurationOption kRampDurationOptions[] = {
+    {RampDuration::Seconds30, "30 sec"},
+    {RampDuration::Minute1, "1 min"},
+    {RampDuration::Minutes2, "2 min"},
+    {RampDuration::Minutes5, "5 min"},
+    {RampDuration::Minutes10, "10 min"},
+};
+constexpr std::size_t kDefaultRampDurationOptionIndex = 2;
+
 static_assert(
     sizeof(kPreferencesNamespace) - 1 <= 15, "NVS namespace names are limited to 15 characters");
 static_assert(sizeof(kBrightnessKey) - 1 <= 15, "NVS key names are limited to 15 characters");
@@ -85,6 +105,8 @@ static_assert(sizeof(kAutoConnectKey) - 1 <= 15, "NVS key names are limited to 1
 static_assert(sizeof(kTouchscreenKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kDepthControlKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kStrokeDirectionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
+static_assert(sizeof(kRampIncreaseKey) - 1 <= 15, "NVS key names are limited to 15 characters");
+static_assert(sizeof(kRampDurationKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kOssmConnectionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(
     sizeof(kBrightnessOptions) / sizeof(kBrightnessOptions[0]) ==
@@ -113,6 +135,22 @@ static_assert(
     sizeof(kStrokeDirectionOptions) / sizeof(kStrokeDirectionOptions[0]) ==
         SettingsStore::kStrokeDirectionOptionCount,
     "Stroke direction option count does not match its catalog");
+static_assert(
+    sizeof(kRampIncreaseOptions) / sizeof(kRampIncreaseOptions[0]) ==
+        SettingsStore::kRampIncreaseOptionCount,
+    "Ramp increase option count does not match its catalog");
+static_assert(
+    sizeof(kRampDurationOptions) / sizeof(kRampDurationOptions[0]) ==
+        SettingsStore::kRampDurationOptionCount,
+    "Ramp duration option count does not match its catalog");
+static_assert(
+    kRampIncreaseOptions[kDefaultRampIncreaseOptionIndex].increase ==
+        SettingsStore::kDefaultRampIncrease,
+    "Default ramp increase option must match the default");
+static_assert(
+    kRampDurationOptions[kDefaultRampDurationOptionIndex].duration ==
+        SettingsStore::kDefaultRampDuration,
+    "Default ramp duration option must match the default");
 static_assert(
     kIdleDimOptions[kDefaultIdleDimOptionIndex].timeout == SettingsStore::kDefaultIdleDimTimeout,
     "Default idle dim option must remain one minute");
@@ -161,6 +199,16 @@ bool SettingsStore::begin() {
     }
     strokeEncoderReversed_ =
         preferences_.getBool(kStrokeDirectionKey, kDefaultStrokeEncoderReversed);
+    const std::uint8_t storedRampIncrease =
+        preferences_.getUChar(kRampIncreaseKey, static_cast<std::uint8_t>(kDefaultRampIncrease));
+    if (isValidRampIncrease(storedRampIncrease)) {
+        rampIncrease_ = static_cast<RampIncrease>(storedRampIncrease);
+    }
+    const std::uint32_t storedRampDuration =
+        preferences_.getUInt(kRampDurationKey, static_cast<std::uint32_t>(kDefaultRampDuration));
+    if (isValidRampDuration(storedRampDuration)) {
+        rampDuration_ = static_cast<RampDuration>(storedRampDuration);
+    }
 
     StoredOssmConnection storedConnection;
     if (preferences_.getBytesLength(kOssmConnectionKey) == sizeof(storedConnection) &&
@@ -382,6 +430,50 @@ bool SettingsStore::setStrokeEncoderReversed(bool reversed) {
     return true;
 }
 
+RampIncrease SettingsStore::rampIncrease() const {
+    return rampIncrease_;
+}
+
+bool SettingsStore::setRampIncrease(RampIncrease increase) {
+    const std::uint8_t value = static_cast<std::uint8_t>(increase);
+    if (!initialized_ || !isValidRampIncrease(value)) {
+        return false;
+    }
+
+    if (increase == rampIncrease_) {
+        return true;
+    }
+
+    if (preferences_.putUChar(kRampIncreaseKey, value) != sizeof(value)) {
+        return false;
+    }
+
+    rampIncrease_ = increase;
+    return true;
+}
+
+RampDuration SettingsStore::rampDuration() const {
+    return rampDuration_;
+}
+
+bool SettingsStore::setRampDuration(RampDuration duration) {
+    const std::uint32_t seconds = static_cast<std::uint32_t>(duration);
+    if (!initialized_ || !isValidRampDuration(seconds)) {
+        return false;
+    }
+
+    if (duration == rampDuration_) {
+        return true;
+    }
+
+    if (preferences_.putUInt(kRampDurationKey, seconds) != sizeof(seconds)) {
+        return false;
+    }
+
+    rampDuration_ = duration;
+    return true;
+}
+
 bool SettingsStore::savedOssmConnection(SavedOssmConnection& connection) const {
     if (!hasSavedOssmConnection_) {
         return false;
@@ -530,6 +622,38 @@ std::size_t SettingsStore::strokeDirectionOptionIndex(bool reversed) {
     return 0;
 }
 
+const RampIncreaseOption& SettingsStore::rampIncreaseOption(std::size_t index) {
+    if (index >= kRampIncreaseOptionCount) {
+        index = kDefaultRampIncreaseOptionIndex;
+    }
+    return kRampIncreaseOptions[index];
+}
+
+std::size_t SettingsStore::rampIncreaseOptionIndex(RampIncrease increase) {
+    for (std::size_t index = 0; index < kRampIncreaseOptionCount; ++index) {
+        if (kRampIncreaseOptions[index].increase == increase) {
+            return index;
+        }
+    }
+    return kDefaultRampIncreaseOptionIndex;
+}
+
+const RampDurationOption& SettingsStore::rampDurationOption(std::size_t index) {
+    if (index >= kRampDurationOptionCount) {
+        index = kDefaultRampDurationOptionIndex;
+    }
+    return kRampDurationOptions[index];
+}
+
+std::size_t SettingsStore::rampDurationOptionIndex(RampDuration duration) {
+    for (std::size_t index = 0; index < kRampDurationOptionCount; ++index) {
+        if (kRampDurationOptions[index].duration == duration) {
+            return index;
+        }
+    }
+    return kDefaultRampDurationOptionIndex;
+}
+
 bool SettingsStore::isValidBrightnessLevel(std::uint8_t value) {
     return value <= static_cast<std::uint8_t>(BrightnessLevel::Maximum);
 }
@@ -554,6 +678,24 @@ bool SettingsStore::isValidIdlePowerOffTimeout(std::uint32_t seconds) {
 
 bool SettingsStore::isValidDepthControlMode(std::uint8_t value) {
     return value <= static_cast<std::uint8_t>(DepthControlMode::MinMax);
+}
+
+bool SettingsStore::isValidRampIncrease(std::uint8_t value) {
+    for (const RampIncreaseOption& option : kRampIncreaseOptions) {
+        if (static_cast<std::uint8_t>(option.increase) == value) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool SettingsStore::isValidRampDuration(std::uint32_t seconds) {
+    for (const RampDurationOption& option : kRampDurationOptions) {
+        if (static_cast<std::uint32_t>(option.duration) == seconds) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool SettingsStore::isValidSavedOssmConnection(const SavedOssmConnection& connection) {

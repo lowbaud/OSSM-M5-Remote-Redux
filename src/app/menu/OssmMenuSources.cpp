@@ -5,7 +5,6 @@
 #include <cstdio>
 #include <string>
 
-#include "app/menu/AppMenuCommands.h"
 #include "diagnostics/Log.h"
 
 namespace m5_redux {
@@ -30,6 +29,24 @@ const SettingChoiceItem<StrokeDirectionOption, bool>::Setting kStrokeDirectionSe
     &StrokeDirectionOption::reversed,
     &SettingsStore::strokeEncoderReversed,
     &SettingsStore::setStrokeEncoderReversed,
+};
+
+const SettingChoiceItem<RampIncreaseOption, RampIncrease>::Setting kRampIncreaseSetting = {
+    SettingsStore::kRampIncreaseOptionCount,
+    &SettingsStore::rampIncreaseOption,
+    &SettingsStore::rampIncreaseOptionIndex,
+    &RampIncreaseOption::increase,
+    &SettingsStore::rampIncrease,
+    &SettingsStore::setRampIncrease,
+};
+
+const SettingChoiceItem<RampDurationOption, RampDuration>::Setting kRampDurationSetting = {
+    SettingsStore::kRampDurationOptionCount,
+    &SettingsStore::rampDurationOption,
+    &SettingsStore::rampDurationOptionIndex,
+    &RampDurationOption::duration,
+    &SettingsStore::rampDuration,
+    &SettingsStore::setRampDuration,
 };
 
 }  // namespace
@@ -113,11 +130,54 @@ void OssmSettingsSource::addItems(MenuPage& page) {
     page.add(strokeDirection_);
 }
 
-OssmQuickActionsSource::OssmQuickActionsSource()
-    : pause_("ossm.pause", "Pause", static_cast<MenuCommand>(AppMenuCommand::Pause)),
+OssmActionTile::OssmActionTile(
+    const char* id,
+    const char* name,
+    const char* icon,
+    AppMenuCommand command,
+    const OssmControl& control,
+    const Running& running)
+    : MenuCommandItem(id, name, static_cast<MenuCommand>(command)), control_(control),
+      running_(running) {
+    setIcon(icon);
+}
+
+const char* OssmActionTile::name() const {
+    return isRunning() ? running_.name : MenuCommandItem::name();
+}
+
+const char* OssmActionTile::icon() const {
+    return isRunning() ? running_.icon : MenuCommandItem::icon();
+}
+
+const char* OssmActionTile::selectLabel() const {
+    return isRunning() ? running_.selectLabel : MenuCommandItem::selectLabel();
+}
+
+bool OssmActionTile::isRunning() const {
+    return control_.action() == running_.action;
+}
+
+OssmQuickActionsSource::OssmQuickActionsSource(
+    SettingsStore& settings, const OssmControl& control, ApplySettingsFn applySettings)
+    : pause_(
+          "ossm.pause",
+          "Pause",
+          LV_SYMBOL_PAUSE,
+          AppMenuCommand::Pause,
+          control,
+          {OssmAction::Paused, "Resume", LV_SYMBOL_PLAY, "Resume"}),
       pullOut_("ossm.pullout", "Pull out", static_cast<MenuCommand>(AppMenuCommand::PullOut)),
-      range_("ossm.range", "Range", static_cast<MenuCommand>(AppMenuCommand::SwitchDepthMode)) {
-    pause_.setIcon(LV_SYMBOL_PAUSE);
+      range_("ossm.range", "Range", static_cast<MenuCommand>(AppMenuCommand::SwitchDepthMode)),
+      ramp_(
+          "ossm.ramp",
+          "Ramp",
+          LV_SYMBOL_UP,
+          AppMenuCommand::Ramp,
+          control,
+          {OssmAction::Ramping, "Ramping", LV_SYMBOL_UP, "End"}),
+      rampIncrease_("ossm.rampby", "Ramp by", settings, kRampIncreaseSetting, applySettings),
+      rampDuration_("ossm.ramptime", "Ramp time", settings, kRampDurationSetting, applySettings) {
     pullOut_.setIcon(LV_SYMBOL_PREV);
     range_.setIcon(LV_SYMBOL_SHUFFLE);
 }
@@ -126,6 +186,9 @@ void OssmQuickActionsSource::addItems(MenuPage& page) {
     page.addTile(pause_);
     page.addTile(pullOut_);
     page.addTile(range_);
+    page.addTile(ramp_);
+    page.add(rampIncrease_);
+    page.add(rampDuration_);
 }
 
 }  // namespace m5_redux
