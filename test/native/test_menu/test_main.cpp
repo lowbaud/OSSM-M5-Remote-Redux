@@ -575,8 +575,12 @@ void test_tiles_from_every_source_come_before_the_rows() {
 
     // The highlight starts on the first tile and moves on through the rows.
     TEST_ASSERT_TRUE(menu.highlightedItem() == &pause);
-    menu.update(stepInput(3));
+    TEST_ASSERT_TRUE(menu.highlightedTile() == &pause);
+    menu.update(stepInput(2));
+    TEST_ASSERT_TRUE(menu.highlightedTile() == &lock);
+    menu.update(stepInput(1));
     TEST_ASSERT_TRUE(menu.highlightedItem() == &depthMode);
+    TEST_ASSERT_NULL(menu.highlightedTile());
 
     page.populate();
     TEST_ASSERT_EQUAL_UINT(5, page.count());

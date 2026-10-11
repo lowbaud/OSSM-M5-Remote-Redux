@@ -37,6 +37,10 @@ class MenuScreen {
     void setMotionActive(bool active);
     // Shows a quick action that started or ended while the menu is open on its tile.
     void refreshTiles();
+    // Marks the tiles whose actions are held on the left and right button with L and R.
+    void setHeldTiles(const MenuItem* left, const MenuItem* right);
+    // The highlighted tile, or nullptr while a row is highlighted or a popup is open.
+    MenuItem* highlightedTile() const;
     // Back and Select taps, also the tap beside an open popup; handled on the next update.
     void requestBack();
     void requestSelect();
@@ -69,6 +73,8 @@ class MenuScreen {
     PageView popupView_;
     std::uint32_t saveFailureShownAtMs_ = 0;
     StopButtonFeedback stopButtonFeedback_;
+    const MenuItem* heldLeft_ = nullptr;
+    const MenuItem* heldRight_ = nullptr;
     std::size_t tappedRow_ = MenuPage::kNoItem;
     bool backTapped_ = false;
     bool selectTapped_ = false;
@@ -84,6 +90,7 @@ class MenuScreen {
     void showPage(PageView& view, std::size_t level);
     void updateHighlight(std::size_t level);
     void updateValues(std::size_t level);
+    void refreshView(const MenuItemView& view) const;
     void updateButtonBar();
     void resizePopup(std::size_t rowCount);
     void showSaveFailure();

@@ -83,6 +83,7 @@ void test_uninitialized_store_rejects_all_writes() {
     TEST_ASSERT_FALSE(store.setRampIncrease(RampIncrease::Plus50));
     TEST_ASSERT_FALSE(store.setRampDuration(RampDuration::Seconds30));
     TEST_ASSERT_FALSE(store.setDefaultPattern("Wave"));
+    TEST_ASSERT_FALSE(store.setHeldAction(SideButton::Left, "ossm.pause"));
     TEST_ASSERT_FALSE(store.setSavedOssmConnection(connection()));
     TEST_ASSERT_EQUAL_UINT(0, test_support::preferences.writeCalls);
 }
@@ -163,6 +164,25 @@ void test_clearing_default_pattern_removes_key_only_after_success() {
     SettingsStore reopened;
     TEST_ASSERT_TRUE(reopened.begin());
     TEST_ASSERT_TRUE(reopened.defaultPattern().empty());
+}
+
+void test_held_actions_default_persist_per_button_and_stay_cleared() {
+    SettingsStore store;
+    TEST_ASSERT_TRUE(store.begin());
+    TEST_ASSERT_EQUAL_STRING("ossm.pause", store.heldAction(SideButton::Left).c_str());
+    TEST_ASSERT_EQUAL_STRING("ossm.range", store.heldAction(SideButton::Right).c_str());
+    TEST_ASSERT_TRUE(store.setHeldAction(SideButton::Right, "ossm.ramp"));
+    test_support::preferences.failWrites = true;
+    TEST_ASSERT_FALSE(store.setHeldAction(SideButton::Right, ""));
+    TEST_ASSERT_EQUAL_STRING("ossm.ramp", store.heldAction(SideButton::Right).c_str());
+    test_support::preferences.failWrites = false;
+    // Without an action the button does not fall back to its default.
+    TEST_ASSERT_TRUE(store.setHeldAction(SideButton::Left, ""));
+
+    SettingsStore reopened;
+    TEST_ASSERT_TRUE(reopened.begin());
+    TEST_ASSERT_TRUE(reopened.heldAction(SideButton::Left).empty());
+    TEST_ASSERT_EQUAL_STRING("ossm.ramp", reopened.heldAction(SideButton::Right).c_str());
 }
 
 void test_saved_connection_round_trip_and_failed_replacement() {
@@ -257,6 +277,7 @@ int main() {
     RUN_TEST(test_invalid_stored_values_fall_back_to_defaults);
     RUN_TEST(test_default_pattern_round_trip_and_failed_replacement);
     RUN_TEST(test_clearing_default_pattern_removes_key_only_after_success);
+    RUN_TEST(test_held_actions_default_persist_per_button_and_stay_cleared);
     RUN_TEST(test_saved_connection_round_trip_and_failed_replacement);
     RUN_TEST(test_invalid_saved_connections_are_rejected_without_writes);
     RUN_TEST(test_corrupt_connection_blobs_are_ignored);

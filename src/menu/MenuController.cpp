@@ -139,6 +139,14 @@ MenuItem* MenuController::highlightedItem() const {
     return depth_ == 0 ? nullptr : itemAt(frames_[depth_ - 1]);
 }
 
+MenuItem* MenuController::highlightedTile() const {
+    if (depth_ == 0) {
+        return nullptr;
+    }
+    const Frame& top = frames_[depth_ - 1];
+    return top.highlight < top.page->tileCount() ? itemAt(top) : nullptr;
+}
+
 void MenuController::push(MenuPage& page) {
     if (depth_ >= frames_.size()) {
         return;

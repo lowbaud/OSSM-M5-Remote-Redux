@@ -2,6 +2,7 @@
 
 #include <Preferences.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -51,6 +52,12 @@ enum class RampDuration : std::uint32_t {
     Minutes2 = 120,
     Minutes5 = 300,
     Minutes10 = 600,
+};
+
+// The buttons on either side below the screen.
+enum class SideButton : std::uint8_t {
+    Left,
+    Right,
 };
 
 struct BrightnessOption {
@@ -117,6 +124,9 @@ class SettingsStore {
     static constexpr bool kDefaultStrokeEncoderReversed = false;
     static constexpr RampIncrease kDefaultRampIncrease = RampIncrease::Plus20;
     static constexpr RampDuration kDefaultRampDuration = RampDuration::Minutes2;
+    // The menu item ids of the Pause and Range quick action tiles.
+    static constexpr const char* kDefaultLeftHeldAction = "ossm.pause";
+    static constexpr const char* kDefaultRightHeldAction = "ossm.range";
 
     static constexpr std::size_t kBrightnessOptionCount = 4;
     static constexpr std::size_t kIdleDimOptionCount = 4;
@@ -127,6 +137,7 @@ class SettingsStore {
     static constexpr std::size_t kStrokeDirectionOptionCount = 2;
     static constexpr std::size_t kRampIncreaseOptionCount = 5;
     static constexpr std::size_t kRampDurationOptionCount = 5;
+    static constexpr std::size_t kSideButtonCount = 2;
 
     bool begin();
     const std::string& defaultPattern() const;
@@ -150,6 +161,10 @@ class SettingsStore {
     bool setRampIncrease(RampIncrease increase);
     RampDuration rampDuration() const;
     bool setRampDuration(RampDuration duration);
+    // The menu item id of the quick action that holding the button runs; empty for none. Pause
+    // on the left and Range on the right until changed.
+    const std::string& heldAction(SideButton button) const;
+    bool setHeldAction(SideButton button, const std::string& itemId);
     bool savedOssmConnection(SavedOssmConnection& connection) const;
     bool setSavedOssmConnection(const SavedOssmConnection& connection);
 
@@ -184,6 +199,9 @@ class SettingsStore {
     bool strokeEncoderReversed_ = kDefaultStrokeEncoderReversed;
     RampIncrease rampIncrease_ = kDefaultRampIncrease;
     RampDuration rampDuration_ = kDefaultRampDuration;
+    // By SideButton.
+    std::array<std::string, kSideButtonCount> heldActions_{
+        kDefaultLeftHeldAction, kDefaultRightHeldAction};
     SavedOssmConnection savedOssmConnection_{};
     bool hasSavedOssmConnection_ = false;
     bool initialized_ = false;

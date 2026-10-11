@@ -27,6 +27,7 @@ struct TileStyles {
     lv_style_t tileSelected;
     lv_style_t icon;
     lv_style_t name;
+    lv_style_t badge;
 };
 
 void initTileStyles(TileStyles& styles) {
@@ -76,6 +77,11 @@ void initTileStyles(TileStyles& styles) {
     lv_style_set_width(&styles.name, lv_pct(100));
     lv_style_set_height(&styles.name, lv_font_get_line_height(&lv_font_montserrat_12));
     lv_style_set_text_align(&styles.name, LV_TEXT_ALIGN_CENTER);
+
+    // Plain accent text in the top right corner of the content.
+    lv_style_init(&styles.badge);
+    lv_style_set_align(&styles.badge, LV_ALIGN_TOP_RIGHT);
+    lv_style_set_text_color(&styles.badge, themeColor(COLOR_ID_ACCENT));
 }
 
 TileStyles& tileStyles() {
@@ -202,6 +208,12 @@ void createMenuTile(MenuItemView& view, lv_obj_t* tileRow) {
     view.name = lv_label_create(view.root);
     lv_obj_add_style(view.name, &styles.name, LV_PART_MAIN);
     lv_label_set_long_mode(view.name, LV_LABEL_LONG_MODE_DOTS);
+
+    // In the corner, outside the layout that centers the icon and name.
+    view.badge = lv_label_create(view.root);
+    lv_obj_add_style(view.badge, &styles.badge, LV_PART_MAIN);
+    lv_obj_add_flag(view.badge, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    setMenuTileBadge(view, "");
 }
 
 void refreshMenuItemView(const MenuItemView& view) {
@@ -232,6 +244,11 @@ void refreshMenuItemView(const MenuItemView& view) {
     }
 
     lv_label_set_text_static(view.value, item.showsChevron() ? LV_SYMBOL_RIGHT : item.valueText());
+}
+
+void setMenuTileBadge(const MenuItemView& view, const char* badge) {
+    setStaticText(view.badge, badge);
+    setHidden(view.badge, badge[0] == '\0');
 }
 
 void setMenuItemViewSelected(const MenuItemView& view, bool selected) {

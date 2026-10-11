@@ -187,11 +187,23 @@ OssmQuickActionsSource::OssmQuickActionsSource(
     range_.setIcon(LV_SYMBOL_SHUFFLE);
 }
 
+std::array<MenuItem*, MenuPage::kMaxTiles> OssmQuickActionsSource::tiles() {
+    return {&pause_, &pullOut_, &range_, &ramp_};
+}
+
+MenuItem* OssmQuickActionsSource::tile(const std::string& id) {
+    for (MenuItem* tile : tiles()) {
+        if (id == tile->id()) {
+            return tile;
+        }
+    }
+    return nullptr;
+}
+
 void OssmQuickActionsSource::addItems(MenuPage& page) {
-    page.addTile(pause_);
-    page.addTile(pullOut_);
-    page.addTile(range_);
-    page.addTile(ramp_);
+    for (MenuItem* tile : tiles()) {
+        page.addTile(*tile);
+    }
     page.add(rampIncrease_);
     page.add(rampDuration_);
 }

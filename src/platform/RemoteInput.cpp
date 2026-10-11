@@ -37,11 +37,14 @@ constexpr std::uint8_t kLeftButtonPin = 36;
 constexpr std::uint8_t kRightButtonPin = 34;
 #endif
 
+// How long the left or right button is held down before it counts as a hold, not a click.
+constexpr unsigned int kHoldMs = 500;
+
 }  // namespace
 
 void RemoteInput::begin() {
     pendingEvents_ = {};
-    suppressLeftClick_ = false;
+    suppressLeftPress_ = false;
     previousCounts_.fill(0);
     countRemainders_.fill(0);
 
@@ -59,6 +62,10 @@ void RemoteInput::begin() {
     mxButton_.attachPress(handleMxPress, this);
     leftButton_.attachClick(handleLeftClick, this);
     rightButton_.attachClick(handleRightClick, this);
+    leftButton_.setPressMs(kHoldMs);
+    rightButton_.setPressMs(kHoldMs);
+    leftButton_.attachLongPressStart(handleLeftHold, this);
+    rightButton_.attachLongPressStart(handleRightHold, this);
 }
 
 void RemoteInput::update() {
@@ -68,8 +75,8 @@ void RemoteInput::update() {
 
     // A short click is reported after release, so keep suppression until the
     // callback consumes it or the button state machine returns to idle.
-    if (suppressLeftClick_ && !leftPressed() && leftButton_.isIdle()) {
-        suppressLeftClick_ = false;
+    if (suppressLeftPress_ && !leftPressed() && leftButton_.isIdle()) {
+        suppressLeftPress_ = false;
     }
 
     for (std::size_t index = 0; index < encoders_.size(); ++index) {
@@ -93,8 +100,8 @@ bool RemoteInput::leftPressed() const {
     return digitalRead(kLeftButtonPin) == HIGH;
 }
 
-void RemoteInput::suppressLeftClick() {
-    suppressLeftClick_ = leftPressed();
+void RemoteInput::suppressLeftPress() {
+    suppressLeftPress_ = leftPressed();
 }
 
 void RemoteInput::handleMxPress(void* context) {
@@ -103,8 +110,8 @@ void RemoteInput::handleMxPress(void* context) {
 
 void RemoteInput::handleLeftClick(void* context) {
     auto* input = static_cast<RemoteInput*>(context);
-    if (input->suppressLeftClick_) {
-        input->suppressLeftClick_ = false;
+    if (input->suppressLeftPress_) {
+        input->suppressLeftPress_ = false;
         return;
     }
     input->pendingEvents_.leftClick = true;
@@ -112,6 +119,18 @@ void RemoteInput::handleLeftClick(void* context) {
 
 void RemoteInput::handleRightClick(void* context) {
     static_cast<RemoteInput*>(context)->pendingEvents_.rightClick = true;
+}
+
+void RemoteInput::handleLeftHold(void* context) {
+    auto* input = static_cast<RemoteInput*>(context);
+    // Still the suppressed press; update() lifts the suppression once it is released.
+    if (!input->suppressLeftPress_) {
+        input->pendingEvents_.leftHold = true;
+    }
+}
+
+void RemoteInput::handleRightHold(void* context) {
+    static_cast<RemoteInput*>(context)->pendingEvents_.rightHold = true;
 }
 
 }  // namespace m5_redux

@@ -88,6 +88,9 @@ MenuPage settingsPage;
 OssmQuickActionsSource ossmQuickActions(settingsStore, ossmControl, applySettings);
 RemoteQuickActionsSource remoteQuickActions(remoteSettings, settingsPage);
 MenuPage quickActionsPage;
+// The quick action tiles that holding the left or right button runs on the control screen.
+MenuItem* leftHeldAction = nullptr;
+MenuItem* rightHeldAction = nullptr;
 
 Screen currentScreen = Screen::Boot;
 // Where the menu was opened from, and where closing it returns to.
@@ -111,7 +114,8 @@ SavedOssmConnection makeSavedConnection(const ossm::DiscoveredOssm& device) {
 }
 
 bool hasInputActivity(const RemoteInputEvents& events) {
-    if (events.mxPress || events.leftClick || events.rightClick) {
+    if (events.mxPress || events.leftClick || events.rightClick || events.leftHold ||
+        events.rightHold) {
         return true;
     }
 
@@ -348,26 +352,79 @@ void switchDepthMode() {
     applySettings();
 }
 
-void handleMenuCommand(AppMenuCommand command) {
+// The command of a quick action tile, picked in the menu or held on a button.
+void runQuickAction(AppMenuCommand command) {
     switch (command) {
         case AppMenuCommand::SwitchDepthMode:
             // The control screen's range caption shows the new mode.
             switchDepthMode();
-            closeMenu();
             break;
         case AppMenuCommand::Pause:
             ossmControl.togglePause(millis());
-            closeMenu();
             break;
         case AppMenuCommand::PullOut:
             ossmControl.pullOut(millis());
-            closeMenu();
             break;
         case AppMenuCommand::Ramp:
             ossmControl.toggleRamp(
                 static_cast<int>(settingsStore.rampIncrease()),
                 static_cast<std::uint32_t>(settingsStore.rampDuration()) * 1000,
                 millis());
+            break;
+        case AppMenuCommand::ShowDiagnostics:
+        case AppMenuCommand::Disconnect:
+            // Rows, not quick actions.
+            break;
+    }
+}
+
+MenuItem*& heldAction(SideButton button) {
+    return button == SideButton::Left ? leftHeldAction : rightHeldAction;
+}
+
+void showHeldActions() {
+    menuScreen.setHeldTiles(leftHeldAction, rightHeldAction);
+    ossmControlScreen.setHeldActions(leftHeldAction, rightHeldAction);
+}
+
+// Holding a button on the highlighted tile holds its action on that button. Holding the same
+// button on it again takes the action off.
+void toggleHeldAction(SideButton button) {
+    MenuItem* tile = menuScreen.highlightedTile();
+    if (tile == nullptr || tile->kind() != MenuItemKind::Action) {
+        return;
+    }
+
+    MenuItem*& held = heldAction(button);
+    MenuItem* next = held == tile ? nullptr : tile;
+    if (!settingsStore.setHeldAction(button, next != nullptr ? next->id() : "")) {
+        LOGE(kTag, "Unable to save held action");
+        return;
+    }
+    held = next;
+    showHeldActions();
+}
+
+void runHeldAction(SideButton button) {
+    MenuItem* action = heldAction(button);
+    if (action == nullptr) {
+        return;
+    }
+
+    const MenuResult result = action->activate();
+    if (result.type == MenuResult::Type::Command) {
+        runQuickAction(static_cast<AppMenuCommand>(result.command));
+        refreshMotion();
+    }
+}
+
+void handleMenuCommand(AppMenuCommand command) {
+    switch (command) {
+        case AppMenuCommand::SwitchDepthMode:
+        case AppMenuCommand::Pause:
+        case AppMenuCommand::PullOut:
+        case AppMenuCommand::Ramp:
+            runQuickAction(command);
             closeMenu();
             break;
         case AppMenuCommand::ShowDiagnostics:
@@ -503,6 +560,12 @@ void dispatchInput(const RemoteInputEvents& events, bool connectedScreenWasReady
                 case OssmControlScreenAction::Patterns:
                     app::showOssmPatterns();
                     break;
+                case OssmControlScreenAction::LeftHeld:
+                    runHeldAction(SideButton::Left);
+                    break;
+                case OssmControlScreenAction::RightHeld:
+                    runHeldAction(SideButton::Right);
+                    break;
                 case OssmControlScreenAction::None:
                     break;
             }
@@ -523,6 +586,12 @@ void dispatchInput(const RemoteInputEvents& events, bool connectedScreenWasReady
             }
             break;
         case Screen::Menu:
+            if (events.leftHold) {
+                toggleHeldAction(SideButton::Left);
+            }
+            if (events.rightHold) {
+                toggleHeldAction(SideButton::Right);
+            }
             handleMenuEvent(menuScreen.update(events));
             break;
         case Screen::Diagnostics:
@@ -574,6 +643,9 @@ void begin() {
     quickActionsPage.addSource(ossmQuickActions);
     quickActionsPage.addSource(remoteQuickActions);
     menuScreen.begin();
+    leftHeldAction = ossmQuickActions.tile(settingsStore.heldAction(SideButton::Left));
+    rightHeldAction = ossmQuickActions.tile(settingsStore.heldAction(SideButton::Right));
+    showHeldActions();
     updateBatteryIndicator(true);
     ossmConnection.begin(APP_DISPLAY_NAME);
     if (!ossmDiscovery.begin()) {
@@ -597,7 +669,7 @@ void update() {
     remoteInput.update();
     const RemoteInputEvents inputEvents = remoteInput.takeEvents();
     if (currentScreen == Screen::Boot && remoteInput.leftPressed()) {
-        remoteInput.suppressLeftClick();
+        remoteInput.suppressLeftPress();
         if (connectAfterBoot) {
             connectAfterBoot = false;
             bootScreen.showAutoConnectSkipped();

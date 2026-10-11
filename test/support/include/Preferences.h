@@ -50,6 +50,9 @@ class Preferences {
     std::size_t putBool(const char* key, bool value) {
         return putBytes(key, &value, sizeof(value));
     }
+    bool isKey(const char* key) {
+        return opened_ && test_support::preferences.values.count(fullKey(key)) != 0;
+    }
     std::string getString(const char* key, const char* fallback) {
         const auto& values = test_support::preferences.values;
         const auto found = values.find(fullKey(key));

@@ -19,6 +19,15 @@ constexpr char kDepthControlKey[] = "depth_control";
 constexpr char kStrokeDirectionKey[] = "stroke_reverse";
 constexpr char kRampIncreaseKey[] = "ramp_increase";
 constexpr char kRampDurationKey[] = "ramp_duration";
+constexpr char kLeftHeldActionKey[] = "held_left";
+constexpr char kRightHeldActionKey[] = "held_right";
+// By SideButton.
+constexpr const char* kHeldActionKeys[SettingsStore::kSideButtonCount] = {
+    kLeftHeldActionKey,
+    kRightHeldActionKey,
+};
+// Stored for a button without a held action; a missing key means the default action.
+constexpr char kNoHeldAction[] = "none";
 constexpr char kOssmConnectionKey[] = "ossm_conn";
 constexpr std::uint8_t kOssmConnectionVersion = 1;
 
@@ -107,6 +116,8 @@ static_assert(sizeof(kDepthControlKey) - 1 <= 15, "NVS key names are limited to 
 static_assert(sizeof(kStrokeDirectionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kRampIncreaseKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kRampDurationKey) - 1 <= 15, "NVS key names are limited to 15 characters");
+static_assert(sizeof(kLeftHeldActionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
+static_assert(sizeof(kRightHeldActionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(sizeof(kOssmConnectionKey) - 1 <= 15, "NVS key names are limited to 15 characters");
 static_assert(
     sizeof(kBrightnessOptions) / sizeof(kBrightnessOptions[0]) ==
@@ -171,7 +182,10 @@ bool SettingsStore::begin() {
     }
 
     initialized_ = true;
-    defaultPattern_ = preferences_.getString(kDefaultPatternKey, "").c_str();
+    // getString() logs a missing key as an error, so strings that are often unset check first.
+    if (preferences_.isKey(kDefaultPatternKey)) {
+        defaultPattern_ = preferences_.getString(kDefaultPatternKey, "").c_str();
+    }
     const std::uint8_t stored =
         preferences_.getUChar(kBrightnessKey, static_cast<std::uint8_t>(kDefaultBrightnessLevel));
     if (isValidBrightnessLevel(stored)) {
@@ -208,6 +222,12 @@ bool SettingsStore::begin() {
         preferences_.getUInt(kRampDurationKey, static_cast<std::uint32_t>(kDefaultRampDuration));
     if (isValidRampDuration(storedRampDuration)) {
         rampDuration_ = static_cast<RampDuration>(storedRampDuration);
+    }
+    for (std::size_t index = 0; index < kSideButtonCount; ++index) {
+        if (preferences_.isKey(kHeldActionKeys[index])) {
+            const std::string stored = preferences_.getString(kHeldActionKeys[index], "").c_str();
+            heldActions_[index] = stored == kNoHeldAction ? std::string() : stored;
+        }
     }
 
     StoredOssmConnection storedConnection;
@@ -471,6 +491,26 @@ bool SettingsStore::setRampDuration(RampDuration duration) {
     }
 
     rampDuration_ = duration;
+    return true;
+}
+
+const std::string& SettingsStore::heldAction(SideButton button) const {
+    return heldActions_[static_cast<std::size_t>(button)];
+}
+
+bool SettingsStore::setHeldAction(SideButton button, const std::string& itemId) {
+    if (!initialized_) {
+        return false;
+    }
+    const std::size_t index = static_cast<std::size_t>(button);
+    if (itemId == heldActions_[index]) {
+        return true;
+    }
+    const char* stored = itemId.empty() ? kNoHeldAction : itemId.c_str();
+    if (preferences_.putString(kHeldActionKeys[index], stored) != std::strlen(stored)) {
+        return false;
+    }
+    heldActions_[index] = itemId;
     return true;
 }
 

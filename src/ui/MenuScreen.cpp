@@ -138,11 +138,21 @@ void MenuScreen::refreshTiles() {
     for (std::size_t index = 0; index < page.tileCount(); ++index) {
         const MenuItemView* view = findView(page.item(index), true);
         if (view != nullptr) {
-            refreshMenuItemView(*view);
+            refreshView(*view);
         }
     }
     // A highlighted tile's select label can change with it, e.g. Ramp to End.
     updateButtonBar();
+}
+
+void MenuScreen::setHeldTiles(const MenuItem* left, const MenuItem* right) {
+    heldLeft_ = left;
+    heldRight_ = right;
+    refreshTiles();
+}
+
+MenuItem* MenuScreen::highlightedTile() const {
+    return controller_.highlightedTile();
 }
 
 void MenuScreen::requestBack() {
@@ -260,7 +270,7 @@ void MenuScreen::showPage(PageView& view, std::size_t level) {
         const std::size_t position = tile ? index : index - tiles + firstRow;
         lv_obj_move_to_index(itemView->root, static_cast<std::int32_t>(position));
         lv_obj_remove_flag(itemView->root, LV_OBJ_FLAG_HIDDEN);
-        refreshMenuItemView(*itemView);
+        refreshView(*itemView);
     }
 
     // Scrolling the highlight into view only scrolls as far as needed, so a page left scrolled
@@ -306,9 +316,19 @@ void MenuScreen::updateValues(std::size_t level) {
     for (std::size_t index = 0; index < page.count(); ++index) {
         const MenuItemView* itemView = findView(page.item(index), index < tiles);
         if (itemView != nullptr) {
-            refreshMenuItemView(*itemView);
+            refreshView(*itemView);
         }
     }
+}
+
+void MenuScreen::refreshView(const MenuItemView& view) const {
+    refreshMenuItemView(view);
+    if (!view.tile) {
+        return;
+    }
+    const bool left = view.item == heldLeft_;
+    const bool right = view.item == heldRight_;
+    setMenuTileBadge(view, left && right ? "LR" : left ? "L" : right ? "R" : "");
 }
 
 void MenuScreen::updateButtonBar() {

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
+#include <string>
 
 #include "app/menu/AppMenuCommands.h"
 #include "app/menu/SettingChoiceItem.h"
@@ -88,6 +90,9 @@ class OssmQuickActionsSource : public MenuSource {
     OssmQuickActionsSource(
         SettingsStore& settings, const OssmControl& control, ApplySettingsFn applySettings);
 
+    // The tile with the menu item id, e.g. one stored for a held button, or nullptr.
+    MenuItem* tile(const std::string& id);
+
     void addItems(MenuPage& page) override;
 
   private:
@@ -98,6 +103,8 @@ class OssmQuickActionsSource : public MenuSource {
     OssmActionTile ramp_;
     SettingChoiceItem<RampIncreaseOption, RampIncrease> rampIncrease_;
     SettingChoiceItem<RampDurationOption, RampDuration> rampDuration_;
+
+    std::array<MenuItem*, MenuPage::kMaxTiles> tiles();
 };
 
 }  // namespace m5_redux

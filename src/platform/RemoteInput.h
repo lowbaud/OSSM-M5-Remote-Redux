@@ -16,6 +16,9 @@ struct RemoteInputEvents {
     bool mxPress = false;
     bool leftClick = false;
     bool rightClick = false;
+    // A button was held down long enough; it reports no click when released.
+    bool leftHold = false;
+    bool rightHold = false;
 
     // Menus scroll with either outer encoder: speed or sensation.
     std::int32_t menuSteps() const {
@@ -35,7 +38,8 @@ class RemoteInput {
     void update();
     RemoteInputEvents takeEvents();
     bool leftPressed() const;
-    void suppressLeftClick();
+    // Ignores the left button until it is released, e.g. a press that skips the auto-connect.
+    void suppressLeftPress();
 
   private:
     static constexpr std::int64_t kCountsPerDetent = 2;
@@ -47,11 +51,13 @@ class RemoteInput {
     std::array<std::int64_t, RemoteInputEvents::kEncoderCount> previousCounts_{};
     std::array<std::int64_t, RemoteInputEvents::kEncoderCount> countRemainders_{};
     RemoteInputEvents pendingEvents_{};
-    bool suppressLeftClick_ = false;
+    bool suppressLeftPress_ = false;
 
     static void handleMxPress(void* context);
     static void handleLeftClick(void* context);
     static void handleRightClick(void* context);
+    static void handleLeftHold(void* context);
+    static void handleRightHold(void* context);
 };
 
 }  // namespace m5_redux

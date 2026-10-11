@@ -444,7 +444,9 @@ void create_screen_ossm_control() {
             {
                 lv_obj_t *parent_obj = obj;
                 {
+                    // ossm_control_patterns_lbl
                     lv_obj_t *obj = lv_label_create(parent_obj);
+                    objects.ossm_control_patterns_lbl = obj;
                     lv_obj_set_pos(obj, 0, 0);
                     lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                     lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -484,7 +486,9 @@ void create_screen_ossm_control() {
             {
                 lv_obj_t *parent_obj = obj;
                 {
+                    // ossm_control_menu_lbl
                     lv_obj_t *obj = lv_label_create(parent_obj);
+                    objects.ossm_control_menu_lbl = obj;
                     lv_obj_set_pos(obj, 0, 0);
                     lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                     lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);

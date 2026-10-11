@@ -3,7 +3,11 @@
 #include <Arduino.h>
 
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
 
+#include "ui/ThemeColors.h"
 #include "ui/generated/screens.h"
 #include "ui/generated/ui.h"
 
@@ -78,6 +82,13 @@ void OssmControlScreen::begin() {
     sensationHighlight_.begin(
         objects.ossm_control_sensation_value_lbl, objects.ossm_control_sensation_lbl);
     lv_obj_remove_flag(objects.ossm_control_motion_range_slider, LV_OBJ_FLAG_CLICKABLE);
+    leftButtonLabel_.label = objects.ossm_control_menu_lbl;
+    rightButtonLabel_.label = objects.ossm_control_patterns_lbl;
+    for (HeldActionLabel* held : {&leftButtonLabel_, &rightButtonLabel_}) {
+        std::snprintf(held->text, sizeof(held->text), "%s", lv_label_get_text(held->label));
+        // Colors the icon; a "#" in the EEZ text would start a color command too.
+        lv_label_set_recolor(held->label, true);
+    }
     setPatternLabel(control_.values().pattern, nullptr);
     refresh();
 }
@@ -105,6 +116,12 @@ OssmControlScreenAction OssmControlScreen::update(const RemoteInputEvents& event
     }
     if (events.rightClick) {
         return OssmControlScreenAction::Patterns;
+    }
+    if (events.leftHold) {
+        return OssmControlScreenAction::LeftHeld;
+    }
+    if (events.rightHold) {
+        return OssmControlScreenAction::RightHeld;
     }
 
     const std::uint32_t now = millis();
@@ -297,6 +314,8 @@ void OssmControlScreen::refresh() {
         lv_label_set_text_static(objects.ossm_control_speed_lbl, caption);
     }
     speedHighlight_.setPulsing(control_.action() != OssmAction::None);
+    refreshHeldActionLabel(leftButtonLabel_);
+    refreshHeldActionLabel(rightButtonLabel_);
 
     stopButtonFeedback_.setMotionActive(control_.canStop());
 
@@ -378,6 +397,36 @@ void OssmControlScreen::setDepthControlMode(DepthControlMode mode) {
 
 void OssmControlScreen::setStrokeEncoderReversed(bool reversed) {
     strokeEncoderReversed_ = reversed;
+}
+
+void OssmControlScreen::setHeldActions(const MenuItem* left, const MenuItem* right) {
+    leftButtonLabel_.action = left;
+    rightButtonLabel_.action = right;
+    refreshHeldActionLabel(leftButtonLabel_);
+    refreshHeldActionLabel(rightButtonLabel_);
+}
+
+// The icon follows its tile, e.g. Pause shows Play while paused. Runs with every refresh, so only
+// changes are set; setting the same static text again would still redraw the label.
+void OssmControlScreen::refreshHeldActionLabel(HeldActionLabel& held) {
+    if (held.action == nullptr) {
+        if (lv_label_get_text(held.label) != held.text) {
+            lv_label_set_text_static(held.label, held.text);
+        }
+        return;
+    }
+
+    // The solid icon in the secondary text color, so it weighs no more than the text. A recolor
+    // command takes the color as six hex digits.
+    const unsigned int iconColor =
+        static_cast<unsigned int>(lv_color_to_u32(themeColor(COLOR_ID_TEXT_SECONDARY)) & 0xFFFFFF);
+    char text[sizeof(held.textWithIcon)];
+    std::snprintf(text, sizeof(text), "%s #%06x %s#", held.text, iconColor, held.action->icon());
+    if (lv_label_get_text(held.label) != held.textWithIcon ||
+        std::strcmp(text, held.textWithIcon) != 0) {
+        std::memcpy(held.textWithIcon, text, sizeof(text));
+        lv_label_set_text_static(held.label, held.textWithIcon);
+    }
 }
 
 }  // namespace m5_redux

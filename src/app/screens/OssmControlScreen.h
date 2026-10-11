@@ -1,9 +1,12 @@
 #pragma once
 
+#include <lvgl.h>
+
 #include <array>
 #include <cstdint>
 
 #include "devices/ossm/OssmControl.h"
+#include "menu/MenuItem.h"
 #include "platform/RemoteInput.h"
 #include "settings/SettingsStore.h"
 #include "ui/BatteryIndicator.h"
@@ -17,6 +20,9 @@ enum class OssmControlScreenAction : std::uint8_t {
     None,
     Menu,
     Patterns,
+    // A side button was held: run the quick action held on it.
+    LeftHeld,
+    RightHeld,
 };
 
 class OssmControlScreen {
@@ -32,6 +38,9 @@ class OssmControlScreen {
     void setPatternLabel(int patternId, const char* patternName);
     void setDepthControlMode(DepthControlMode mode);
     void setStrokeEncoderReversed(bool reversed);
+    // Shows the icons of the quick actions held on the left and right button after the labels of
+    // their soft buttons; nullptr for none.
+    void setHeldActions(const MenuItem* left, const MenuItem* right);
 
   private:
     enum class AccelerationPolicy : std::uint8_t {
@@ -53,6 +62,15 @@ class OssmControlScreen {
         bool pushing = false;
     };
 
+    // A soft button label followed by the icon of the quick action held on its button.
+    struct HeldActionLabel {
+        lv_obj_t* label = nullptr;
+        // A copy of the EEZ text, e.g. "Menu", to show again without the icon.
+        char text[16] = {};
+        const MenuItem* action = nullptr;
+        char textWithIcon[32] = {};
+    };
+
     static constexpr std::uint32_t kBoundaryPushIntervalMs = 750;
     static constexpr std::uint32_t kAccelerationStepIntervalMs = 200;
     static constexpr std::uint32_t kTopAccelerationStepIntervalMs = 100;
@@ -69,6 +87,8 @@ class OssmControlScreen {
     RangeValueReadout rangeValueReadout_;
     ValueHighlight speedHighlight_;
     ValueHighlight sensationHighlight_;
+    HeldActionLabel leftButtonLabel_;
+    HeldActionLabel rightButtonLabel_;
     DepthControlMode depthControlMode_ = SettingsStore::kDefaultDepthControlMode;
     bool strokeEncoderReversed_ = false;
     bool holdFeedbackActive_ = false;
@@ -77,6 +97,7 @@ class OssmControlScreen {
     void resetAcceleration();
     void setHoldFeedback(bool active);
     void setSpeedDimmed(bool dimmed);
+    static void refreshHeldActionLabel(HeldActionLabel& held);
     bool allowBoundaryPush(
         std::int64_t rawSteps, bool hasRange, bool crossesBoundary, std::uint32_t nowMs);
     static std::int64_t accelerate(

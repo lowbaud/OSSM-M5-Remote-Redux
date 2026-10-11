@@ -17,6 +17,7 @@ struct MenuItemView {
     // Tiles only.
     lv_obj_t* icon = nullptr;
     lv_obj_t* name = nullptr;
+    lv_obj_t* badge = nullptr;
     // Rows only: the value, or a level bar instead of it.
     lv_obj_t* value = nullptr;
     lv_obj_t* level = nullptr;
@@ -29,5 +30,7 @@ void createMenuRow(MenuItemView& view, lv_obj_t* list);
 void createMenuTile(MenuItemView& view, lv_obj_t* tileRow);
 void refreshMenuItemView(const MenuItemView& view);
 void setMenuItemViewSelected(const MenuItemView& view, bool selected);
+// Shows a short text in the top right corner of a tile, e.g. "L"; empty hides it.
+void setMenuTileBadge(const MenuItemView& view, const char* badge);
 
 }  // namespace m5_redux

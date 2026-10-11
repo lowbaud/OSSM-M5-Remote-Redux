@@ -67,6 +67,8 @@ class MenuController {
     std::size_t highlight(std::size_t level) const;
     // Highlighted row on the top page, or nullptr.
     MenuItem* highlightedItem() const;
+    // The highlighted row when it is one of the top page's tiles, otherwise nullptr.
+    MenuItem* highlightedTile() const;
 
   private:
     struct Frame {
