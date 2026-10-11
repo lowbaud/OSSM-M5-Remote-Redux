@@ -13,13 +13,6 @@ bool MenuCommandItem::showsChevron() const {
     return style_ == Style::OpensScreen;
 }
 
-const char* MenuCommandItem::selectLabel() const {
-    if (style_ == Style::OpensScreen) {
-        return "Open";
-    }
-    return style_ == Style::Destructive ? "Select" : "Run";
-}
-
 bool MenuCommandItem::destructive() const {
     return style_ == Style::Destructive;
 }
@@ -37,10 +30,6 @@ MenuItemKind MenuLinkItem::kind() const {
 
 bool MenuLinkItem::showsChevron() const {
     return true;
-}
-
-const char* MenuLinkItem::selectLabel() const {
-    return "Open";
 }
 
 MenuResult MenuLinkItem::activate() {
@@ -68,10 +57,6 @@ MenuItemKind MenuChoiceItem::kind() const {
 const char* MenuChoiceItem::valueText() const {
     const std::size_t option = displayedOption();
     return option < optionCount() ? optionName(option) : "";
-}
-
-const char* MenuChoiceItem::selectLabel() const {
-    return "Change";
 }
 
 bool MenuChoiceItem::adjust(std::int32_t steps) {

@@ -86,8 +86,6 @@ class MenuItem {
     // Symbol drawn on action tiles, e.g. LV_SYMBOL_PAUSE; empty for none.
     virtual const char* icon() const;
     void setIcon(const char* icon);
-    // Label of the select button while the row is highlighted.
-    virtual const char* selectLabel() const;
     // A page never starts on a destructive row, so a quick select cannot trigger it by accident.
     virtual bool destructive() const;
     // True while the action the row started is still running, e.g. a pause; views make it pulse.

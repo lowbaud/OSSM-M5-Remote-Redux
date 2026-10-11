@@ -46,10 +46,6 @@ void MenuItem::setIcon(const char* icon) {
     icon_ = icon;
 }
 
-const char* MenuItem::selectLabel() const {
-    return "Select";
-}
-
 bool MenuItem::destructive() const {
     return false;
 }

@@ -177,7 +177,6 @@ void test_command_rows_hand_their_command_to_the_host() {
 
     TEST_ASSERT_EQUAL_INT(static_cast<int>(MenuEvent::Type::Command), static_cast<int>(event.type));
     TEST_ASSERT_EQUAL_UINT(kDiagnosticsCommand, event.command);
-    TEST_ASSERT_EQUAL_STRING("Open", diagnostics.selectLabel());
     TEST_ASSERT_TRUE(diagnostics.showsChevron());
     TEST_ASSERT_FALSE(diagnostics.destructive());
     TEST_ASSERT_TRUE(menu.isOpen());
@@ -194,7 +193,6 @@ void test_tapping_a_row_highlights_and_selects_it() {
     page.addSource(source);
     MenuController menu;
     menu.open(page);
-    TEST_ASSERT_EQUAL_STRING("Select", disconnect.selectLabel());
     TEST_ASSERT_FALSE(disconnect.showsChevron());
 
     MenuInput input;
@@ -231,7 +229,6 @@ void test_link_opens_a_page_and_back_returns_to_the_same_row() {
     menu.update(stepInput(1));
     menu.takeChanges();
     TEST_ASSERT_TRUE(settingsLink.showsChevron());
-    TEST_ASSERT_EQUAL_STRING("Open", settingsLink.selectLabel());
 
     menu.update(selectInput());
     TEST_ASSERT_EQUAL_UINT(2, menu.depth());
@@ -570,8 +567,6 @@ void test_tiles_from_every_source_come_before_the_rows() {
     TEST_ASSERT_TRUE(&page.item(2) == &lock);
     TEST_ASSERT_TRUE(&page.item(3) == &depthMode);
     TEST_ASSERT_TRUE(&page.item(4) == &brightness);
-    TEST_ASSERT_EQUAL_STRING("Run", pause.selectLabel());
-    TEST_ASSERT_EQUAL_STRING("Change", depthMode.selectLabel());
 
     // The highlight starts on the first tile and moves on through the rows.
     TEST_ASSERT_TRUE(menu.highlightedItem() == &pause);

@@ -55,15 +55,14 @@ class OssmSettingsSource : public MenuSource {
     bool connected_ = false;
 };
 
-// An action tile that pulses and can read differently while its action runs, where selecting it
-// again ends the action: Pause reads Resume while paused.
+// An action tile that pulses while its action runs and then reads as what selecting it again
+// does: Pause reads Resume while paused.
 class OssmActionTile : public MenuCommandItem {
   public:
     struct Running {
         OssmAction action;
         const char* name;
         const char* icon;
-        const char* selectLabel;
     };
 
     OssmActionTile(
@@ -76,7 +75,6 @@ class OssmActionTile : public MenuCommandItem {
 
     const char* name() const override;
     const char* icon() const override;
-    const char* selectLabel() const override;
     bool running() const override;
 
   private:

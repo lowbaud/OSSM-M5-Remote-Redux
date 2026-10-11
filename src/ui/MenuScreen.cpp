@@ -141,8 +141,6 @@ void MenuScreen::refreshTiles() {
             refreshView(*view);
         }
     }
-    // A highlighted tile's select label can change with it, e.g. Ramp to End.
-    updateButtonBar();
 }
 
 void MenuScreen::setHeldTiles(const MenuItem* left, const MenuItem* right) {
@@ -335,7 +333,6 @@ void MenuScreen::updateButtonBar() {
     setStaticText(objects.menu_back_lbl, controller_.depth() > 1 ? "Back" : rootBackLabel_);
 
     const MenuItem* item = controller_.highlightedItem();
-    setStaticText(objects.menu_select_lbl, item != nullptr ? item->selectLabel() : "Select");
     if (item != nullptr) {
         lv_obj_remove_state(objects.menu_select_btn, LV_STATE_DISABLED);
     } else {

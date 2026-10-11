@@ -11,9 +11,9 @@ namespace m5_redux {
 class MenuCommandItem : public MenuItem {
   public:
     enum class Style : std::uint8_t {
-        // An action such as Pause; selects with "Run".
+        // An action such as Pause.
         Plain,
-        // Shows a chevron and selects with "Open".
+        // Shows a chevron.
         OpensScreen,
         // Acts at once, e.g. Disconnect, so a page never starts on it.
         Destructive,
@@ -24,7 +24,6 @@ class MenuCommandItem : public MenuItem {
 
     MenuItemKind kind() const override;
     bool showsChevron() const override;
-    const char* selectLabel() const override;
     bool destructive() const override;
     MenuResult activate() override;
 
@@ -40,7 +39,6 @@ class MenuLinkItem : public MenuItem {
 
     MenuItemKind kind() const override;
     bool showsChevron() const override;
-    const char* selectLabel() const override;
     MenuResult activate() override;
 
   private:
@@ -73,7 +71,6 @@ class MenuChoiceItem : public MenuItem {
 
     MenuItemKind kind() const override;
     const char* valueText() const override;
-    const char* selectLabel() const override;
     bool adjust(std::int32_t steps) override;
     MenuResult activate() override;
     MenuResult unhighlighted() override;
