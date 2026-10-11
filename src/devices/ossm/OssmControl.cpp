@@ -128,7 +128,9 @@ void OssmControl::togglePause(std::uint32_t nowMs) {
     }
 
     if (action_ == OssmAction::Paused) {
-        startRamp(OssmAction::Resuming, pausedSpeed_, kResumeDurationMs, nowMs);
+        const std::uint32_t durationMs =
+            kResumeFullSpeedMs * static_cast<std::uint32_t>(pausedSpeed_) / kMaximum;
+        startRamp(OssmAction::Resuming, pausedSpeed_, durationMs, nowMs);
         return;
     }
 
@@ -167,13 +169,16 @@ void OssmControl::pullOut(std::uint32_t nowMs) {
 
     endAction();
     const int stroke = client_.isOfficialFirmware() ? kOfficialPullOutStroke : minimumStroke();
+    const int startDepth = values_.depth;
     values_.stroke = stroke;
     values_.depth = kPullOutStart + stroke;
     client_.setMotionRange(values_.depth, values_.stroke);
 
+    // The deepest point travels furthest; already at or before the target, it stops at once.
+    const int travel = startDepth > values_.depth ? startDepth - values_.depth : 0;
     action_ = OssmAction::PullingOut;
     actionStartMs_ = nowMs;
-    actionDurationMs_ = kPullOutDurationMs;
+    actionDurationMs_ = kPullOutFullTravelMs * static_cast<std::uint32_t>(travel) / kMaximum;
     setSpeed(kPullOutSpeed);
 }
 

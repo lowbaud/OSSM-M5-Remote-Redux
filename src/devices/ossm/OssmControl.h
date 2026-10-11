@@ -64,9 +64,13 @@ class OssmControl {
   private:
     static constexpr int kMinimum = 0;
     static constexpr int kMaximum = 100;
-    static constexpr std::uint32_t kResumeDurationMs = 2000;
+    // How long resuming to full speed takes; slower speeds get the same share of it, so the speed
+    // always rises at the same rate.
+    static constexpr std::uint32_t kResumeFullSpeedMs = 3000;
     static constexpr int kPullOutSpeed = 15;
-    static constexpr std::uint32_t kPullOutDurationMs = 2000;
+    // How long a pull out over the whole rail takes; shorter ones get the same share of it as of
+    // the rail they travel.
+    static constexpr std::uint32_t kPullOutFullTravelMs = 3000;
     // Where a pull out leaves the range: just before the start of the rail.
     static constexpr int kPullOutStart = 2;
     // The official firmware does not come to a full stop on a collapsed range, so a pull out

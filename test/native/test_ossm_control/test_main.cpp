@@ -202,14 +202,17 @@ void test_pause_stops_and_resume_ramps_back_to_the_paused_speed() {
     assertSingleCommand(client.commands, CommandKind::Speed, 0);
     TEST_ASSERT_FALSE(control.update(5000));
 
+    // Speed 40 is 40% of full speed, so it takes 40% of the full 3 s.
     control.togglePause(10000);
     TEST_ASSERT_TRUE(control.action() == OssmAction::Resuming);
-    TEST_ASSERT_TRUE(control.update(11000));
+    TEST_ASSERT_TRUE(control.update(10600));
     TEST_ASSERT_EQUAL_INT(20, control.values().speed);
-    TEST_ASSERT_TRUE(control.update(12000));
+    TEST_ASSERT_TRUE(control.update(11199));
+    TEST_ASSERT_TRUE(control.action() == OssmAction::Resuming);
+    TEST_ASSERT_TRUE(control.update(11200));
     TEST_ASSERT_EQUAL_INT(40, control.values().speed);
     TEST_ASSERT_TRUE(control.action() == OssmAction::None);
-    TEST_ASSERT_FALSE(control.update(13000));
+    TEST_ASSERT_FALSE(control.update(11500));
 }
 
 void test_pause_needs_motion_and_pausing_while_resuming_keeps_the_paused_speed() {
@@ -221,8 +224,9 @@ void test_pause_needs_motion_and_pausing_while_resuming_keeps_the_paused_speed()
     control.apply({40, 0, 0, 0});
     control.togglePause(0);
     control.togglePause(1000);
-    control.update(2000);
-    control.togglePause(2000);
+    control.update(1400);
+    TEST_ASSERT_TRUE(control.action() == OssmAction::Resuming);
+    control.togglePause(1400);
     TEST_ASSERT_TRUE(control.action() == OssmAction::Paused);
     TEST_ASSERT_EQUAL_INT(40, control.pausedSpeed());
     TEST_ASSERT_EQUAL_INT(0, control.values().speed);
@@ -323,12 +327,29 @@ void test_pull_out_moves_to_the_start_ignores_input_and_then_stops() {
     TEST_ASSERT_TRUE(client.commands.empty());
     TEST_ASSERT_TRUE(control.action() == OssmAction::PullingOut);
 
-    TEST_ASSERT_FALSE(control.update(1999));
-    TEST_ASSERT_TRUE(control.update(2000));
+    // From depth 50 to 2 is 48% of the rail, so 48% of the full 3 s.
+    TEST_ASSERT_FALSE(control.update(1439));
+    TEST_ASSERT_TRUE(control.update(1440));
     TEST_ASSERT_TRUE(control.action() == OssmAction::None);
     TEST_ASSERT_EQUAL_INT(0, control.values().speed);
     TEST_ASSERT_EQUAL_INT(2, control.values().depth);
     assertSingleCommand(client.commands, CommandKind::Speed, 0);
+}
+
+void test_pull_out_time_follows_the_distance_to_travel() {
+    FakeOssmClient client;
+    client.collapsedRangeSupported = true;
+    OssmControl control(client);
+    control.apply({0, 0, 1000, 0});
+
+    control.pullOut(0);
+    TEST_ASSERT_FALSE(control.update(2939));
+    TEST_ASSERT_TRUE(control.update(2940));
+
+    // Already at the target, it stops at once.
+    control.pullOut(5000);
+    TEST_ASSERT_TRUE(control.update(5000));
+    TEST_ASSERT_TRUE(control.action() == OssmAction::None);
 }
 
 void test_official_firmware_pulls_out_to_a_short_stroke() {
@@ -340,6 +361,9 @@ void test_official_firmware_pulls_out_to_a_short_stroke() {
     control.pullOut(0);
     TEST_ASSERT_EQUAL_INT(7, control.values().depth);
     TEST_ASSERT_EQUAL_INT(5, control.values().stroke);
+    // The target counts too: from depth 10 to 7 is 3% of the rail.
+    TEST_ASSERT_FALSE(control.update(89));
+    TEST_ASSERT_TRUE(control.update(90));
 }
 
 void test_stop_and_a_refused_speed_end_the_running_action() {
@@ -393,6 +417,7 @@ int main() {
     RUN_TEST(test_ramp_toggles_off_and_the_speed_knob_takes_over);
     RUN_TEST(test_pause_during_a_ramp_keeps_the_speed_reached);
     RUN_TEST(test_pull_out_moves_to_the_start_ignores_input_and_then_stops);
+    RUN_TEST(test_pull_out_time_follows_the_distance_to_travel);
     RUN_TEST(test_official_firmware_pulls_out_to_a_short_stroke);
     RUN_TEST(test_stop_and_a_refused_speed_end_the_running_action);
     return UNITY_END();
