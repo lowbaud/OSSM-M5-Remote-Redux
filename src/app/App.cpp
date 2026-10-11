@@ -86,7 +86,7 @@ OssmSettingsSource ossmSettings(settingsStore, applySettings);
 RemoteSettingsSource remoteSettings(settingsStore, backlightController, applySettings);
 MenuPage settingsPage;
 OssmQuickActionsSource ossmQuickActions(settingsStore, ossmControl, applySettings);
-RemoteQuickActionsSource remoteQuickActions(remoteSettings, settingsPage);
+RemoteQuickActionsSource remoteQuickActions(settingsPage);
 MenuPage quickActionsPage;
 // The quick action tiles that holding the left or right button runs on the control screen.
 MenuItem* leftHeldAction = nullptr;

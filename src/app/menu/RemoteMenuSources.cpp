@@ -68,10 +68,6 @@ RemoteSettingsSource::RemoteSettingsSource(
           static_cast<MenuCommand>(AppMenuCommand::ShowDiagnostics),
           MenuCommandItem::Style::OpensScreen) {}
 
-MenuItem& RemoteSettingsSource::brightness() {
-    return brightness_;
-}
-
 void RemoteSettingsSource::addItems(MenuPage& page) {
     page.add(brightness_);
     page.add(idleDim_);
@@ -81,12 +77,10 @@ void RemoteSettingsSource::addItems(MenuPage& page) {
     page.add(diagnostics_);
 }
 
-RemoteQuickActionsSource::RemoteQuickActionsSource(
-    RemoteSettingsSource& settings, MenuPage& settingsPage)
-    : settings_(settings), settingsLink_("remote.settings", "Settings", settingsPage) {}
+RemoteQuickActionsSource::RemoteQuickActionsSource(MenuPage& settingsPage)
+    : settingsLink_("remote.settings", "Settings", settingsPage) {}
 
 void RemoteQuickActionsSource::addItems(MenuPage& page) {
-    page.add(settings_.brightness());
     page.add(settingsLink_);
 }
 

@@ -30,9 +30,6 @@ class RemoteSettingsSource : public MenuSource {
     RemoteSettingsSource(
         SettingsStore& settings, BacklightController& backlight, ApplySettingsFn applySettings);
 
-    // Also shown in the quick actions.
-    MenuItem& brightness();
-
     void addItems(MenuPage& page) override;
 
   private:
@@ -44,16 +41,15 @@ class RemoteSettingsSource : public MenuSource {
     MenuCommandItem diagnostics_;
 };
 
-// Quick actions of the remote itself: Brightness from the settings, and the link to the
-// settings, which comes last below every other quick action.
+// Quick actions of the remote itself: the link to the settings, which comes last below every
+// other quick action.
 class RemoteQuickActionsSource : public MenuSource {
   public:
-    RemoteQuickActionsSource(RemoteSettingsSource& settings, MenuPage& settingsPage);
+    explicit RemoteQuickActionsSource(MenuPage& settingsPage);
 
     void addItems(MenuPage& page) override;
 
   private:
-    RemoteSettingsSource& settings_;
     MenuLinkItem settingsLink_;
 };
 
