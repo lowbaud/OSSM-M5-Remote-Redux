@@ -58,12 +58,14 @@ class OssmControl {
     OssmAction action() const;
     // The speed a pause resumes at.
     int pausedSpeed() const;
+    // Stop has something to stop: the OSSM moves, or a quick action runs, e.g. a pause.
+    bool canStop() const;
 
   private:
     static constexpr int kMinimum = 0;
     static constexpr int kMaximum = 100;
     static constexpr std::uint32_t kResumeDurationMs = 2000;
-    static constexpr int kPullOutSpeed = 10;
+    static constexpr int kPullOutSpeed = 15;
     static constexpr std::uint32_t kPullOutDurationMs = 2000;
     // Where a pull out leaves the range: just before the start of the rail.
     static constexpr int kPullOutStart = 2;

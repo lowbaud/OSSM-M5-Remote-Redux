@@ -72,9 +72,11 @@ class OssmControlScreen {
     DepthControlMode depthControlMode_ = SettingsStore::kDefaultDepthControlMode;
     bool strokeEncoderReversed_ = false;
     bool holdFeedbackActive_ = false;
+    bool speedDimmed_ = false;
 
     void resetAcceleration();
     void setHoldFeedback(bool active);
+    void setSpeedDimmed(bool dimmed);
     bool allowBoundaryPush(
         std::int64_t rawSteps, bool hasRange, bool crossesBoundary, std::uint32_t nowMs);
     static std::int64_t accelerate(

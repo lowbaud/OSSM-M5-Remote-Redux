@@ -53,8 +53,8 @@ class OssmSettingsSource : public MenuSource {
     bool connected_ = false;
 };
 
-// An action tile that reads differently while its action runs, where selecting it again ends
-// the action: Pause reads Resume while paused.
+// An action tile that pulses and can read differently while its action runs, where selecting it
+// again ends the action: Pause reads Resume while paused.
 class OssmActionTile : public MenuCommandItem {
   public:
     struct Running {
@@ -75,12 +75,11 @@ class OssmActionTile : public MenuCommandItem {
     const char* name() const override;
     const char* icon() const override;
     const char* selectLabel() const override;
+    bool running() const override;
 
   private:
     const OssmControl& control_;
     Running running_;
-
-    bool isRunning() const;
 };
 
 // Action tiles while an OSSM is under control, and the settings of the Ramp tile.
@@ -93,7 +92,7 @@ class OssmQuickActionsSource : public MenuSource {
 
   private:
     OssmActionTile pause_;
-    MenuCommandItem pullOut_;
+    OssmActionTile pullOut_;
     // Switches the depth mode; the control screen shows which one is active.
     MenuCommandItem range_;
     OssmActionTile ramp_;

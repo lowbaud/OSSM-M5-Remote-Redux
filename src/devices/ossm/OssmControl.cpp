@@ -216,6 +216,10 @@ int OssmControl::pausedSpeed() const {
     return pausedSpeed_;
 }
 
+bool OssmControl::canStop() const {
+    return values_.speed > 0 || action_ != OssmAction::None;
+}
+
 // The OSSM can refuse a speed above 0, e.g. when it is not running a pattern; it stops then and
 // any running action ends.
 void OssmControl::setSpeed(int speed) {

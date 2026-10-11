@@ -143,18 +143,18 @@ OssmActionTile::OssmActionTile(
 }
 
 const char* OssmActionTile::name() const {
-    return isRunning() ? running_.name : MenuCommandItem::name();
+    return running() ? running_.name : MenuCommandItem::name();
 }
 
 const char* OssmActionTile::icon() const {
-    return isRunning() ? running_.icon : MenuCommandItem::icon();
+    return running() ? running_.icon : MenuCommandItem::icon();
 }
 
 const char* OssmActionTile::selectLabel() const {
-    return isRunning() ? running_.selectLabel : MenuCommandItem::selectLabel();
+    return running() ? running_.selectLabel : MenuCommandItem::selectLabel();
 }
 
-bool OssmActionTile::isRunning() const {
+bool OssmActionTile::running() const {
     return control_.action() == running_.action;
 }
 
@@ -167,7 +167,13 @@ OssmQuickActionsSource::OssmQuickActionsSource(
           AppMenuCommand::Pause,
           control,
           {OssmAction::Paused, "Resume", LV_SYMBOL_PLAY, "Resume"}),
-      pullOut_("ossm.pullout", "Pull out", static_cast<MenuCommand>(AppMenuCommand::PullOut)),
+      pullOut_(
+          "ossm.pullout",
+          "Pull out",
+          LV_SYMBOL_PREV,
+          AppMenuCommand::PullOut,
+          control,
+          {OssmAction::PullingOut, "Pull out", LV_SYMBOL_PREV, "Run"}),
       range_("ossm.range", "Range", static_cast<MenuCommand>(AppMenuCommand::SwitchDepthMode)),
       ramp_(
           "ossm.ramp",
@@ -178,7 +184,6 @@ OssmQuickActionsSource::OssmQuickActionsSource(
           {OssmAction::Ramping, "Ramping", LV_SYMBOL_UP, "End"}),
       rampIncrease_("ossm.rampby", "Ramp by", settings, kRampIncreaseSetting, applySettings),
       rampDuration_("ossm.ramptime", "Ramp time", settings, kRampDurationSetting, applySettings) {
-    pullOut_.setIcon(LV_SYMBOL_PREV);
     range_.setIcon(LV_SYMBOL_SHUFFLE);
 }
 

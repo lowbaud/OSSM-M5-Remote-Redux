@@ -82,7 +82,7 @@ OssmPatternsScreenAction OssmPatternsScreen::update(const RemoteInputEvents& eve
 }
 
 void OssmPatternsScreen::refresh() {
-    stopButtonFeedback_.setMotionActive(control_.values().speed > 0);
+    stopButtonFeedback_.setMotionActive(control_.canStop());
 }
 
 void OssmPatternsScreen::requestCancel() {

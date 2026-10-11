@@ -35,6 +35,8 @@ class MenuScreen {
     MenuEvent update(const RemoteInputEvents& events);
     void setStopAvailable(bool available);
     void setMotionActive(bool active);
+    // Shows a quick action that started or ended while the menu is open on its tile.
+    void refreshTiles();
     // Back and Select taps, also the tap beside an open popup; handled on the next update.
     void requestBack();
     void requestSelect();

@@ -5,6 +5,7 @@
 #include "menu/MenuItems.h"
 #include "ui/ListRowStyle.h"
 #include "ui/ThemeColors.h"
+#include "ui/ValueHighlight.h"
 
 namespace m5_redux {
 
@@ -117,11 +118,48 @@ void setHidden(lv_obj_t* object, bool hidden) {
     }
 }
 
+// Setting the same static text again would still redraw the label.
+void setStaticText(lv_obj_t* label, const char* text) {
+    if (lv_label_get_text(label) != text) {
+        lv_label_set_text_static(label, text);
+    }
+}
+
+// Fills the tile with the accent color at the peak of the pulse, from the background it has
+// highlighted or not. A style for a more specific state outranks a local style for the default
+// state, so the highlighted background gets a local style of its own; otherwise the highlight
+// would hide the pulse.
+void setTilePulse(void* object, std::int32_t strength) {
+    lv_obj_t* tile = static_cast<lv_obj_t*>(object);
+    const lv_color_t accent = themeColor(COLOR_ID_ACCENT);
+    const lv_opa_t mix = static_cast<lv_opa_t>(strength);
+    lv_obj_set_style_bg_color(
+        tile, lv_color_mix(accent, themeColor(COLOR_ID_SURFACE), mix), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(
+        tile, lv_color_mix(accent, themeColor(COLOR_ID_ROW_SELECTED), mix), LV_STATE_CHECKED);
+}
+
+void setTilePulsing(lv_obj_t* tile, bool pulsing) {
+    const bool pulsingNow = lv_anim_get(tile, setTilePulse) != nullptr;
+    if (pulsing == pulsingNow) {
+        return;
+    }
+    if (pulsing) {
+        startAccentPulse(tile, setTilePulse);
+        return;
+    }
+    lv_anim_delete(tile, setTilePulse);
+    lv_obj_remove_local_style_prop(tile, LV_STYLE_BG_COLOR, LV_PART_MAIN);
+    lv_obj_remove_local_style_prop(tile, LV_STYLE_BG_COLOR, LV_STATE_CHECKED);
+}
+
+// Also runs whenever a quick action starts or ends, so unchanged parts are left alone.
 void refreshTile(const MenuItemView& view) {
     const MenuItem& item = *view.item;
-    lv_label_set_text_static(view.name, item.name());
-    lv_label_set_text_static(view.icon, item.icon());
+    setStaticText(view.name, item.name());
+    setStaticText(view.icon, item.icon());
     setHidden(view.icon, item.icon()[0] == '\0');
+    setTilePulsing(view.root, item.running());
 }
 
 }  // namespace

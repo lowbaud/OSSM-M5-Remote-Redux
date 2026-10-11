@@ -16,7 +16,7 @@ constexpr std::uint32_t kHoldPingPauseMs = 500;
 constexpr std::int32_t kHoldPingWidth = 2;
 constexpr std::int32_t kHoldPingMaximumPad = 7;
 constexpr std::int32_t kHoldPingProgressEnd = 255;
-constexpr lv_opa_t kHeldSpeedOpacity = LV_OPA_40;
+constexpr lv_opa_t kDimmedSpeedOpacity = LV_OPA_40;
 
 int clampEndpoint(std::int64_t value, int minimum, int maximum) {
     if (value < minimum) {
@@ -284,15 +284,21 @@ std::int64_t OssmControlScreen::accelerate(
 
 void OssmControlScreen::refresh() {
     const OssmControlValues& values = control_.values();
-    lv_label_set_text_fmt(objects.ossm_control_speed_value_lbl, "%02d", values.speed);
+    // A pause keeps showing the speed it resumes at.
+    const bool paused = control_.action() == OssmAction::Paused;
+    lv_label_set_text_fmt(
+        objects.ossm_control_speed_value_lbl,
+        "%02d",
+        paused ? control_.pausedSpeed() : values.speed);
     lv_label_set_text_fmt(objects.ossm_control_sensation_value_lbl, "%02d", values.sensation);
     // Setting the same static text again would still redraw the label.
     const char* caption = speedCaption(control_.action());
     if (lv_label_get_text(objects.ossm_control_speed_lbl) != caption) {
         lv_label_set_text_static(objects.ossm_control_speed_lbl, caption);
     }
+    speedHighlight_.setPulsing(control_.action() != OssmAction::None);
 
-    stopButtonFeedback_.setMotionActive(values.speed > 0);
+    stopButtonFeedback_.setMotionActive(control_.canStop());
 
     const int strokeStart = values.depth - values.stroke;
     lv_label_set_text_static(
@@ -302,9 +308,25 @@ void OssmControlScreen::refresh() {
 
     // A collapsed range holds the machine in place even though the speed is set.
     setHoldFeedback(values.stroke == 0 && values.speed > 0);
+    // The speed is greyed out while it has no effect.
+    setSpeedDimmed(paused || holdFeedbackActive_);
 }
 
-// Pings the range knob and dims the speed, which has no effect while the range is collapsed.
+void OssmControlScreen::setSpeedDimmed(bool dimmed) {
+    if (dimmed == speedDimmed_) {
+        return;
+    }
+    speedDimmed_ = dimmed;
+
+    lv_obj_t* speedLabel = objects.ossm_control_speed_value_lbl;
+    if (dimmed) {
+        lv_obj_set_style_text_opa(speedLabel, kDimmedSpeedOpacity, LV_PART_MAIN);
+    } else {
+        lv_obj_remove_local_style_prop(speedLabel, LV_STYLE_TEXT_OPA, LV_PART_MAIN);
+    }
+}
+
+// Pings the range knob, which holds the machine in place while the range is collapsed.
 void OssmControlScreen::setHoldFeedback(bool active) {
     if (active == holdFeedbackActive_) {
         return;
@@ -312,9 +334,7 @@ void OssmControlScreen::setHoldFeedback(bool active) {
     holdFeedbackActive_ = active;
 
     lv_obj_t* slider = objects.ossm_control_motion_range_slider;
-    lv_obj_t* speedLabel = objects.ossm_control_speed_value_lbl;
     if (!active) {
-        lv_obj_remove_local_style_prop(speedLabel, LV_STYLE_TEXT_OPA, LV_PART_MAIN);
         lv_anim_delete(slider, setRangeKnobPing);
         lv_obj_remove_local_style_prop(slider, LV_STYLE_OUTLINE_WIDTH, LV_PART_KNOB);
         lv_obj_remove_local_style_prop(slider, LV_STYLE_OUTLINE_PAD, LV_PART_KNOB);
@@ -323,7 +343,6 @@ void OssmControlScreen::setHoldFeedback(bool active) {
         return;
     }
 
-    lv_obj_set_style_text_opa(speedLabel, kHeldSpeedOpacity, LV_PART_MAIN);
     lv_obj_set_style_outline_color(
         slider, lv_obj_get_style_bg_color(slider, LV_PART_KNOB), LV_PART_KNOB);
     lv_obj_set_style_outline_width(slider, kHoldPingWidth, LV_PART_KNOB);

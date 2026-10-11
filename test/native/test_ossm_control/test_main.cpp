@@ -311,9 +311,9 @@ void test_pull_out_moves_to_the_start_ignores_input_and_then_stops() {
     TEST_ASSERT_TRUE(control.action() == OssmAction::PullingOut);
     TEST_ASSERT_EQUAL_INT(2, control.values().depth);
     TEST_ASSERT_EQUAL_INT(0, control.values().stroke);
-    TEST_ASSERT_EQUAL_INT(10, control.values().speed);
+    TEST_ASSERT_EQUAL_INT(15, control.values().speed);
     assertSingleCommand(client.commands, CommandKind::Range, 2, 0);
-    assertSingleCommand(client.commands, CommandKind::Speed, 10);
+    assertSingleCommand(client.commands, CommandKind::Speed, 15);
 
     client.commands.clear();
     TEST_ASSERT_FALSE(control.apply({10, 10, 10, 10}));
@@ -345,11 +345,15 @@ void test_official_firmware_pulls_out_to_a_short_stroke() {
 void test_stop_and_a_refused_speed_end_the_running_action() {
     FakeOssmClient client;
     OssmControl control(client);
+    TEST_ASSERT_FALSE(control.canStop());
     control.apply({40, 0, 0, 0});
     control.togglePause(0);
+    // Stop still has a pause to end, although the speed is 0.
+    TEST_ASSERT_TRUE(control.canStop());
     control.stop();
     TEST_ASSERT_TRUE(control.action() == OssmAction::None);
     TEST_ASSERT_EQUAL_INT(0, control.pausedSpeed());
+    TEST_ASSERT_FALSE(control.canStop());
 
     control.pullOut(0);
     control.stop();

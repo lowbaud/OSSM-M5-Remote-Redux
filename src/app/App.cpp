@@ -240,7 +240,7 @@ void enterScreen(Screen screen, Screen previous) {
             ossmSettings.setConnected(connected);
             ossmSettings.setPatternCatalog(catalog);
             menuScreen.setStopAvailable(connected);
-            menuScreen.setMotionActive(ossmControl.values().speed > 0);
+            menuScreen.setMotionActive(ossmControl.canStop());
             if (previous == Screen::Diagnostics && menuScreen.isOpen()) {
                 menuScreen.resume();
             } else if (connected) {
@@ -252,7 +252,7 @@ void enterScreen(Screen screen, Screen previous) {
         }
         case Screen::Diagnostics:
             diagnosticsScreen.setStopAvailable(menuConnected());
-            diagnosticsScreen.setMotionActive(ossmControl.values().speed > 0);
+            diagnosticsScreen.setMotionActive(ossmControl.canStop());
             diagnosticsScreen.enter();
             break;
     }
@@ -318,15 +318,16 @@ void handleBootAction(BootScreenAction action) {
 
 // Shows motion the remote changed by itself, e.g. Stop or a ramp step, on the current screen.
 void refreshMotion() {
-    const bool moving = ossmControl.values().speed > 0;
+    const bool canStop = ossmControl.canStop();
     if (currentScreen == Screen::OssmControl) {
         ossmControlScreen.refresh();
     } else if (currentScreen == Screen::OssmPatterns) {
         ossmPatternsScreen.refresh();
     } else if (currentScreen == Screen::Menu) {
-        menuScreen.setMotionActive(moving);
+        menuScreen.setMotionActive(canStop);
+        menuScreen.refreshTiles();
     } else if (currentScreen == Screen::Diagnostics) {
-        diagnosticsScreen.setMotionActive(moving);
+        diagnosticsScreen.setMotionActive(canStop);
     }
 }
 

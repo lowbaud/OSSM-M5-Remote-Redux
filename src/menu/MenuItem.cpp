@@ -54,6 +54,10 @@ bool MenuItem::destructive() const {
     return false;
 }
 
+bool MenuItem::running() const {
+    return false;
+}
+
 bool MenuItem::adjust(std::int32_t) {
     return false;
 }

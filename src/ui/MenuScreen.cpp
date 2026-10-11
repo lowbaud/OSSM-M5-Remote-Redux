@@ -129,6 +129,22 @@ void MenuScreen::setMotionActive(bool active) {
     stopButtonFeedback_.setMotionActive(active);
 }
 
+void MenuScreen::refreshTiles() {
+    if (!controller_.isOpen()) {
+        return;
+    }
+
+    const MenuPage& page = controller_.page(baseLevel());
+    for (std::size_t index = 0; index < page.tileCount(); ++index) {
+        const MenuItemView* view = findView(page.item(index), true);
+        if (view != nullptr) {
+            refreshMenuItemView(*view);
+        }
+    }
+    // A highlighted tile's select label can change with it, e.g. Ramp to End.
+    updateButtonBar();
+}
+
 void MenuScreen::requestBack() {
     backTapped_ = true;
 }

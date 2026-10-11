@@ -90,6 +90,8 @@ class MenuItem {
     virtual const char* selectLabel() const;
     // A page never starts on a destructive row, so a quick select cannot trigger it by accident.
     virtual bool destructive() const;
+    // True while the action the row started is still running, e.g. a pause; views make it pulse.
+    virtual bool running() const;
     // Inner knob turns while the row is highlighted. Returns true when the row changed.
     virtual bool adjust(std::int32_t steps);
     virtual MenuResult activate();
