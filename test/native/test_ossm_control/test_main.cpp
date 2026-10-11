@@ -346,9 +346,12 @@ void test_pull_out_time_follows_the_distance_to_travel() {
     TEST_ASSERT_FALSE(control.update(2939));
     TEST_ASSERT_TRUE(control.update(2940));
 
-    // Already at the target, it stops at once.
+    // A range already at the target leaves the rod anywhere, so it takes the whole 3 s.
     control.pullOut(5000);
-    TEST_ASSERT_TRUE(control.update(5000));
+    TEST_ASSERT_TRUE(control.action() == OssmAction::PullingOut);
+    TEST_ASSERT_EQUAL_INT(15, control.values().speed);
+    TEST_ASSERT_FALSE(control.update(7999));
+    TEST_ASSERT_TRUE(control.update(8000));
     TEST_ASSERT_TRUE(control.action() == OssmAction::None);
 }
 

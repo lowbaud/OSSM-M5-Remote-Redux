@@ -174,8 +174,9 @@ void OssmControl::pullOut(std::uint32_t nowMs) {
     values_.depth = kPullOutStart + stroke;
     client_.setMotionRange(values_.depth, values_.stroke);
 
-    // The deepest point travels furthest; already at or before the target, it stops at once.
-    const int travel = startDepth > values_.depth ? startDepth - values_.depth : 0;
+    // The deepest point travels furthest. A range already at the target says nothing about where
+    // the rod is, e.g. after a stopped pull out, so that counts as the whole rail.
+    const int travel = startDepth > values_.depth ? startDepth - values_.depth : kMaximum;
     action_ = OssmAction::PullingOut;
     actionStartMs_ = nowMs;
     actionDurationMs_ = kPullOutFullTravelMs * static_cast<std::uint32_t>(travel) / kMaximum;
