@@ -281,12 +281,74 @@ main th {
   font-weight: 600;
 }
 
-.flasher__release-info--development {
-  color: var(--orange);
+.flasher__development-warning {
+  max-width: 55rem;
+  border: 2px solid var(--orange);
 }
 
-.flasher__development-warning {
-  border: 2px solid var(--orange);
+/* Matches the width of the build panel and the install cards. */
+.flasher__intro {
+  max-width: 55rem;
+}
+
+.flasher__build {
+  max-width: 55rem;
+  margin-block: 1.5rem 2rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid rgb(72 192 240 / 30%);
+  border-radius: 0.5rem;
+}
+
+.flasher__build > .flasher__control {
+  margin-block: 0 1rem;
+}
+
+.flasher__build > :last-child {
+  margin-bottom: 0;
+}
+
+.flasher__build-version {
+  color: rgb(220 226 236 / 70%);
+}
+
+.flasher__build-version--error {
+  color: var(--orange);
+  font-weight: 600;
+}
+
+.flasher__build-description {
+  margin-block: 0 1rem;
+  white-space: pre-line;
+}
+
+.flasher__build-changes-title {
+  margin-block: 0 0.5rem;
+  font-weight: 600;
+}
+
+.flasher__build summary {
+  margin-top: 0.5rem;
+  color: var(--blue);
+  cursor: pointer;
+}
+
+.flasher__build-changes {
+  margin-block: 0;
+  padding-left: 1.25rem;
+}
+
+details > .flasher__build-changes {
+  margin-top: 0.35rem;
+}
+
+.flasher__build-changes li + li {
+  margin-top: 0.35rem;
+}
+
+.flasher__commit {
+  margin-right: 0.35rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
 }
 
 .flasher__control {

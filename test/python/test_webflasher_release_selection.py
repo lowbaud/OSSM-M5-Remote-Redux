@@ -41,16 +41,10 @@ class WebflasherReleaseSelectionTests(unittest.TestCase):
     def test_official_selection_excludes_prereleases_and_drafts(self):
         self.assertEqual(select_release(self.releases, "release"), "v1.2.3")
 
-    def test_development_selection_uses_latest_matching_prerelease(self):
-        self.assertEqual(
-            select_release(self.releases, "development"),
-            "development-14-bbbbbbbb",
-        )
+    def test_official_selection_finds_nothing_among_prereleases(self):
+        prereleases = [self.releases[0], self.releases[3]]
 
-    def test_development_selection_ignores_unrelated_prereleases(self):
-        unrelated = [self.releases[3]]
-
-        self.assertIsNone(select_release(unrelated, "development"))
+        self.assertIsNone(select_release(prereleases, "release"))
 
 
 if __name__ == "__main__":

@@ -1,12 +1,12 @@
-"""Select official or development web-flasher releases from GitHub JSON."""
+"""Select the official web-flasher release from GitHub JSON.
+
+Development builds are picked per branch by development_builds.py.
+"""
 
 import argparse
 import json
 import sys
 from pathlib import Path
-
-
-DEVELOPMENT_TAG_PREFIX = "development-"
 
 
 def select_release(releases, channel):
@@ -15,16 +15,6 @@ def select_release(releases, channel):
             release
             for release in releases
             if not release.get("isDraft") and not release.get("isPrerelease")
-        ]
-    elif channel == "development":
-        candidates = [
-            release
-            for release in releases
-            if not release.get("isDraft")
-            and release.get("isPrerelease")
-            and str(release.get("tagName", "")).startswith(
-                DEVELOPMENT_TAG_PREFIX
-            )
         ]
     else:
         raise ValueError(f"Unknown release channel: {channel}")
@@ -45,7 +35,7 @@ def main():
     parser.add_argument("releases_file", type=Path)
     parser.add_argument(
         "--channel",
-        choices=("release", "development"),
+        choices=("release",),
         required=True,
     )
     parser.add_argument("--optional", action="store_true")
