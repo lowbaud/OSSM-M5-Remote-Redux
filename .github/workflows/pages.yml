@@ -1,20 +1,8 @@
 name: Update documentation and web flasher
 
+# Development firmware is published by publish-development.yml.
 on:
   workflow_dispatch:
-    inputs:
-      operation:
-        description: Documentation and firmware operation
-        required: true
-        default: Deploy documentation using published firmware
-        type: choice
-        options:
-          - Deploy documentation using published firmware
-          - Publish selected branch as development firmware
-      description:
-        description: Development build note shown in the web flasher (optional)
-        required: false
-        type: string
   release:
     types: [published]
 
@@ -32,20 +20,19 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
     runs-on: ubuntu-latest
     env:
-      DOCS_SOURCE: ${{ (github.event_name == 'release' || inputs.operation == 'Publish selected branch as development firmware') && '_documentation/docs' || 'docs' }}
+      DOCS_SOURCE: ${{ github.event_name == 'release' && '_documentation/docs' || 'docs' }}
 
     steps:
-      - name: Check that a branch was selected
-        if: inputs.operation == 'Publish selected branch as development firmware' && github.ref_type != 'branch'
+      - name: Show run parameters
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          echo "Development firmware is published per branch; select a branch, not $GITHUB_REF_NAME."
-          exit 1
+          echo "Event: $EVENT_NAME"
+          echo "Ref: $GITHUB_REF ($GITHUB_REF_TYPE) at $GITHUB_SHA"
+          echo "Site source: $DOCS_SOURCE"
 
       - name: Check out source
         uses: actions/checkout@v6
-        with:
-          # The development build lists the commits it adds to the default branch.
-          fetch-depth: ${{ inputs.operation == 'Publish selected branch as development firmware' && '0' || '1' }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -53,7 +40,7 @@ jobs:
           python-version: "3.11"
 
       - name: Cache PlatformIO downloads
-        if: github.event_name == 'release' || inputs.operation == 'Publish selected branch as development firmware'
+        if: github.event_name == 'release'
         uses: actions/cache@v4
         with:
           path: |
@@ -64,7 +51,7 @@ jobs:
             ${{ runner.os }}-pio-
 
       - name: Install PlatformIO
-        if: github.event_name == 'release' || inputs.operation == 'Publish selected branch as development firmware'
+        if: github.event_name == 'release'
         run: python -m pip install platformio==6.1.19
 
       - name: Verify release version
@@ -80,16 +67,12 @@ jobs:
           fi
 
       - name: Test release tooling
-        if: github.event_name == 'release' || inputs.operation == 'Publish selected branch as development firmware'
+        if: github.event_name == 'release'
         run: python -m unittest discover -s test/python -p "test_*.py"
 
       - name: Build official firmware
         if: github.event_name == 'release'
         run: python release_build.py
-
-      - name: Build development firmware
-        if: inputs.operation == 'Publish selected branch as development firmware'
-        run: python release_build.py --charge-current 500
 
       - name: Write official release information
         if: github.event_name == 'release'
@@ -100,32 +83,6 @@ jobs:
           --commit "$GITHUB_SHA"
           --channel release
           --timestamp "${{ github.event.release.published_at }}"
-
-      - name: Set development release identifiers
-        if: inputs.operation == 'Publish selected branch as development firmware'
-        shell: bash
-        run: |
-          short_commit="${GITHUB_SHA:0:8}"
-          development_tag="development-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}-${short_commit}"
-          echo "DEVELOPMENT_TAG=$development_tag" >> "$GITHUB_ENV"
-          echo "DEVELOPMENT_BUNDLE=web-flasher-${development_tag}.zip" >> "$GITHUB_ENV"
-
-      - name: Write development release information
-        if: inputs.operation == 'Publish selected branch as development firmware'
-        env:
-          DESCRIPTION: ${{ inputs.description }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        shell: bash
-        run: |
-          python scripts/write_release_info.py \
-            build/release/release-info.json \
-            --tag "$DEVELOPMENT_TAG" \
-            --commit "$GITHUB_SHA" \
-            --channel development \
-            --source-ref "$GITHUB_REF_NAME" \
-            --description "$DESCRIPTION" \
-            --changes-base "origin/$DEFAULT_BRANCH" \
-            --changes-label "$DEFAULT_BRANCH"
 
       - name: Create official release bundle
         if: github.event_name == 'release'
@@ -141,116 +98,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" "$RELEASE_BUNDLE" --clobber
 
-      - name: Create development release bundle
-        if: inputs.operation == 'Publish selected branch as development firmware'
-        shell: bash
-        run: (cd build/release && zip -r "../../$DEVELOPMENT_BUNDLE" .)
-
-      - name: Publish development prerelease
-        if: inputs.operation == 'Publish selected branch as development firmware'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          DESCRIPTION: ${{ inputs.description }}
-        shell: bash
-        run: |
-          notes="Development firmware built from $GITHUB_REF_NAME at $GITHUB_SHA."
-          if [ -n "$DESCRIPTION" ]; then
-            notes="$DESCRIPTION"$'\n\n'"$notes"
-          fi
-
-          # development_builds.py reads the branch back from this title.
-          gh release create "$DEVELOPMENT_TAG" "$DEVELOPMENT_BUNDLE" \
-            --target "$GITHUB_SHA" \
-            --title "Development build from $GITHUB_REF_NAME ($DEVELOPMENT_TAG)" \
-            --notes "$notes" \
-            --prerelease \
-            --latest=false
-
       - name: Check out default-branch documentation
-        if: github.event_name == 'release' || inputs.operation == 'Publish selected branch as development firmware'
+        if: github.event_name == 'release'
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.repository.default_branch }}
           path: _documentation
 
-      - name: Find published firmware releases
+      - name: Add published firmware to site source
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          gh release list \
-            --exclude-drafts \
-            --exclude-pre-releases \
-            --limit 1 \
-            --json tagName,isDraft,isPrerelease,publishedAt \
-            > _official_releases.json
-
-          gh release list \
-            --exclude-drafts \
-            --limit 1000 \
-            --json tagName,name,isDraft,isPrerelease,publishedAt \
-            > _releases.json
-
-          gh api "repos/$GITHUB_REPOSITORY/branches" \
-            --paginate \
-            --jq '.[].name' \
-            > _branches.txt
-
-          official_tag="$(python scripts/select_webflasher_release.py \
-            _official_releases.json --channel release --optional)"
-          python scripts/development_builds.py select \
-            _releases.json _branches.txt \
-            --stale _stale_development_builds.txt \
-            > _development_builds.tsv
-
-          echo "OFFICIAL_TAG=$official_tag" >> "$GITHUB_ENV"
-
-      - name: Add official firmware to site source
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          if [ -z "$OFFICIAL_TAG" ]; then
-            echo "No published official firmware was found; skipping it."
-            exit 0
-          fi
-
-          release_bundle="web-flasher-${OFFICIAL_TAG}.zip"
-          mkdir -p _release/official "$DOCS_SOURCE/flash"
-          gh release download "$OFFICIAL_TAG" \
-            --pattern "$release_bundle" \
-            --dir _release/official
-          unzip "_release/official/$release_bundle" -d "$DOCS_SOURCE/flash"
-
-      - name: Add development firmware to site source
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          # Each branch's newest build goes into its own folder; builds.json lists them.
-          mkdir -p _release/development "$DOCS_SOURCE/flash/development"
-          while IFS=$'\t' read -r tag folder; do
-            development_bundle="web-flasher-${tag}.zip"
-            gh release download "$tag" \
-              --pattern "$development_bundle" \
-              --dir _release/development
-            unzip "_release/development/$development_bundle" \
-              -d "$DOCS_SOURCE/flash/development/$folder"
-          done < _development_builds.tsv
-
-          python scripts/development_builds.py index "$DOCS_SOURCE/flash/development"
-
-      - name: Delete superseded development firmware
-        if: inputs.operation == 'Publish selected branch as development firmware'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          # Keeps only the newest build of each branch that still exists.
-          while read -r tag; do
-            echo "Deleting $tag"
-            gh release delete "$tag" --cleanup-tag --yes
-          done < _stale_development_builds.txt
+        run: bash scripts/add_flasher_firmware.sh "$DOCS_SOURCE"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
