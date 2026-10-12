@@ -1,0 +1,168 @@
+name: Publish development firmware
+
+# Builds the branch selected under "Use workflow from" and adds it to the
+# development web flasher. Each branch keeps only its newest build.
+on:
+  workflow_dispatch:
+    inputs:
+      description:
+        description: Development build note shown in the web flasher (optional)
+        required: false
+        type: string
+
+# Shared with pages.yml so site deployments never overlap.
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DOCS_SOURCE: _documentation/docs
+
+    steps:
+      - name: Show run parameters
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUTS: ${{ toJSON(inputs) }}
+        run: |
+          echo "Event: $EVENT_NAME"
+          echo "Ref: $GITHUB_REF ($GITHUB_REF_TYPE) at $GITHUB_SHA"
+          echo "Inputs: $INPUTS"
+
+      - name: Check that a branch was selected
+        if: github.ref_type != 'branch'
+        run: |
+          echo "Development firmware is published per branch; select a branch, not $GITHUB_REF_NAME."
+          exit 1
+
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          # The development build lists the commits it adds to the default branch.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Cache PlatformIO downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+
+      - name: Install PlatformIO
+        run: python -m pip install platformio==6.1.19
+
+      - name: Test release tooling
+        run: python -m unittest discover -s test/python -p "test_*.py"
+
+      - name: Build development firmware
+        run: python release_build.py --charge-current 500
+
+      - name: Set development release identifiers
+        shell: bash
+        run: |
+          short_commit="${GITHUB_SHA:0:8}"
+          development_tag="development-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}-${short_commit}"
+          echo "DEVELOPMENT_TAG=$development_tag" >> "$GITHUB_ENV"
+          echo "DEVELOPMENT_BUNDLE=web-flasher-${development_tag}.zip" >> "$GITHUB_ENV"
+
+      - name: Write development release information
+        env:
+          DESCRIPTION: ${{ inputs.description }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          python scripts/write_release_info.py \
+            build/release/release-info.json \
+            --tag "$DEVELOPMENT_TAG" \
+            --commit "$GITHUB_SHA" \
+            --channel development \
+            --source-ref "$GITHUB_REF_NAME" \
+            --description "$DESCRIPTION" \
+            --changes-base "origin/$DEFAULT_BRANCH" \
+            --changes-label "$DEFAULT_BRANCH"
+
+      - name: Create development release bundle
+        shell: bash
+        run: (cd build/release && zip -r "../../$DEVELOPMENT_BUNDLE" .)
+
+      - name: Publish development prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DESCRIPTION: ${{ inputs.description }}
+        shell: bash
+        run: |
+          notes="Development firmware built from $GITHUB_REF_NAME at $GITHUB_SHA."
+          if [ -n "$DESCRIPTION" ]; then
+            notes="$DESCRIPTION"$'\n\n'"$notes"
+          fi
+
+          # development_builds.py reads the branch back from this title.
+          gh release create "$DEVELOPMENT_TAG" "$DEVELOPMENT_BUNDLE" \
+            --target "$GITHUB_SHA" \
+            --title "Development build from $GITHUB_REF_NAME ($DEVELOPMENT_TAG)" \
+            --notes "$notes" \
+            --prerelease \
+            --latest=false
+
+      - name: Check out default-branch documentation
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: _documentation
+
+      - name: Add published firmware to site source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/add_flasher_firmware.sh "$DOCS_SOURCE"
+
+      - name: Delete superseded development firmware
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          # Keeps only the newest build of each branch that still exists.
+          while read -r tag; do
+            echo "Deleting $tag"
+            gh release delete "$tag" --cleanup-tag --yes
+          done < _stale_development_builds.txt
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build site with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./${{ env.DOCS_SOURCE }}
+          destination: ./_site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
