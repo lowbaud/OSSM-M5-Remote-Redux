@@ -14,8 +14,11 @@ MAX_LISTED_CHANGES = 20
 
 
 def load_changes(project_dir, base):
-    """Return the commits since base, newest first, and how many there are."""
-    revisions = f"{base}..HEAD"
+    """Return the commits since base, newest first, and how many there are.
+
+    Commits that were cherry-picked into base are left out.
+    """
+    revisions = ["--cherry-pick", "--right-only", f"{base}...HEAD"]
 
     def git(*args):
         return subprocess.run(
@@ -27,14 +30,14 @@ def load_changes(project_dir, base):
             timeout=10,
         ).stdout
 
-    count = int(git("rev-list", "--count", "--no-merges", revisions))
+    count = int(git("rev-list", "--count", "--no-merges", *revisions))
     log = git(
         "log",
         "--no-merges",
         f"--max-count={MAX_LISTED_CHANGES}",
         "--abbrev=8",
         "--format=%h%x09%s",
-        revisions,
+        *revisions,
     )
     changes = []
     for line in log.splitlines():
