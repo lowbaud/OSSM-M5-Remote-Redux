@@ -44,6 +44,42 @@ class ReleaseInfoTests(unittest.TestCase):
         self.assertEqual(release_info["sourceRef"], "feature/test-build")
         self.assertEqual(release_info["commit"], "a" * 40)
 
+    def test_development_release_includes_description_and_changes(self):
+        changes = [{"commit": "aaaaaaaa", "subject": "Add held quick actions"}]
+        release_info = create_release_info(
+            metadata=self.metadata,
+            build_metadata=self.build_metadata,
+            tag="development-12-aaaaaaaa",
+            commit="a" * 40,
+            channel="development",
+            timestamp="2026-07-30T10:00:00Z",
+            source_ref="feature/test-build",
+            description="  Try holding the side buttons.\n",
+            changes=changes,
+            change_count=25,
+            changes_base="master",
+        )
+
+        self.assertEqual(release_info["description"], "Try holding the side buttons.")
+        self.assertEqual(release_info["changes"], changes)
+        self.assertEqual(release_info["changeCount"], 25)
+        self.assertEqual(release_info["changesBase"], "master")
+
+    def test_blank_description_and_missing_base_are_omitted(self):
+        release_info = create_release_info(
+            metadata=self.metadata,
+            build_metadata=self.build_metadata,
+            tag="development-12-aaaaaaaa",
+            commit="a" * 40,
+            channel="development",
+            timestamp="2026-07-30T10:00:00Z",
+            source_ref="develop",
+            description="   ",
+        )
+
+        self.assertNotIn("description", release_info)
+        self.assertNotIn("changes", release_info)
+
     def test_official_release_omits_missing_source_ref(self):
         release_info = create_release_info(
             metadata=self.metadata,

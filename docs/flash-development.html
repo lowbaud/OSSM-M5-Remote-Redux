@@ -18,19 +18,33 @@ permalink: /flash/development/
   </p>
 </div>
 
-<p
-  id="release-info"
-  class="flasher__release-info flasher__release-info--development"
-  role="status"
->
-  Loading development firmware information...
+<p class="flasher__intro">
+  Each branch offers its latest published development build with a fixed
+  500 mA battery charge current. The flasher automatically detects whether the
+  connected OSSM M5 Remote is Core2-based or CoreS3-based.
 </p>
 
-<p>
-  This flasher uses the latest published development build with a fixed 500 mA
-  battery charge current. It automatically detects whether the connected OSSM
-  M5 Remote is Core2-based or CoreS3-based.
-</p>
+<section class="flasher__build" aria-label="Selected development build">
+  <div class="flasher__control">
+    <label for="development-build">Branch:</label>
+    <select id="development-build" disabled>
+      <option>Loading...</option>
+    </select>
+    <span id="release-info" class="flasher__build-version" role="status">
+      Loading development firmware information...
+    </span>
+  </div>
+
+  <p id="build-description" class="flasher__build-description" hidden></p>
+  <div id="build-changes" hidden>
+    <p id="build-changes-title" class="flasher__build-changes-title"></p>
+    <ul id="build-changes-list" class="flasher__build-changes"></ul>
+    <details id="build-changes-more" hidden>
+      <summary>Show more</summary>
+      <ul id="build-changes-more-list" class="flasher__build-changes"></ul>
+    </details>
+  </div>
+</section>
 
 <div class="flasher__actions">
   <section class="flasher__card flasher__card--full">
@@ -40,10 +54,7 @@ permalink: /flash/development/
     </p>
     <p><strong>Erases saved devices and settings.</strong></p>
 
-    <esp-web-install-button
-      id="factory-install-button"
-      manifest="{{ '/flash/development/manifest_factory_500mA.json' | relative_url }}"
-    >
+    <esp-web-install-button id="factory-install-button">
       <button id="factory-firmware" class="flasher__button" slot="activate" disabled>
         Install development build
       </button>
@@ -60,6 +71,10 @@ permalink: /flash/development/
   <section class="flasher__card">
     <h2>Update Redux</h2>
     <p>Keeps saved devices and settings.</p>
+    <p>
+      Saved settings can differ between branches. If something seems off after
+      switching, use Full install.
+    </p>
 
     <p>During installation, leave <strong>Erase device</strong> unchecked.</p>
 
@@ -69,10 +84,7 @@ permalink: /flash/development/
         <span>This remote already runs Redux</span>
       </label>
 
-      <esp-web-install-button
-        id="update-install-button"
-        manifest="{{ '/flash/development/manifest_update_500mA.json' | relative_url }}"
-      >
+      <esp-web-install-button id="update-install-button">
         <button id="update-firmware" class="flasher__button" slot="activate" disabled>
           Update to development build
         </button>
@@ -123,51 +135,146 @@ permalink: /flash/development/
   const flasherBaseUrl = "{{ '/flash/development/' | relative_url }}";
   const updateFirmware = document.querySelector("#update-firmware");
   const factoryFirmware = document.querySelector("#factory-firmware");
+  const factoryInstallButton = document.querySelector("#factory-install-button");
+  const updateInstallButton = document.querySelector("#update-install-button");
   const reduxInstalled = document.querySelector("#redux-installed");
+  const buildSelect = document.querySelector("#development-build");
   const releaseInfo = document.querySelector("#release-info");
+  const commitBaseUrl = "{{ site.repository_url }}/commit/";
+  const buildDescription = document.querySelector("#build-description");
+  const buildChanges = document.querySelector("#build-changes");
+  const buildChangesTitle = document.querySelector("#build-changes-title");
+  const buildChangesList = document.querySelector("#build-changes-list");
+  const buildChangesMore = document.querySelector("#build-changes-more");
+  const buildChangesMoreList = document.querySelector("#build-changes-more-list");
+  // The newest commits show right away; the rest fold away.
+  const visibleChangeCount = 3;
+  let builds = [];
   let releaseAvailable = false;
 
   function updateButtonAvailability() {
     updateFirmware.disabled = !releaseAvailable || !reduxInstalled.checked;
+    factoryFirmware.disabled = !releaseAvailable;
   }
 
-  async function loadReleaseInfo() {
+  function isComplete(build) {
+    return (
+      build.path &&
+      build.version &&
+      build.buildVersion &&
+      build.commit &&
+      build.channel === "development" &&
+      build.timestamp &&
+      build.sourceRef
+    );
+  }
+
+  function setManifest(installButton, manifestUrl) {
+    installButton.manifest = manifestUrl;
+    installButton.setAttribute("manifest", manifestUrl);
+  }
+
+  function showChanges(build) {
+    const changes = Array.isArray(build.changes) ? build.changes : [];
+    buildChangesList.replaceChildren();
+    buildChangesMoreList.replaceChildren();
+    buildChangesMore.open = false;
+    if (!build.changesBase || changes.length === 0) {
+      buildChanges.hidden = true;
+      return;
+    }
+
+    changes.forEach((change, index) => {
+      const item = document.createElement("li");
+      const commit = document.createElement("a");
+      commit.href = `${commitBaseUrl}${encodeURIComponent(change.commit)}`;
+      commit.className = "flasher__commit";
+      commit.textContent = change.commit;
+      item.append(commit, ` ${change.subject}`);
+      (index < visibleChangeCount ? buildChangesList : buildChangesMoreList).append(item);
+    });
+
+    const count = Number(build.changeCount) || changes.length;
+    // The changes are counted against the default branch, which holds the releases.
+    const changesText = count === 1 ? "change" : "changes";
+    buildChangesTitle.textContent =
+      `${count} ${changesText} since the last release, newest first:`;
+    if (count > changes.length) {
+      const older = document.createElement("li");
+      older.textContent = `and ${count - changes.length} older`;
+      buildChangesMoreList.append(older);
+    }
+
+    const hiddenCount = count - Math.min(changes.length, visibleChangeCount);
+    buildChangesMore.hidden = hiddenCount === 0;
+    buildChanges.hidden = false;
+  }
+
+  function showBuild(build) {
+    const buildUrl = `${flasherBaseUrl}${build.path}/`;
+    setManifest(factoryInstallButton, `${buildUrl}manifest_factory_500mA.json`);
+    setManifest(updateInstallButton, `${buildUrl}manifest_update_500mA.json`);
+
+    const date = build.timestamp.slice(0, 10);
+    releaseInfo.textContent = `${build.buildVersion} \u00b7 built ${date}`;
+
+    buildDescription.textContent = build.description || "";
+    buildDescription.hidden = !build.description;
+    showChanges(build);
+
+    releaseAvailable = true;
+    updateButtonAvailability();
+  }
+
+  function selectBuild(index) {
+    const build = builds[index];
+    const url = new URL(window.location.href);
+    url.searchParams.set("branch", build.sourceRef);
+    window.history.replaceState(null, "", url);
+    showBuild(build);
+  }
+
+  async function loadBuilds() {
     try {
-      const response = await fetch(`${flasherBaseUrl}release-info.json`, {
+      const response = await fetch(`${flasherBaseUrl}builds.json`, {
         cache: "no-store",
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      const release = await response.json();
-      if (
-        !release.version ||
-        !release.buildVersion ||
-        !release.commit ||
-        release.channel !== "development" ||
-        !release.timestamp ||
-        !release.sourceRef
-      ) {
-        throw new Error("Incomplete development release information");
+      const index = await response.json();
+      builds = (Array.isArray(index.builds) ? index.builds : []).filter(isComplete);
+      if (builds.length === 0) {
+        throw new Error("No development builds are published");
       }
 
-      const date = release.timestamp.slice(0, 10);
-      const shortCommit = release.commit.slice(0, 8);
-      releaseInfo.textContent =
-        `DEVELOPMENT ${release.buildVersion} \u2014 ${release.sourceRef} ` +
-        `(${shortCommit}) \u2014 built ${date}`;
-      releaseAvailable = true;
-      updateButtonAvailability();
-      factoryFirmware.disabled = false;
+      buildSelect.replaceChildren(
+        ...builds.map((build, buildIndex) => {
+          const option = document.createElement("option");
+          option.value = String(buildIndex);
+          option.textContent = build.sourceRef;
+          return option;
+        })
+      );
+
+      // The index lists the default branch first.
+      const requested = new URLSearchParams(window.location.search).get("branch");
+      const requestedIndex = builds.findIndex((build) => build.sourceRef === requested);
+      buildSelect.value = String(Math.max(requestedIndex, 0));
+      buildSelect.disabled = builds.length < 2;
+      showBuild(builds[Number(buildSelect.value)]);
     } catch (error) {
+      buildSelect.replaceChildren(new Option("None available"));
       releaseInfo.textContent =
         "Development firmware is unavailable. Flashing is disabled.";
+      releaseInfo.classList.add("flasher__build-version--error");
       console.error("Could not load development firmware information:", error);
     }
   }
 
+  buildSelect.addEventListener("change", () => selectBuild(Number(buildSelect.value)));
   reduxInstalled.addEventListener("change", updateButtonAvailability);
 
-  loadReleaseInfo();
+  loadBuilds();
 </script>
